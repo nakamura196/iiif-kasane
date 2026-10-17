@@ -77,7 +77,7 @@ export const NEWS: NewsItem[] = [
       en: 'When a story is open, a thin strip of the whole scroll along the top shows where you are. Moving between scenes glides sideways, and the commentary appears on a card over the image. Press Play to step through the scenes automatically.',
     },
     action: { href: hrefOfUseCase('cma-fukutomi-story') },
-    video: { ja: '2woP78hHCs8', en: '2T5SDTOdcMg' },
+    video: { ja: 'Na6Ta3zouM4', en: '2T5SDTOdcMg' },
     usecases: ['cma-fukutomi-story'],
   },
   {
