@@ -254,6 +254,7 @@
       "checked": "確認済み"
     },
     "back": "サンプルの一覧へ",
+    "playClip": "この場面を再生（{time} から）",
     "copyLink": "リンクをコピー",
     "copied": "コピーしました",
     "details": "詳しく見る",

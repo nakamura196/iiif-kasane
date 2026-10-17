@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { buttonClass } from '@nakamura196/react-ui';
 import { Link } from '@/i18n/routing';
@@ -15,6 +16,8 @@ const linkClass = 'text-[var(--ds-primary)] hover:underline';
 export default function RecipeDetailContent({ id }: { id: string }) {
   const t = useTranslations('Samples');
   const locale = useLocale() === 'en' ? 'en' : 'ja';
+  // 押されるまで YouTube は読み込まない（開いただけでは YouTube に閲覧の情報が渡らない）
+  const [playing, setPlaying] = useState(false);
   const r = recipeById(id);
   if (!r) return null;
 
@@ -48,12 +51,29 @@ export default function RecipeDetailContent({ id }: { id: string }) {
           </p>
         </header>
 
-        {clip && (
+        {clip && !playing && (
+          <button
+            type="button"
+            onClick={() => setPlaying(true)}
+            className="flex aspect-video w-full flex-col items-center justify-center gap-3 rounded-xl border border-[var(--ds-border)] bg-black text-white shadow-md hover:bg-neutral-900"
+          >
+            <span
+              aria-hidden="true"
+              className="flex h-16 w-16 items-center justify-center rounded-full bg-white/15 text-3xl"
+            >
+              ▶
+            </span>
+            <span className="text-sm">
+              {t('playClip', { time: `${Math.floor(clip.start / 60)}:${String(clip.start % 60).padStart(2, '0')}` })}
+            </span>
+          </button>
+        )}
+        {clip && playing && (
           // 紹介動画（全レシピを通した 1 本）のうち、このレシピの場面だけを再生する
           <div className="w-full overflow-hidden rounded-xl border border-[var(--ds-border)] bg-black shadow-md">
             <iframe
               className="aspect-video w-full"
-              src={`https://www.youtube.com/embed/${clip.videoId}?start=${clip.start}${clip.end ? `&end=${clip.end}` : ''}`}
+              src={`https://www.youtube.com/embed/${clip.videoId}?autoplay=1&start=${clip.start}${clip.end ? `&end=${clip.end}` : ''}`}
               title={`${r.id} ${r.title[locale]}`}
               referrerPolicy="strict-origin-when-cross-origin"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"

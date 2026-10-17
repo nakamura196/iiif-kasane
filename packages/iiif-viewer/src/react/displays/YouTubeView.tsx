@@ -162,8 +162,9 @@ export default function YouTubeView({ videoId, start = 0, tracks = [], mediaRef,
       .then((YT) => {
         if (cancelled) return;
         player = new YT.Player(target, {
-          // youtube-nocookie.com を host にすると、2026-10 時点ではどの動画もエラー 150（埋め込み不可）になる。
-          // YouTube の公式の見本動画でも同じなので、こちらの動画の設定ではなく YouTube 側の挙動
+          // 2026-10-16 に youtube-nocookie.com だけが、YouTube の公式の見本動画を含めてエラー 150（埋め込み不可）を返した。
+          // youtube.com では再生できた。翌日には両方とも再生できたので、YouTube 側の一時的な現象とみられる。
+          // 読み込みはどちらも www.youtube.com/iframe_api からなので、nocookie にしてもプライバシーの得は小さい
           host: 'https://www.youtube.com',
           videoId,
           width: '100%',

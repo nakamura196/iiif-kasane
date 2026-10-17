@@ -254,6 +254,7 @@
       "checked": "Checked"
     },
     "back": "Back to all samples",
+    "playClip": "Play this scene (from {time})",
     "copyLink": "Copy link",
     "copied": "Copied",
     "details": "Details",
