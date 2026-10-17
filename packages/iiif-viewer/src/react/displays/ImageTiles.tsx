@@ -100,7 +100,7 @@ export default function ImageLayerView({
   /** 0 to 1 (the Layers tab). */
   opacity?: number;
   onFailed?: () => void;
-  /** The image (the base image with a service) was read: clears an earlier failure, e.g. before signing in. */
+  /** The image (the base image or one of its tiles) was read: clears an earlier failure, e.g. before signing in. */
   onLoaded?: () => void;
 }) {
   const t = useTranslations('Viewer');
@@ -273,6 +273,8 @@ export default function ImageLayerView({
             width: pct(tile.w / region.w),
             height: pct(tile.h / region.h),
           }}
+          // a tile drawn means the image is there, even if the small base image failed
+          onLoad={onLoaded}
           onError={(e) => {
             e.currentTarget.style.display = 'none';
           }}
