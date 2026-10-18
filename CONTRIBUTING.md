@@ -58,7 +58,7 @@ How to add a feature (where files go) is described in [packages/iiif-viewer/EXTE
 3. Write the title and description in English. Explain what changes for users, then how it is implemented.
 4. Add or update tests where it makes sense.
 5. For user-visible changes, add the text in both English and Japanese (`src/messages/` and the bilingual entries in `src/lib/`). If you cannot write Japanese, say so in the pull request and the maintainer will add it.
-6. If you add a new feature, say in the description whether it should be added to the use cases (`src/lib/usecases.ts`), the news (`src/lib/news.ts`) or the samples (`src/lib/samples.ts`), and why.
+6. If you add a new feature, say in the description whether it should be added to the use cases (`src/lib/usecases.ts`), the news (one file in `content/news/`) or the samples (`src/lib/samples.ts`), and why.
 
 ## Commit messages
 

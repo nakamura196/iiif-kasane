@@ -17,7 +17,7 @@ export default function HomeContent() {
   const tNews = useTranslations('News');
   const locale = useLocale();
 
-  // お知らせは src/lib/news.ts。トップには新しいものから NEWS_ON_HOME 件
+  // お知らせは content/news/<id>.md（src/lib/news.ts が読む）。トップには新しいものから NEWS_ON_HOME 件
   const lang = locale === 'en' ? 'en' : 'ja';
   const newsItems = NEWS.slice(0, NEWS_ON_HOME).map((n) => ({
     date: n.date,

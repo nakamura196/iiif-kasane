@@ -7,6 +7,11 @@
   ],
   "scripts": {
     "gen": "node scripts/gen-registries.mjs",
+    "news": "node scripts/build-news.mjs",
+    "predev": "node scripts/build-news.mjs",
+    "prebuild": "node scripts/build-news.mjs",
+    "pretest": "node scripts/build-news.mjs",
+    "prelint": "node scripts/build-news.mjs",
     "dev": "node scripts/copy-maplibre-worker.mjs && next dev -p 3838",
     "build:element": "npm run build:element -w @nakamura196/iiif-viewer",
     "build": "node scripts/copy-maplibre-worker.mjs && npm run build:element && next build && node scripts/copy-element.mjs",
