@@ -7,7 +7,7 @@
 // IIIF Image API も Presentation API も v2/v3 の両方を相手にする。
 
 /** 末尾の /info.json や / を落として image service の base id にそろえる */
-import { t } from "./i18n.js";
+import { t, getLang } from "./i18n.js";
 
 // 外部サーバを待つ上限。応答しないサーバ（接続も拒否もしない）でも、ここで打ち切って
 // 「読み込めません」を出す。打ち切らないとブラウザがあきらめるまで数分、黒い画面のままになる。
@@ -31,15 +31,23 @@ export function imageServiceBase(idOrInfo) {
   return idOrInfo.replace(/\/info\.json$/i, "").replace(/\/$/, "");
 }
 
-/** 多言語ラベル (v3 の {en:[...]}) や v2 の文字列/配列をプレーン文字列に */
-export function plainLabel(label) {
+/**
+ * 多言語ラベル (v3 の {en:[...]}) や v2 の文字列/配列をプレーン文字列に。
+ * 言語マップは、ページの言語 → none → en → 最初の言語、の順に選ぶ
+ * (packages/iiif-viewer の labelIn と同じ順)。locale を省略するとページの言語。
+ */
+export function plainLabel(label, locale = getLang()) {
   if (!label) return "";
   if (typeof label === "string") return label;
-  if (Array.isArray(label)) return plainLabel(label[0]);
+  if (Array.isArray(label)) return plainLabel(label[0], locale);
   if (typeof label === "object") {
-    // v3 language map: 最初の言語の最初の値
-    const vals = label["@value"] ?? Object.values(label)[0];
-    return plainLabel(vals);
+    if ("@value" in label) return plainLabel(label["@value"], locale);
+    for (const lang of [locale, "none", "en", ...Object.keys(label)]) {
+      const v = label[lang];
+      if (Array.isArray(v) && v.length > 0) return plainLabel(v[0], locale);
+      if (typeof v === "string") return v;
+    }
+    return "";
   }
   return String(label);
 }
@@ -259,7 +267,7 @@ function parseManifestDoc(m, { limit = 24, url = null } = {}) {
     });
     if (walls.length >= limit) break;
   }
-  if (!walls.length) throw new Error("manifest から画像を抽出できませんでした");
+  if (!walls.length) throw new Error(t("noImagesIn").replace("{kind}", "manifest"));
   return walls;
 }
 
@@ -288,7 +296,7 @@ export async function loadCollection(url, { limit = 24 } = {}) {
       console.warn("collection: skip manifest", murl, err.message);
     }
   }
-  if (!walls.length) throw new Error("collection から画像を抽出できませんでした");
+  if (!walls.length) throw new Error(t("noImagesIn").replace("{kind}", "collection"));
   return walls;
 }
 
@@ -307,7 +315,7 @@ async function parseCurationDoc(cur, { selections = null, limit = 64 } = {}) {
   const chosen = selections ? selections.map((i) => sels[i]).filter(Boolean) : sels;
   const members = chosen.flatMap(selectionMembers);
   const walls = await resolveCurationMembers(members, { limit });
-  if (!walls.length) throw new Error("curation から画像を抽出できませんでした");
+  if (!walls.length) throw new Error(t("noImagesIn").replace("{kind}", "curation"));
   return walls;
 }
 
@@ -382,7 +390,7 @@ function splitCanvasId(cid) {
 export function curationSelections(doc) {
   return (doc.selections || []).map((s, index) => {
     const members = selectionMembers(s);
-    return { index, label: plainLabel(s.label) || `展示 ${index + 1}`, count: members.length, first: members[0] };
+    return { index, label: plainLabel(s.label) || t("exhibitionN").replace("{n}", String(index + 1)), count: members.length, first: members[0] };
   });
 }
 

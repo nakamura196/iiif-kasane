@@ -122,7 +122,7 @@ export function buildEntrance(exhibitions, startMode) {
 export function buildEntranceFromCuration(url, doc, startMode) {
   const exhibitions = curationSelections(doc).map((s) => ({
     title: s.label,
-    subtitle: `${s.count}点`,
+    subtitle: t("countWorks").replace("{n}", String(s.count)),
     coverMember: s.first,
     source: { curation: url, selections: [s.index] },
   }));

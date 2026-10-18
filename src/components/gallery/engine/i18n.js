@@ -56,6 +56,10 @@ const DICT = {
     indexOpen: "目次",
     indexTitle: "作品一覧",
     indexEmpty: "表示できる作品がありません",
+    quality: "画質",
+    noImagesIn: "{kind} から画像を抽出できませんでした",
+    exhibitionN: "展示 {n}",
+    countWorks: "{n}点",
   },
   en: {
     loadFailed: "Failed to load:",
@@ -109,6 +113,10 @@ const DICT = {
     indexOpen: "Contents",
     indexTitle: "All works",
     indexEmpty: "No works to show",
+    quality: "Quality",
+    noImagesIn: "No images could be extracted from the {kind}",
+    exhibitionN: "Exhibition {n}",
+    countWorks: "{n} works",
   },
 };
 
