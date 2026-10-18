@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Annotation } from '../../types/main';
 import { contentSearchTargetOf, runContentSearch } from './index';
-import { findSceneAnnotation, isSceneMatch, searchSceneAnnotations } from './scene';
+import { findSceneAnnotation, highlightParts, isSceneMatch, searchSceneAnnotations } from './scene';
 
 const SCENE = 'https://example.org/ueno.json#scene';
 
@@ -90,5 +90,37 @@ describe('searchSceneAnnotations (local)', () => {
 
   it('returns nothing for an empty query', () => {
     expect(searchSceneAnnotations(ANNOS, SCENE, '  ')).toEqual([]);
+  });
+});
+
+describe('highlightParts', () => {
+  it('marks only the terms that occur', () => {
+    expect(highlightParts('上野警察署上野駅前交番', '上野')).toEqual([
+      { text: '上野', hit: true },
+      { text: '警察署', hit: false },
+      { text: '上野', hit: true },
+      { text: '駅前交番', hit: false },
+    ]);
+  });
+
+  it('leaves a text without the term unmarked', () => {
+    expect(highlightParts('高さ 7.1 m', '上野')).toEqual([{ text: '高さ 7.1 m', hit: false }]);
+  });
+
+  it('ignores case and width, and handles several terms', () => {
+    expect(highlightParts('Height 20 m', 'ｈｅｉｇｈｔ m').map((p) => p.hit)).toEqual([true, false, true]);
+  });
+});
+
+describe('hit label', () => {
+  it('keeps the label of a Scene hit', async () => {
+    const h = { ...hit('https://s.example/h', 'body', [1, 2, 3]), label: { ja: ['上野駅'], en: ['Ueno Station'] } };
+    const r = await runContentSearch({ id: 'https://s.example/search' }, '上野', async () => page([h]));
+    expect(r.matches[0].regions[0].label).toEqual({ ja: ['上野駅'], en: ['Ueno Station'] });
+  });
+
+  it('puts the description in the local hit body so the title stays the main line', () => {
+    const [m] = searchSceneAnnotations(ANNOS, SCENE, '交番');
+    expect(m.regions[0].text).toBe('高さ 7.1 m');
   });
 });

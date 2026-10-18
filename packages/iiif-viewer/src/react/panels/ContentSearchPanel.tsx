@@ -10,6 +10,7 @@ import {
   fetchContentSearchTerms,
   findContentSearchService,
   findSceneAnnotation,
+  highlightParts,
   groupMatchesByCanvas,
   isSceneMatch,
   labelIn,
@@ -143,6 +144,37 @@ function useAutocomplete(service: ContentSearchService | undefined, text: string
     };
   }, [ac, q]);
   return ac && q.length >= 2 && terms.q === q ? terms.terms : [];
+}
+
+function Highlighted({ text, q }: { text: string; q: string }) {
+  return (
+    <>
+      {highlightParts(text, q).map((p, i) =>
+        p.hit ? (
+          <mark key={i} className="bg-yellow-200 dark:bg-yellow-700 dark:text-white rounded-sm px-0.5">
+            {p.text}
+          </mark>
+        ) : (
+          <span key={i}>{p.text}</span>
+        ),
+      )}
+    </>
+  );
+}
+
+// 3D の当たり: 注釈の見出しを 1 行目に（探した語を目立たせる）、本文を小さく 2 行目に出す
+function SceneMatchText({ match, q, title }: { match: ContentSearchMatch; q: string; title: string }) {
+  const body = match.regions[0]?.text ?? '';
+  return (
+    <span className="break-words">
+      <span className="block">{title ? <Highlighted text={title} q={q} /> : '—'}</span>
+      {body && body !== title ? (
+        <span className="block text-xs text-gray-500 dark:text-gray-400">
+          <Highlighted text={body} q={q} />
+        </span>
+      ) : null}
+    </span>
+  );
 }
 
 function MatchText({ match }: { match: ContentSearchMatch }) {
@@ -498,7 +530,17 @@ export function ContentSearchPanelBody(ctx: PanelContext) {
                   {m.time ? (
                     <span className="mr-2 text-xs tabular-nums text-blue-700 dark:text-blue-300">{fmt(m.time[0])}</span>
                   ) : null}
-                  <MatchText match={m} />
+                  {isSceneMatch(m) ? (
+                    <SceneMatchText
+                      match={m}
+                      q={current?.q ?? ''}
+                      title={
+                        findSceneAnnotation(m, sceneAnnotations)?.title ?? labelIn(m.regions[0]?.label, locale).trim()
+                      }
+                    />
+                  ) : (
+                    <MatchText match={m} />
+                  )}
                   {m.transcript && !m.time ? (
                     <span className="ml-2 text-[10px] text-gray-500 dark:text-gray-400">{t('transcriptFile')}</span>
                   ) : null}

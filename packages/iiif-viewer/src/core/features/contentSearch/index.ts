@@ -24,6 +24,8 @@ export interface ContentSearchRegion {
   xywh?: [number, number, number, number];
   /** 3D の Scene 上の点（PointSelector）。canvasId は Scene の id になる */
   point?: [number, number, number];
+  /** 結果の Annotation の label（言語ごとの辞書）。3D の当たりの見出しに使う */
+  label?: unknown;
   text?: string;
   /** Text Granularity の単位（page / block / paragraph / line / word / glyph） */
   granularity?: string;
@@ -207,6 +209,7 @@ const regionOf = (anno: unknown): ContentSearchRegion | undefined => {
     canvasId: where.canvasId,
     ...(where.xywh ? { xywh: where.xywh } : {}),
     ...(where.point ? { point: where.point } : {}),
+    ...(where.point && anno.label ? { label: anno.label } : {}),
     ...(text ? { text } : {}),
     ...(granularity ? { granularity } : {}),
   };

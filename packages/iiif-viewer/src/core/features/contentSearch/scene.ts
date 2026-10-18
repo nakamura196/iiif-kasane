@@ -63,7 +63,7 @@ export function searchSceneAnnotations(
         annotationId: a.id,
         canvasId: sceneId,
         point: [a.position.x, a.position.y, a.position.z],
-        text,
+        text: a.description || a.title,
       };
       out.push({
         id: a.id,
@@ -76,6 +76,28 @@ export function searchSceneAnnotations(
       break;
     }
     if (out.length >= maxMatches) break;
+  }
+  return out;
+}
+
+/** 検索語（空白区切り）が文字列のどこに出るか。大文字小文字・全角半角は無視する。出なければ全体が 1 つの「当たりでない」部分になる。 */
+export function highlightParts(text: string, q: string): { text: string; hit: boolean }[] {
+  const needles = q
+    .split(/\s+/)
+    .map((w) => foldForSearch(w).folded)
+    .filter(Boolean);
+  const { folded, at } = foldForSearch(text);
+  const marked = new Array<boolean>(text.length).fill(false);
+  for (const n of needles) {
+    for (let i = folded.indexOf(n); i >= 0; i = folded.indexOf(n, i + n.length)) {
+      for (let k = at[i]; k < at[i + n.length]; k++) marked[k] = true;
+    }
+  }
+  const out: { text: string; hit: boolean }[] = [];
+  for (let i = 0; i < text.length; i++) {
+    const last = out[out.length - 1];
+    if (last && last.hit === marked[i]) last.text += text[i];
+    else out.push({ text: text[i], hit: marked[i] });
   }
   return out;
 }
