@@ -22,6 +22,8 @@ export interface ContentSearchRegion {
   canvasId: string;
   /** Canvas 座標の矩形。無ければ Canvas 全体 */
   xywh?: [number, number, number, number];
+  /** 3D の Scene 上の点（PointSelector）。canvasId は Scene の id になる */
+  point?: [number, number, number];
   text?: string;
   /** Text Granularity の単位（page / block / paragraph / line / word / glyph） */
   granularity?: string;
@@ -140,27 +142,43 @@ const parseXywh = (s: string | undefined): ContentSearchRegion['xywh'] => {
   return m ? [Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4])] : undefined;
 };
 
-/** Annotation の target（1.0 は on）から Canvas の id と矩形を取り出す。 */
-export function contentSearchTargetOf(target: unknown): { canvasId: string; xywh?: ContentSearchRegion['xywh'] } | undefined {
+/** Annotation の target（1.0 は on）から Canvas（3D なら Scene）の id と矩形・点を取り出す。 */
+export function contentSearchTargetOf(
+  target: unknown,
+): { canvasId: string; xywh?: ContentSearchRegion['xywh']; point?: ContentSearchRegion['point'] } | undefined {
   const t = asList(target)[0];
   if (typeof t === 'string') {
     const [canvasId, fragment] = t.split('#');
     return canvasId ? { canvasId, xywh: parseXywh(fragment ? `#${fragment}` : undefined) } : undefined;
   }
   if (!isObj(t)) return undefined;
-  const source = t.source ?? t.full;
-  if (source === undefined) {
+  const rawSource = t.source ?? t.full;
+  if (rawSource === undefined) {
     // 位置の無い Canvas そのもの（{ id, type: 'Canvas' }）
     const canvasId = idOf(t);
     return canvasId ? contentSearchTargetOf(canvasId) : undefined;
   }
-  const canvasId = idOf(source)?.split('#')[0];
+  // 3D の注釈は source を配列で書くことがある（[{ id, type: 'Scene' }]）
+  const source = asList(rawSource)[0];
+  const sources = asList(t.selector).filter(isObj);
+  let point: ContentSearchRegion['point'];
+  for (const sel of sources) {
+    const [x, y, z] = [num(sel.x), num(sel.y), num(sel.z)];
+    if (typeOf(sel) === 'PointSelector' && x !== undefined && y !== undefined && z !== undefined) {
+      point = [x, y, z];
+      break;
+    }
+  }
+  const sourceId = idOf(source);
+  // Scene の id は `…#scene` のように断片を含むことがあるので、切らない
+  const canvasId = typeOf(source) === 'Scene' || point ? sourceId : sourceId?.split('#')[0];
   if (!canvasId) return undefined;
-  for (const sel of asList(t.selector)) {
-    const xywh = parseXywh(isObj(sel) ? str(sel.value) : undefined);
+  if (point) return { canvasId, point };
+  for (const sel of sources) {
+    const xywh = parseXywh(str(sel.value));
     if (xywh) return { canvasId, xywh };
   }
-  return { canvasId, xywh: parseXywh(idOf(source)) };
+  return { canvasId, xywh: parseXywh(sourceId) };
 }
 
 const granularityOf = (anno: Json): string | undefined => str(anno.textGranularity);
@@ -188,6 +206,7 @@ const regionOf = (anno: unknown): ContentSearchRegion | undefined => {
     annotationId,
     canvasId: where.canvasId,
     ...(where.xywh ? { xywh: where.xywh } : {}),
+    ...(where.point ? { point: where.point } : {}),
     ...(text ? { text } : {}),
     ...(granularity ? { granularity } : {}),
   };
@@ -398,4 +417,5 @@ export function contentSearchAnnotationPage(canvasId: string, matches: ContentSe
 export const TEXT_GRANULARITIES = ['page', 'block', 'paragraph', 'line', 'word', 'glyph'] as const;
 
 export * from './local';
+export * from './scene';
 export * from './transcripts';

@@ -9,12 +9,15 @@ import {
   contentSearchAnnotationPage,
   fetchContentSearchTerms,
   findContentSearchService,
+  findSceneAnnotation,
   groupMatchesByCanvas,
+  isSceneMatch,
   labelIn,
   manifestHasSearchableText,
   readCanvasAnnotations,
   runContentSearch,
   searchLocalAnnotations,
+  searchSceneAnnotations,
   searchTranscripts,
   transcriptFilesOf,
   type TranscriptSource,
@@ -24,6 +27,7 @@ import {
   type ContentSearchService,
   type ContentSearchTerm,
 } from '../../core';
+import { annotationsAtom, selectedAnnotationIdAtom } from '../atoms';
 import { fmt } from '../displays/TranscriptPanel';
 import { navRequestAtom, nextSeq } from '../displays/structureState';
 import { useLocale, useTranslations } from '../env';
@@ -106,11 +110,14 @@ const localSearchPages = (local: LocalAnnotationPage[], inference: Record<string
 };
 
 /**
- * 手元で探せるか（タブを出すか）。3D の Scene では探さない。
- * 字幕のファイルを指すだけの注釈しか無い資料（Cookbook 0219 など）では、探せる文字が無いので出さない。
+ * 手元で探せるか（タブを出すか）。
+ * Canvas: 字幕のファイルを指すだけの注釈しか無い資料（Cookbook 0219 など）では、探せる文字が無いので出さない。
+ * 3D の Scene: 読み込んだ Scene の注釈（見出し・本文）を探す。注釈が 1 件も無ければ出さない。
  */
-const canSearchLocal = ({ container, manifest, localAnnotationCount }: PanelContext) =>
-  container?.kind === 'Canvas' && (manifestHasSearchableText(manifest) || (localAnnotationCount ?? 0) > 0);
+export const canSearchLocal = ({ container, manifest, localAnnotationCount, annotationCount }: PanelContext) =>
+  container?.kind === 'Scene'
+    ? (annotationCount ?? 0) > 0
+    : container?.kind === 'Canvas' && (manifestHasSearchableText(manifest) || (localAnnotationCount ?? 0) > 0);
 
 const granularityRank = (g: string) => {
   const i = (TEXT_GRANULARITIES as readonly string[]).indexOf(g);
@@ -159,6 +166,9 @@ export function ContentSearchPanelBody(ctx: PanelContext) {
   const [scopeChoice, setScopeChoice] = useAtom(scopeAtom);
   const local = useAtomValue(localAnnotationPagesAtom);
   const inference = useAtomValue(inferenceResultsAtom);
+  const sceneAnnotations = useAtomValue(annotationsAtom);
+  const setSelectedScene = useSetAtom(selectedAnnotationIdAtom);
+  const isScene = container?.kind === 'Scene';
   const [granularity, setGranularity] = useAtom(granularityAtom);
   const [showMarks, setShowMarks] = useAtom(showMarksAtom);
   const setLocal = useSetAtom(localAnnotationPagesAtom);
@@ -188,6 +198,12 @@ export function ContentSearchPanelBody(ctx: PanelContext) {
     setGranularity(null);
     setSelected(null);
     setState({ run, manifestId, q: word, scope: where, status: 'running' });
+    if (where === 'local' && isScene) {
+      // 3D の Scene: 読み込み済みの注釈をその場で探す（取りに行くものは無い）
+      const matches = searchSceneAnnotations(sceneAnnotations, container!.id, word, MAX_MATCHES);
+      put({ status: 'done', result: { matches, truncated: matches.length >= MAX_MATCHES } });
+      return;
+    }
     if (where === 'local') {
       const pages = localSearchPages(local, inference);
       // 字幕・文字起こしのファイルは注釈と並行して読む。読めなかったものは「読み込めなかった」の数に入れる
@@ -265,7 +281,7 @@ export function ContentSearchPanelBody(ctx: PanelContext) {
     setLocal((ls) => {
       const rest = ls.filter((l) => l.source !== SOURCE);
       if (!showMarks || shown.length === 0) return rest;
-      const pages = [...groupMatchesByCanvas(shown)].map(([canvasId, ms]) => ({
+      const pages = [...groupMatchesByCanvas(shown.filter((m) => !isSceneMatch(m)))].map(([canvasId, ms]) => ({
         source: SOURCE,
         canvasId,
         page: contentSearchAnnotationPage(canvasId, ms),
@@ -293,6 +309,12 @@ export function ContentSearchPanelBody(ctx: PanelContext) {
 
   const open = (m: ContentSearchMatch) => {
     setSelected(m.id);
+    // 3D の Scene の当たり: 注釈の一覧で選ぶのと同じ状態を立てる（カメラが寄り、ラベルが開く）
+    if (isSceneMatch(m)) {
+      const hit = findSceneAnnotation(m, sceneAnnotations);
+      if (hit) setSelectedScene(hit.id);
+      return;
+    }
     // 字幕の当たりは、その Canvas のその時刻へ
     if (m.time) {
       setRequest({ seq: nextSeq(), target: { canvasId: m.canvasId, t: m.time } });
@@ -385,7 +407,11 @@ export function ContentSearchPanelBody(ctx: PanelContext) {
         </div>
       ) : null}
       <p className="text-xs text-gray-500 dark:text-gray-300">
-        {scope === 'service' && service ? t('about', { version: service.version === 2 ? '2.0' : '1.0' }) : t('aboutLocal')}
+        {scope === 'service' && service
+          ? t('about', { version: service.version === 2 ? '2.0' : '1.0' })
+          : isScene
+            ? t('aboutScene')
+            : t('aboutLocal')}
       </p>
 
       {current?.status === 'error' ? (
@@ -410,7 +436,7 @@ export function ContentSearchPanelBody(ctx: PanelContext) {
           {result && matches.length > 0 ? (
             <div className="flex flex-wrap items-center gap-2">
               {/* 字幕の当たりには画像の上の印が無いので、印の出る当たりがあるときだけ */}
-              {matches.some((m) => m.regions.length > 0) ? (
+              {matches.some((m) => m.regions.length > 0 && !isSceneMatch(m)) ? (
                 <label className="inline-flex items-center gap-1 text-xs">
                   <input type="checkbox" checked={showMarks} onChange={(e) => setShowMarks(e.target.checked)} />
                   {t('showOnImage')}
