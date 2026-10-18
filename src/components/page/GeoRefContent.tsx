@@ -19,6 +19,7 @@ import { authorizedUrl, convertToV4, probeServiceOf } from '@nakamura196/iiif-vi
 import {
   parseManifestV4,
   geoAnnotations,
+  geoFeaturesNamedBy,
   geoCanvasesOf,
   geoFeatureBoxOf,
   geoFeatureIdOf,
@@ -236,8 +237,11 @@ const GeoRefContent: NextPage = () => {
       setGeoCanvasId(geoCanvasId);
       setManifest(manifest);
       setAttribution(getAttribution(manifest as unknown as Record<string, unknown>, locale));
-      setAnnotations(geoAnnotations(geoFeatures, annotations));
-      setGeoFeatures(geoFeatures);
+      const listed = geoAnnotations(geoFeatures, annotations);
+      setAnnotations(listed);
+      // the map names a place as the list does (in the page language)
+      setGeoFeatures(geoFeaturesNamedBy(geoFeatures, listed));
+      geoFeatures = geoFeaturesNamedBy(geoFeatures, listed);
       // URL の id の地点を選んでおく
       const id = urlState?.id;
       const selected = id ? featureIdFromParam(geoFeatures, id) : undefined;
