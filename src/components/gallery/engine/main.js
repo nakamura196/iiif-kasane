@@ -211,7 +211,7 @@ function setupQualityToggle() {
   if (!btn) return;
   const order = ["auto", "high", "medium", "low"];
   const cur = (G.cfg.quality || "auto");
-  btn.textContent = "画質 " + cur + (cur === "auto" && G.quality ? "(" + G.quality + ")" : "");
+  btn.textContent = t("quality") + " " + cur + (cur === "auto" && G.quality ? "(" + G.quality + ")" : "");
   btn.addEventListener("click", () => {
     const next = order[(order.indexOf(cur) + 1) % order.length];
     const q = new URLSearchParams(location.search);

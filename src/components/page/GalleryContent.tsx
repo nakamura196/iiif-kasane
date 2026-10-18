@@ -43,7 +43,7 @@ const GalleryContent = () => {
           <div id="help" data-i18n-html="helpHtml"></div>
 
           <button id="mode-toggle" data-i18n="toWalk"></button>
-          <button id="quality-toggle" title="画質 / Quality"></button>
+          <button id="quality-toggle" data-i18n-title="quality"></button>
           <button id="tour-toggle" data-i18n="tourFirst" data-i18n-title="tourTitleFirst"></button>
           <button id="tour-toggle-3p" data-i18n="tourThird" data-i18n-title="tourTitleThird"></button>
           <button id="look-toggle" title="内装 / Interior"></button>

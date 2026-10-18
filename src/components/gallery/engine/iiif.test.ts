@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { curationSelections, loadCuration } from './iiif.js';
+import { curationSelections, loadCuration, plainLabel } from './iiif.js';
 
 // Shaped like codh.rois.ac.jp/software/iiif-curation-viewer/sample/curation.json:
 // the manifest is on the selection's `within`, not on each member, and the first
@@ -68,5 +68,23 @@ describe('curationSelections', () => {
     const sels = curationSelections(CURATION);
     expect(sels.map((s: { count: number }) => s.count)).toEqual([2, 1]);
     expect(sels[0].first).toEqual({ '@id': 'http://example.org/a/canvas/0', manifest: 'http://example.org/a/manifest.json' });
+  });
+});
+
+describe('plainLabel', () => {
+  const map = { ja: ['上野駅周辺'], en: ['Around Ueno station'] };
+  it('prefers the page language', () => {
+    expect(plainLabel(map, 'en')).toBe('Around Ueno station');
+    expect(plainLabel(map, 'ja')).toBe('上野駅周辺');
+  });
+  it('falls back to none, en, then the first language', () => {
+    expect(plainLabel({ ja: ['a'], none: ['x'], en: ['y'] }, 'fr')).toBe('x');
+    expect(plainLabel({ ja: ['a'], en: ['b'] }, 'fr')).toBe('b');
+    expect(plainLabel({ ja: ['a'] }, 'en')).toBe('a');
+  });
+  it('handles v2 strings, arrays and @value', () => {
+    expect(plainLabel('s', 'en')).toBe('s');
+    expect(plainLabel(['p', 'q'], 'en')).toBe('p');
+    expect(plainLabel({ '@value': 'v', '@language': 'ja' }, 'en')).toBe('v');
   });
 });
