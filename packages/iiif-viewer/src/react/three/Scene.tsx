@@ -2,14 +2,15 @@
 
 import { startTransition, Suspense, useEffect, useImperativeHandle, useMemo, useRef, type Ref } from 'react';
 import { Clone, useAnimations, useGLTF, Bounds } from '@react-three/drei';
-import { useThree } from '@react-three/fiber';
+import { useThree, type ThreeEvent } from '@react-three/fiber';
 import { Box3, Group, PerspectiveCamera, Points, PointsMaterial, Sphere, Vector3, type Object3D } from 'three';
 import gsap from 'gsap';
 import Annotations from '../three/Annotations';
 import ModelErrorBoundary from './ModelErrorBoundary';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
-import { manifestAtom, modelAnimationAtom, modelChoicesAtom, modelRadiusAtom, paintedModelsAtom, sceneIdAtom, showAnnotationsAtom } from '../atoms';
-import { upgradeUrl } from '../../core';
+import { manifestAtom, measuringAtom, modelAnimationAtom, modelChoicesAtom, modelRadiusAtom, paintedModelsAtom, sceneIdAtom, showAnnotationsAtom } from '../atoms';
+import MeasureMarks, { useMeasure } from './MeasureTool';
+import { sceneSpatialScaleOf, upgradeUrl } from '../../core';
 import { defaultCameraOf, type DefaultCamera } from '../../core';
 import { runFocusFlight, type Vec3 } from '../../core';
 import { fitView, topView } from '../../core';
@@ -124,11 +125,11 @@ export interface PlacedModel {
 
 // A model painted into the Scene besides the main one (e.g. the ground). Each loads
 // in its own Suspense so that switching it does not hide the rest of the scene.
-function PlacedGLTF({ url, position }: PlacedModel) {
+function PlacedGLTF({ url, position, onClick }: PlacedModel & { onClick?: (e: ThreeEvent<MouseEvent>) => void }) {
   const model = useGLTF(url);
   useSizedPoints(model.scene);
   return (
-    <group position={position}>
+    <group position={position} onClick={onClick}>
       <Clone object={model.scene} />
     </group>
   );
@@ -194,10 +195,14 @@ export default function Scene({
     return () => setModelRadius(null);
   }, [sphere, setModelRadius]);
   const animationRoot = useModelAnimation(model);
+  // 測る: シーンに spatialScale があり、ボタンが入っているときだけ
+  const spatialScale = useMemo(() => sceneSpatialScaleOf(manifest, sceneId), [manifest, sceneId]);
+  const measuring = useAtomValue(measuringAtom) && !!spatialScale;
+  const measure = useMeasure(measuring);
   // A model with animations is drawn as it is loaded, not as a copy: the copy rebuilds each light
   // with a new target, so a spot light that the animation moves would keep pointing at the origin.
   const body = (
-    <group ref={animationRoot}>
+    <group ref={animationRoot} onClick={measure.onClick}>
       {model.animations.length > 0 ? <primitive object={model.scene} /> : <Clone object={model.scene} />}
     </group>
   );
@@ -224,7 +229,7 @@ export default function Scene({
         // a model beside the main one that fails to load is left out; the rest stays
         <ModelErrorBoundary key={`${i}:${m.url}`}>
           <Suspense fallback={null}>
-            <PlacedGLTF url={m.url} position={m.position} />
+            <PlacedGLTF url={m.url} position={m.position} onClick={measure.onClick} />
           </Suspense>
         </ModelErrorBoundary>
       ))}
@@ -239,7 +244,11 @@ export default function Scene({
           </Suspense>
         </ModelErrorBoundary>
       ))}
-      {model && showAnnotations && <Annotations model={model} />}
+      {/* 測っている間は注釈の印を隠す（印のクリックが計測と混ざらないように） */}
+      {model && showAnnotations && !measuring && <Annotations model={model} />}
+      {measuring && spatialScale && (
+        <MeasureMarks points={measure.points} scale={spatialScale} size={sphere.radius * 0.012} />
+      )}
     </>
   );
 }

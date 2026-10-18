@@ -4,8 +4,8 @@ import { Suspense, useEffect, useState, useRef, useImperativeHandle, forwardRef,
 import Scene, { type PlacedModel, type ViewHandle } from '../three/Scene';
 import ModelErrorBoundary from './ModelErrorBoundary';
 import { useAtom, useAtomValue } from 'jotai';
-import { manifestAtom, modelAnimationAtom, modelRadiusAtom, sceneIdAtom } from '../atoms';
-import { sceneCamerasOf } from '../../core';
+import { manifestAtom, measuringAtom, modelAnimationAtom, modelRadiusAtom, sceneIdAtom } from '../atoms';
+import { sceneCamerasOf, sceneSpatialScaleOf } from '../../core';
 import { nextZoomDistance, zoomLimitsFor } from '../../core';
 import { labelIn } from '../../core';
 import { useProgress } from '@react-three/drei';
@@ -147,6 +147,14 @@ const CanvasComponent = ({ glbUrl, extraModels, attribution }: CanvasComponentPr
   const sceneId = useAtomValue(sceneIdAtom);
   const [animation, setAnimation] = useAtom(modelAnimationAtom);
   const locale = useLocale();
+  // 実寸（spatialScale）が分かる Scene だけ「測る」ボタンを出す
+  const canMeasure = useMemo(() => !!sceneSpatialScaleOf(manifest, sceneId), [manifest, sceneId]);
+  const [measuring, setMeasuring] = useAtom(measuringAtom);
+  // 別の Scene に移ったら、測るを切る（点も消える）
+  useEffect(() => {
+    if (!canMeasure) setMeasuring(false);
+  }, [canMeasure, setMeasuring]);
+  useEffect(() => () => setMeasuring(false), [setMeasuring]);
   // one button per Camera painted into the Scene (hidden ones belong to notes)
   const cameras = useMemo(() => sceneCamerasOf(manifest, sceneId), [manifest, sceneId]);
   // the main model could not be loaded: say so over the (empty) 3D view
@@ -277,9 +285,24 @@ const CanvasComponent = ({ glbUrl, extraModels, attribution }: CanvasComponentPr
           >
             {t('fitAll')}
           </button>
-          <button onClick={() => viewRef.current?.top()} className={`${VIEW_BUTTON} ${VIEW_BUTTON_IDLE}`}>
+          <button
+            onClick={() => viewRef.current?.top()}
+            className={`${VIEW_BUTTON} ${VIEW_BUTTON_IDLE} ${canMeasure ? 'border-b border-gray-200 dark:border-gray-600' : ''}`}
+          >
             {t('topView')}
           </button>
+          {canMeasure && (
+            <button
+              onClick={() => setMeasuring((v) => !v)}
+              aria-pressed={measuring}
+              title={t('measureHint')}
+              className={`${VIEW_BUTTON} ${
+                measuring ? 'bg-blue-600 text-white hover:bg-blue-700' : VIEW_BUTTON_IDLE
+              }`}
+            >
+              {t('measure')}
+            </button>
+          )}
         </div>
         {animation.clips > 0 && (
           <div className="flex flex-col rounded overflow-hidden shadow">
