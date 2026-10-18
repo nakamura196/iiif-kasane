@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { filterGeorefFeatures, foldGeorefText, georefTagFacets } from './georefList';
-import { geoAnnotations, type GeoFeature } from './services/manifestParser';
+import { geoAnnotations, geoFeaturesNamedBy, type GeoFeature } from './services/manifestParser';
 
 const place = (id: string, title: string, tags: string[] = [], toponyms: string[] = []): GeoFeature => ({
   type: 'Feature',
@@ -58,5 +58,18 @@ describe('georefTagFacets', () => {
       { value: '本部', count: 1 },
       { value: '農学部', count: 1 },
     ]);
+  });
+});
+
+describe('geoFeaturesNamedBy', () => {
+  it('names a place on the map as the list does, from its Annotation', () => {
+    const f = [place('a', '上野駅')];
+    const named = geoAnnotations(f, []).map((a) => ({ ...a, title: 'Ueno Station' }));
+    expect(geoFeaturesNamedBy(f, named)[0].properties.title).toBe('Ueno Station');
+    expect(f[0].properties.title).toBe('上野駅');
+  });
+  it('keeps the feature when the names agree', () => {
+    const f = [place('a', '上野駅')];
+    expect(geoFeaturesNamedBy(f, geoAnnotations(f, []))[0]).toBe(f[0]);
   });
 });

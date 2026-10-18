@@ -573,3 +573,14 @@ export const geoAnnotations = (features: GeoFeature[], annotations: Annotation[]
       : base;
   });
 };
+
+// The map and the image marks name a place by feature.properties.title, which is one fixed
+// string. A place with a commenting Annotation is named in the list by that Annotation's label
+// (already in the reader's language), so take the same name for the map: tags, popups, image marks.
+export const geoFeaturesNamedBy = (features: GeoFeature[], annotations: Annotation[]): GeoFeature[] =>
+  features.map((feature, idx) => {
+    const title = annotations[idx]?.title;
+    return title && title !== feature.properties.title
+      ? { ...feature, properties: { ...feature.properties, title } }
+      : feature;
+  });
