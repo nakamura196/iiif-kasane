@@ -60,6 +60,8 @@ export interface GeoFeature {
 
 export interface ParsedManifest {
   modelUrl: string | null;
+  /** The Model body behind modelUrl, so a page can read its IIIF Auth 2.0 probe service. */
+  modelBody?: unknown;
   annotations: Annotation[];
   geoFeatures: GeoFeature[];
   /** 地点が画像（Canvas）に付いているとき、その Canvas の id。3D の Scene に付いているときは無い。 */
@@ -187,8 +189,10 @@ const cameraFor = (anno: AnnotationV4, cameras: Map<string, CameraView>): Camera
 
 // The model shown when only one is used: the first painted Model (for a Choice,
 // its first item — the default).
-const extractModelUrl = (scene: SceneV4 | undefined): string | null =>
-  paintedModelsOf(scene)[0]?.options[0]?.url ?? null;
+const extractModel = (scene: SceneV4 | undefined): { url: string | null; body?: unknown } => {
+  const option = paintedModelsOf(scene)[0]?.options[0];
+  return { url: option?.url ?? null, body: option?.body };
+};
 
 const extractGeoFeatures = (annos: AnnotationV4[]): GeoFeature[] => {
   const out: GeoFeature[] = [];
@@ -385,7 +389,7 @@ export const parseManifestV4 = (manifest: ManifestV4, sceneId?: string | null): 
       return { modelUrl: null, annotations: [], geoFeatures: canvas.features, geoCanvasId: canvas.id };
     }
   }
-  const modelUrl = extractModelUrl(scene);
+  const { url: modelUrl, body: modelBody } = extractModel(scene);
 
   const sceneAnnotations = flattenAllPages(scene?.annotations);
   const cameras = cameraIndex([...flattenAllPages(scene?.items), ...sceneAnnotations]);
@@ -403,7 +407,7 @@ export const parseManifestV4 = (manifest: ManifestV4, sceneId?: string | null): 
     i++;
   }
 
-  return { modelUrl, annotations: out, geoFeatures };
+  return { modelUrl, modelBody, annotations: out, geoFeatures };
 };
 
 // The id the map, the list and the picture select a feature by.
