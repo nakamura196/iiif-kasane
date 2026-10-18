@@ -6,6 +6,8 @@
 // 仕様: https://iiif.io/api/search/2.0/ ・ https://iiif.io/api/search/1.0/
 // 単位（行・語など）は Text Granularity 拡張: https://iiif.io/api/extension/text-granularity/
 
+import { labelIn } from '../../services/paintedModels';
+
 export type ContentSearchVersion = 1 | 2;
 
 export interface ContentSearchService {
@@ -110,7 +112,7 @@ const autocompleteOf = (s: Json): ContentSearchService['autocomplete'] => {
  * マニフェスト（または Canvas・Range）の service から検索の窓口を探す。2.0 があれば 2.0 を選ぶ。
  * Presentation 2 から直したマニフェストでは `@id` `@type` のまま残るので、両方の書き方を見る。
  */
-export function findContentSearchService(resource: unknown): ContentSearchService | undefined {
+export function findContentSearchService(resource: unknown, locale = 'en'): ContentSearchService | undefined {
   if (!isObj(resource)) return undefined;
   const found: ContentSearchService[] = [];
   for (const s of [...asList(resource.service), ...asList(resource.services)]) {
@@ -118,7 +120,7 @@ export function findContentSearchService(resource: unknown): ContentSearchServic
     const id = idOf(s);
     const version = searchVersionOf(s);
     if (!id || !version) continue;
-    const label = str(s.label) ?? (isObj(s.label) ? textOf(Object.values(s.label)[0]) : undefined);
+    const label = labelIn(s.label, locale) || undefined;
     found.push({ id, version, ...(label ? { label } : {}), ...(autocompleteOf(s) ? { autocomplete: autocompleteOf(s) } : {}) });
   }
   return found.find((s) => s.version === 2) ?? found[0];
@@ -309,7 +311,7 @@ export function parseContentSearchResponse(response: unknown): ContentSearchPage
 }
 
 /** 候補語の応答（1.0 の TermList、2.0 の TermPage）を、語の並びにする。 */
-export function parseAutocompleteResponse(response: unknown): ContentSearchTerm[] {
+export function parseAutocompleteResponse(response: unknown, locale = 'en'): ContentSearchTerm[] {
   if (!isObj(response)) return [];
   const out: ContentSearchTerm[] = [];
   for (const t of [...asList(response.items), ...asList(response.terms)]) {
@@ -317,7 +319,7 @@ export function parseAutocompleteResponse(response: unknown): ContentSearchTerm[
     const value = str(t.value) ?? str(t.match);
     if (!value) continue;
     const count = num(t.total ?? t.count);
-    const label = str(t.label) ?? (isObj(t.label) ? textOf(Object.values(t.label)[0]) : undefined);
+    const label = labelIn(t.label, locale) || undefined;
     out.push({ value, ...(count !== undefined ? { count } : {}), ...(label ? { label } : {}) });
   }
   return out;
@@ -370,9 +372,10 @@ export async function fetchContentSearchTerms(
   autocomplete: { id: string },
   q: string,
   fetchJson: ContentSearchFetch,
+  locale = 'en',
 ): Promise<ContentSearchTerm[]> {
   if (!q.trim()) return [];
-  return parseAutocompleteResponse(await fetchJson(withQuery(autocomplete.id, { q: q.trim() })));
+  return parseAutocompleteResponse(await fetchJson(withQuery(autocomplete.id, { q: q.trim() })), locale);
 }
 
 /** 当たりを Canvas ごとに分ける（一覧の見出しと、画像の上の印に使う）。 */

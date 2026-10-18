@@ -19,6 +19,7 @@ import {
   modelChoicesAtom,
   paintedModelsAtom,
 } from './atoms';
+import { useLocale } from './env';
 
 /**
  * Load a manifest into the current jotai store: the manifest, its annotations,
@@ -27,6 +28,7 @@ import {
 export function useManifest(iiifContent: string | null): { failed: boolean } {
   // the url that could not be read; compared with the current one so that no state is reset in the effect
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const locale = useLocale();
   const setManifestUrl = useSetAtom(manifestUrlAtom);
   const setManifest = useSetAtom(manifestAtom);
   const setAnnotations = useSetAtom(annotationsAtom);
@@ -48,7 +50,7 @@ export function useManifest(iiifContent: string | null): { failed: boolean } {
       }
       try {
         const manifest = convertToV4(raw);
-        const { annotations } = parseManifestV4(manifest);
+        const { annotations } = parseManifestV4(manifest, undefined, locale);
         setPaintedModels(paintedModelsOf(firstSceneOf(manifest)));
         setModelChoices({});
         setLayerSettings({});
@@ -64,7 +66,7 @@ export function useManifest(iiifContent: string | null): { failed: boolean } {
     return () => {
       cancelled = true;
     };
-  }, [iiifContent, setManifestUrl, setManifest, setAnnotations, setPaintedModels, setModelChoices, setLayerSettings, setLayerOrder, setLayerPlayback]);
+  }, [iiifContent, setManifestUrl, setManifest, setAnnotations, setPaintedModels, setModelChoices, setLayerSettings, setLayerOrder, setLayerPlayback, locale]);
 
   return { failed: iiifContent !== null && failedUrl === iiifContent };
 }

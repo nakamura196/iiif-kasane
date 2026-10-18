@@ -94,12 +94,12 @@ export const chosenUrl = (model: PaintedModel, choices: Record<string, number>):
 export const upgradeUrl = (model: PaintedModel, choices: Record<string, number>): string | null =>
   model.progressive && choices[model.id] === undefined ? model.options[model.options.length - 1].url : null;
 
-// A IIIF label in the reader's language: the locale, then "none", then any.
+// A IIIF label in the reader's language: the locale, then "none", then "en", then any.
 export const labelIn = (label: unknown, locale: string): string => {
   if (typeof label === 'string') return label;
   if (!label || typeof label !== 'object') return '';
   const map = label as Record<string, unknown>;
-  for (const lang of [locale, 'none', ...Object.keys(map)]) {
+  for (const lang of [locale, 'none', 'en', ...Object.keys(map)]) {
     const v = map[lang];
     if (Array.isArray(v) && v.length > 0) return v.map(String).join(' ');
     if (typeof v === 'string') return v;

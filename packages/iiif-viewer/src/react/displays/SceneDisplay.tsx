@@ -35,9 +35,9 @@ function SceneDisplay({ container, manifest, iiifContent, renderActions, selecte
   useEffect(() => {
     setSceneId(sceneId);
     setPaintedModels(paintedModelsOf(sceneOf(manifest, sceneId)));
-    setAnnotations(parseManifestV4(manifest, sceneId).annotations);
+    setAnnotations(parseManifestV4(manifest, sceneId, locale).annotations);
     setSelectedAnnotation(null);
-  }, [manifest, sceneId, setSceneId, setPaintedModels, setAnnotations, setSelectedAnnotation]);
+  }, [manifest, sceneId, setSceneId, setPaintedModels, setAnnotations, setSelectedAnnotation, locale]);
 
   // The first painted model is the main one (framing, annotation occlusion);
   // the others are drawn alongside. A Choice shows its chosen (default: first) Model.
