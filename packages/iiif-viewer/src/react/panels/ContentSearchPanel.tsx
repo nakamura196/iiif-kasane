@@ -125,7 +125,7 @@ const granularityRank = (g: string) => {
   return i < 0 ? TEXT_GRANULARITIES.length : i;
 };
 
-function useAutocomplete(service: ContentSearchService | undefined, text: string): ContentSearchTerm[] {
+function useAutocomplete(service: ContentSearchService | undefined, text: string, locale: string): ContentSearchTerm[] {
   const [terms, setTerms] = useState<{ q: string; terms: ContentSearchTerm[] }>({ q: '', terms: [] });
   const ac = service?.autocomplete;
   const q = text.trim();
@@ -133,7 +133,7 @@ function useAutocomplete(service: ContentSearchService | undefined, text: string
     if (!ac || q.length < 2) return;
     let live = true;
     const timer = window.setTimeout(() => {
-      fetchContentSearchTerms(ac, q, fetchJson).then(
+      fetchContentSearchTerms(ac, q, fetchJson, locale).then(
         (ts) => live && setTerms({ q, terms: ts.slice(0, 20) }),
         () => {}, // 候補が出ないだけにする
       );
@@ -142,7 +142,7 @@ function useAutocomplete(service: ContentSearchService | undefined, text: string
       live = false;
       window.clearTimeout(timer);
     };
-  }, [ac, q]);
+  }, [ac, q, locale]);
   return ac && q.length >= 2 && terms.q === q ? terms.terms : [];
 }
 
@@ -191,7 +191,7 @@ export function ContentSearchPanelBody(ctx: PanelContext) {
   const { container, manifest } = ctx;
   const t = useTranslations('ContentSearch');
   const locale = useLocale();
-  const service = useMemo(() => findContentSearchService(manifest), [manifest]);
+  const service = useMemo(() => findContentSearchService(manifest, locale), [manifest, locale]);
   const localOk = canSearchLocal(ctx);
   const manifestId = manifest?.id ?? '';
   const [state, setState] = useAtom(contentSearchAtom);
@@ -214,7 +214,7 @@ export function ContentSearchPanelBody(ctx: PanelContext) {
   const [limit, setLimit] = useState(LIST_STEP);
   const [copied, setCopied] = useState(false);
   const abort = useRef<AbortController | null>(null);
-  const terms = useAutocomplete(scope === 'service' ? service : undefined, text);
+  const terms = useAutocomplete(scope === 'service' ? service : undefined, text, locale);
 
   const search = (q: string, where: Scope = scope) => {
     const word = q.trim();

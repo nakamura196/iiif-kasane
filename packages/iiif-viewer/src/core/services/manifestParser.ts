@@ -16,7 +16,7 @@ import type {
 } from '../types/iiif';
 import type { Annotation, AnnotationImage, AnnotationTag } from '../types/main';
 import { sceneOf } from './containers';
-import { paintedModelsOf } from './paintedModels';
+import { labelIn, paintedModelsOf } from './paintedModels';
 
 export interface GeoFeatureName {
   toponym: string;
@@ -194,32 +194,29 @@ const extractModel = (scene: SceneV4 | undefined): { url: string | null; body?: 
   return { url: option?.url ?? null, body: option?.body };
 };
 
-const extractGeoFeatures = (annos: AnnotationV4[]): GeoFeature[] => {
+// A place name may be a IIIF language map instead of a string: pick the reader's language.
+const withTitleIn = (feature: GeoFeature, locale: string): GeoFeature => {
+  const title: unknown = feature.properties?.title;
+  return title === undefined || typeof title === 'string'
+    ? feature
+    : { ...feature, properties: { ...feature.properties, title: labelIn(title, locale) } };
+};
+
+const extractGeoFeatures = (annos: AnnotationV4[], locale: string): GeoFeature[] => {
   const out: GeoFeature[] = [];
   for (const anno of annos) {
     if (!motivationsOf(anno).includes('georeferencing')) continue;
     const body = anno.body as { type?: string; features?: GeoFeature[] } | undefined;
     if (body?.type === 'FeatureCollection' && Array.isArray(body.features)) {
-      out.push(...body.features);
+      out.push(...body.features.map((f) => withTitleIn(f, locale)));
     }
   }
   return out;
 };
 
-// A label may be a plain string or a IIIF language map.
-const localizedString = (label: unknown): string => {
-  if (typeof label === 'string') return label;
-  if (Array.isArray(label)) return label.map(String).join(' ');
-  if (label && typeof label === 'object') {
-    const map = label as Record<string, unknown>;
-    for (const lang of ['none', 'ja', 'en', ...Object.keys(map)]) {
-      const v = map[lang];
-      if (Array.isArray(v) && v.length > 0) return v.map(String).join(' ');
-      if (typeof v === 'string') return v;
-    }
-  }
-  return '';
-};
+// A label may be a plain string or a IIIF language map: the reader's locale first.
+const localizedString = (label: unknown, locale: string): string =>
+  Array.isArray(label) ? label.map(String).join(' ') : labelIn(label, locale);
 
 const hasPurpose = (body: Record<string, unknown>, purpose: string): boolean => {
   const p = body.purpose;
@@ -232,19 +229,19 @@ const firstOf = (v: unknown): Record<string, unknown> | undefined => {
 };
 
 // An Image body (§5 Images in an annotation, Region & Tag extension draft).
-const parseImage = (body: Record<string, unknown>): AnnotationImage | null => {
+const parseImage = (body: Record<string, unknown>, locale: string): AnnotationImage | null => {
   if (typeof body.id !== 'string') return null;
   const service = firstOf(body.service);
   const homepage = firstOf(body.homepage);
   const serviceId = service?.id ?? service?.['@id'];
   return {
     id: body.id,
-    ...(body.label ? { label: localizedString(body.label) } : {}),
+    ...(body.label ? { label: localizedString(body.label, locale) } : {}),
     ...(typeof body.format === 'string' ? { format: body.format } : {}),
     ...(hasPurpose(body, 'linking') ? { purpose: 'linking' } : hasPurpose(body, 'describing') ? { purpose: 'describing' } : {}),
     ...(typeof serviceId === 'string' ? { service: serviceId.replace(/\/info\.json$/, '') } : {}),
     ...(typeof homepage?.id === 'string' ? { homepage: homepage.id } : {}),
-    ...(homepage?.label ? { homepageLabel: localizedString(homepage.label) } : {}),
+    ...(homepage?.label ? { homepageLabel: localizedString(homepage.label, locale) } : {}),
   };
 };
 
@@ -253,6 +250,7 @@ const parseImage = (body: Record<string, unknown>): AnnotationImage | null => {
 // pictures of the annotated place.
 const parseBodies = (
   anno: AnnotationV4,
+  locale: string,
 ): { value: string; label: string; tags: AnnotationTag[]; images: AnnotationImage[] } => {
   if (typeof anno.bodyValue === 'string') {
     return { value: anno.bodyValue, label: anno.bodyValue, tags: [], images: [] };
@@ -266,17 +264,17 @@ const parseBodies = (
     if (!body || typeof body !== 'object') continue;
     if (hasPurpose(body, 'tagging')) {
       if (typeof body.value !== 'string' || body.value === '') continue;
-      const key = localizedString(body.label);
+      const key = localizedString(body.label, locale);
       tags.push(key ? { key, value: body.value } : { value: body.value });
     } else if (body.type === 'Image') {
-      const image = parseImage(body);
+      const image = parseImage(body, locale);
       if (image) images.push(image);
     } else if (!main) {
       main = body;
     }
   }
   const value = typeof main?.value === 'string' ? main.value : '';
-  const label = localizedString(main?.label);
+  const label = localizedString(main?.label, locale);
   return { value, label, tags, images };
 };
 
@@ -292,6 +290,7 @@ const buildAnnotation = (
   anno: AnnotationV4,
   cameras: Map<string, CameraView>,
   fallbackIndex: number,
+  locale: string,
 ): Annotation | null => {
   const selectors = targetSelectors(anno);
   if (selectors.length === 0) return null;
@@ -325,10 +324,10 @@ const buildAnnotation = (
     ? ([point.normal[0], point.normal[1], point.normal[2]] as [number, number, number])
     : undefined;
 
-  const bodies = parseBodies(anno);
+  const bodies = parseBodies(anno, locale);
   const { value, tags, images } = bodies;
   // The Annotation's own label is the heading; a body label is the older convention.
-  const label = localizedString(anno.label) || bodies.label;
+  const label = localizedString(anno.label, locale) || bodies.label;
   const regionId = typeof anno.target === 'object' ? anno.target.id : undefined;
 
   return {
@@ -371,20 +370,21 @@ export interface GeoCanvas {
 
 // Every Canvas that carries a georeferencing Annotation, in the Manifest's order.
 // geo.ldas.jp shows one at a time and pages through them.
-export const geoCanvasesOf = (manifest: ManifestV4): GeoCanvas[] =>
+export const geoCanvasesOf = (manifest: ManifestV4, locale = 'ja'): GeoCanvas[] =>
   (manifest.items ?? []).flatMap((c) => {
     if ((c as { type?: string })?.type !== 'Canvas') return [];
     const canvas = c as CanvasV4;
-    const features = extractGeoFeatures(flattenAllPages(canvas.annotations));
+    const features = extractGeoFeatures(flattenAllPages(canvas.annotations), locale);
     return features.length > 0 ? [{ id: canvas.id, label: (canvas as { label?: unknown }).label, features }] : [];
   });
 
 // Reads the Scene `sceneId` (default: the first Scene). A Manifest without a Scene gives the
 // places of its first georeferenced Canvas (geoCanvasId) instead.
-export const parseManifestV4 = (manifest: ManifestV4, sceneId?: string | null): ParsedManifest => {
+/** `locale` picks the language of the labels (default: Japanese). */
+export const parseManifestV4 = (manifest: ManifestV4, sceneId?: string | null, locale = 'ja'): ParsedManifest => {
   const scene = sceneOf(manifest, sceneId);
   if (!scene) {
-    const canvas = geoCanvasesOf(manifest)[0];
+    const canvas = geoCanvasesOf(manifest, locale)[0];
     if (canvas) {
       return { modelUrl: null, annotations: [], geoFeatures: canvas.features, geoCanvasId: canvas.id };
     }
@@ -393,7 +393,7 @@ export const parseManifestV4 = (manifest: ManifestV4, sceneId?: string | null): 
 
   const sceneAnnotations = flattenAllPages(scene?.annotations);
   const cameras = cameraIndex([...flattenAllPages(scene?.items), ...sceneAnnotations]);
-  const geoFeatures = extractGeoFeatures(sceneAnnotations);
+  const geoFeatures = extractGeoFeatures(sceneAnnotations, locale);
 
   const out: Annotation[] = [];
   let i = 0;
@@ -402,7 +402,7 @@ export const parseManifestV4 = (manifest: ManifestV4, sceneId?: string | null): 
     if (motivations.includes('georeferencing')) continue;
     // Skip camera annotations themselves; they only feed `cameras`.
     if (cameras.has(anno.id)) continue;
-    const built = buildAnnotation(anno, cameras, i);
+    const built = buildAnnotation(anno, cameras, i, locale);
     if (built) out.push(built);
     i++;
   }

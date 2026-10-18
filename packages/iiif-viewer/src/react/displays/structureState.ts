@@ -4,6 +4,7 @@
 // 右パネルの目次・ページ送り・表示が、これを通してつながる。
 
 import { useCallback, useMemo } from 'react';
+import { useLocale } from '../env';
 import { atom, useAtomValue, useSetAtom } from 'jotai';
 import {
   canvasBehaviorsOf,
@@ -92,6 +93,7 @@ export function useManifestSwitch() {
   const manifest = useAtomValue(manifestAtom);
   const manifestUrl = useAtomValue(manifestUrlAtom);
   const trail = useAtomValue(trailAtom);
+  const locale = useLocale();
   const setManifest = useSetAtom(manifestAtom);
   const setAnnotations = useSetAtom(annotationsAtom);
   const setPainted = useSetAtom(paintedModelsAtom);
@@ -104,7 +106,7 @@ export function useManifestSwitch() {
 
   const apply = useCallback(
     (next: ManifestV4) => {
-      const { annotations } = parseManifestV4(next);
+      const { annotations } = parseManifestV4(next, undefined, locale);
       setPainted(paintedModelsOf(firstSceneOf(next)));
       setChoices({});
       setManifest(next);
@@ -114,7 +116,7 @@ export function useManifestSwitch() {
       setCompare([]);
       setCompareMulti(null);
     },
-    [setManifest, setAnnotations, setPainted, setChoices, setSequence, setFocus, setCompare, setCompareMulti],
+    [setManifest, setAnnotations, setPainted, setChoices, setSequence, setFocus, setCompare, setCompareMulti, locale],
   );
 
   /** URL のマニフェスト（または Collection）を開く。push なら「戻る」で今のものに戻れる。 */

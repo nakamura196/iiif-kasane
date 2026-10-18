@@ -2,6 +2,8 @@
 import React from 'react';
 import { sanitizeAboutHtml } from '../../core';
 import { LINK_CLASS } from '../panels/SafeHtml';
+import { useLocale } from '../env';
+import { labelIn } from '../../core/services/paintedModels';
 
 export type IIIFLabel = string | string[] | Record<string, string | string[]>;
 
@@ -12,30 +14,10 @@ interface LabelProps {
 }
 
 export function Label({ label, as = 'span', className = '' }: LabelProps) {
+  const locale = useLocale();
   if (!label) return null;
-  
-  // Handle different label formats from IIIF
-  let displayText = '';
-  
-  if (typeof label === 'string') {
-    displayText = label;
-  } else if (Array.isArray(label)) {
-    displayText = label[0] || '';
-  } else if (typeof label === 'object') {
-    // Handle IIIF internationalized labels
-    if (label.ja) {
-      displayText = Array.isArray(label.ja) ? label.ja[0] : label.ja;
-    } else if (label.en) {
-      displayText = Array.isArray(label.en) ? label.en[0] : label.en;
-    } else {
-      // Get first available language
-      const firstKey = Object.keys(label)[0];
-      if (firstKey) {
-        displayText = Array.isArray(label[firstKey]) ? label[firstKey][0] : label[firstKey];
-      }
-    }
-  }
-  
+  const displayText = labelIn(label, locale);
+
   const props = { className };
   
   if (as === 'span') return <span {...props}>{displayText}</span>;
@@ -55,28 +37,10 @@ interface SummaryProps {
 }
 
 export function Summary({ summary, className = '' }: SummaryProps) {
+  const locale = useLocale();
   if (!summary) return null;
-  
-  let displayText = '';
-  
-  if (typeof summary === 'string') {
-    displayText = summary;
-  } else if (Array.isArray(summary)) {
-    displayText = summary[0] || '';
-  } else if (typeof summary === 'object') {
-    // Handle IIIF internationalized summary
-    if (summary.ja) {
-      displayText = Array.isArray(summary.ja) ? summary.ja[0] : summary.ja;
-    } else if (summary.en) {
-      displayText = Array.isArray(summary.en) ? summary.en[0] : summary.en;
-    } else {
-      const firstKey = Object.keys(summary)[0];
-      if (firstKey) {
-        displayText = Array.isArray(summary[firstKey]) ? summary[firstKey][0] : summary[firstKey];
-      }
-    }
-  }
-  
+  const displayText = labelIn(summary, locale);
+
   return <div className={`${LINK_CLASS} ${className ?? ''}`} dangerouslySetInnerHTML={{ __html: sanitizeAboutHtml(displayText) }} />;
 }
 
@@ -91,51 +55,15 @@ interface MetadataProps {
 }
 
 export function Metadata({ metadata, className = '' }: MetadataProps) {
+  const locale = useLocale();
   if (!metadata || !Array.isArray(metadata)) return null;
-  
+
   return (
     <div className={className}>
       {metadata.map((item, index) => {
-        // Extract text from label
-        let labelText = '';
-        const label = item.label;
-        if (typeof label === 'string') {
-          labelText = label;
-        } else if (Array.isArray(label)) {
-          labelText = label[0] || '';
-        } else if (typeof label === 'object') {
-          if (label.ja) {
-            labelText = Array.isArray(label.ja) ? label.ja[0] : label.ja;
-          } else if (label.en) {
-            labelText = Array.isArray(label.en) ? label.en[0] : label.en;
-          } else {
-            const firstKey = Object.keys(label)[0];
-            if (firstKey) {
-              labelText = Array.isArray(label[firstKey]) ? label[firstKey][0] : label[firstKey];
-            }
-          }
-        }
-        
-        // Extract text from value
-        let valueText = '';
-        const value = item.value;
-        if (typeof value === 'string') {
-          valueText = value;
-        } else if (Array.isArray(value)) {
-          valueText = value[0] || '';
-        } else if (typeof value === 'object') {
-          if (value.ja) {
-            valueText = Array.isArray(value.ja) ? value.ja[0] : value.ja;
-          } else if (value.en) {
-            valueText = Array.isArray(value.en) ? value.en[0] : value.en;
-          } else {
-            const firstKey = Object.keys(value)[0];
-            if (firstKey) {
-              valueText = Array.isArray(value[firstKey]) ? value[firstKey][0] : value[firstKey];
-            }
-          }
-        }
-        
+        const labelText = labelIn(item.label, locale);
+        const valueText = labelIn(item.value, locale);
+
         return (
           <div key={index} className="mb-2">
             <dt className="font-medium text-gray-700 dark:text-gray-300">

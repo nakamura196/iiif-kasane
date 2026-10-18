@@ -217,11 +217,11 @@ const GeoRefContent: NextPage = () => {
     fetchManifest(manifestUrl).then((raw) => {
       if (!raw) return;
       const manifest = convertToV4(raw);
-      const parsed = parseManifestV4(manifest);
+      const parsed = parseManifestV4(manifest, undefined, locale);
       const { modelUrl, modelBody, annotations } = parsed;
       let { geoFeatures, geoCanvasId } = parsed;
       // 地点の付いた Canvas が 2 つ以上あれば、URL の canvas のものを開く
-      const canvases = geoCanvasId ? geoCanvasesOf(manifest) : [];
+      const canvases = geoCanvasId ? geoCanvasesOf(manifest, locale) : [];
       // ビューアと同じく、番号（1 から。マニフェストの何枚目か）でも id でもよい
       const want = urlState?.canvas;
       const wantId = want && /^\d+$/.test(want) ? manifest.items?.[Number(want) - 1]?.id : want;

@@ -20,6 +20,16 @@ const fixture = (name: string): unknown =>
 // 2026-10-15 に取った実物（件数を減らしてある）と、2.0 の仕様の例に沿って手で書いたもの。
 // 2.0 の窓口を持つ公開の資料は見つからなかった。
 
+describe('findContentSearchService label', () => {
+  it('picks the label in the locale asked for', () => {
+    const manifest = {
+      service: [{ id: 'https://example.org/s', type: 'SearchService2', label: { ja: ['本文を探す'], en: ['Search text'] } }],
+    };
+    expect(findContentSearchService(manifest, 'en')?.label).toBe('Search text');
+    expect(findContentSearchService(manifest, 'ja')?.label).toBe('本文を探す');
+  });
+});
+
 describe('findContentSearchService', () => {
   it('finds a 2.0 service and its autocomplete, and prefers it to 1.0', () => {
     const manifest = {

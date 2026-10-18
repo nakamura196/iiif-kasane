@@ -117,6 +117,44 @@ describe('labelIn', () => {
     expect(labelIn({ none: ['1934'], en: ['x'] }, 'ja')).toBe('1934');
     expect(labelIn('plain', 'en')).toBe('plain');
   });
+
+  it('follows the locale, then none, then en, then the first language', () => {
+    const map = { ja: ['上野駅'], en: ['Ueno Station'] };
+    expect(labelIn(map, 'en')).toBe('Ueno Station');
+    expect(labelIn(map, 'ja')).toBe('上野駅');
+    expect(labelIn({ fr: ['Gare'], en: ['Station'] }, 'ja')).toBe('Station');
+    expect(labelIn({ fr: ['Gare'], de: ['Bahnhof'] }, 'ja')).toBe('Gare');
+    expect(labelIn({ none: ['1'], en: ['x'] }, 'en')).toBe('x');
+    expect(labelIn(undefined, 'en')).toBe('');
+  });
+
+  it('gives the annotation titles of a Scene in the locale asked for', () => {
+    const manifest = {
+      items: [
+        {
+          id: 'https://example.org/s',
+          type: 'Scene',
+          annotations: [
+            {
+              type: 'AnnotationPage',
+              items: [
+                {
+                  id: 'https://example.org/a1',
+                  type: 'Annotation',
+                  motivation: 'commenting',
+                  label: { ja: ['上野駅'], en: ['Ueno Station'] },
+                  body: { type: 'TextualBody', value: '' },
+                  target: { type: 'SpecificResource', source: 'https://example.org/s', selector: [{ type: 'PointSelector', x: 1, y: 2, z: 3 }] },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    } as never;
+    expect(parseManifestV4(manifest, undefined, 'en').annotations[0].title).toBe('Ueno Station');
+    expect(parseManifestV4(manifest, undefined, 'ja').annotations[0].title).toBe('上野駅');
+  });
 });
 
 describe('parseManifestV4 modelUrl', () => {
