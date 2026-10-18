@@ -172,7 +172,9 @@ class Controller {
       if (!live()) return;
       if (r && this.allowed(r)) {
         this.set({ logoutOf: a });
-        return this.finishOk(r, true);
+        this.finishOk(r, true);
+        if (a.id) wakeWaiting(this, a.id);
+        return;
       }
       last = r ?? last;
       message = { heading: last?.heading, note: last?.note };
@@ -271,6 +273,14 @@ const notify = () => {
   version++;
   globalListeners.forEach((l) => l());
 };
+
+// After a login through an access service, other probes that wait for the user on the same service
+// (e.g. models A and B of the compare page) ask again: the token service now answers without a window.
+function wakeWaiting(from: Controller, accessId: string) {
+  controllers.forEach((c) => {
+    if (c !== from && c.refs > 0 && c.state.phase === 'prompt' && c.probe.access.some((a) => a.id === accessId)) void c.start(true);
+  });
+}
 
 /** Starts (once) and shares the Controller of a probe while a component uses it. */
 export function useAuth(probe: AuthProbeRef | undefined, locale: string): { state: AuthState; controller: Controller } | undefined {

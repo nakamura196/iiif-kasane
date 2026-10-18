@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAtom, useAtomValue } from 'jotai';
 import { useLocale, useTranslations } from 'next-intl';
 import {
+  AuthPrompt,
   ImageCompareView,
   Info,
   SidePanel,
@@ -13,6 +14,7 @@ import {
   paintedModelsAtom,
   useCanvasImages,
   useCompareSources,
+  useAuthStates,
   useManifest,
   type CompareBlend,
   type CompareMode,
@@ -24,12 +26,14 @@ import ManifestInput from '@/components/Input';
 import CompareView, { type CompareMode3D } from '@/components/three/CompareView';
 import {
   alignmentOf,
+  authorizedUrl,
   choiceSidesOf,
   containersOf,
   contentParam,
   imageChoiceOf,
   labelIn,
   parseAlignment,
+  probeServiceOf,
   type Alignment,
 } from '@nakamura196/iiif-viewer/core';
 import { manifestFromParams } from '@nakamura196/iiif-viewer/core';
@@ -298,12 +302,28 @@ const CompareContent: NextPage = () => {
         : options.map((o) => ({ key: o.url, label: labelIn(o.label, locale) || o.url.split('/').pop() || '' })),
     [multi, found.candidates, options, locale],
   );
-  const extraModels = useMemo(
-    () => paintedModels.slice(1).map((m) => ({ url: m.options[0].url, position: m.position })),
-    [paintedModels],
-  );
   const clamp = (i: number) => Math.min(Math.max(i, 0), Math.max(entries.length - 1, 0));
-  const at = (i: number) => options[clamp(i)];
+
+  // Models behind IIIF Auth 2.0 (an AuthProbeService2 on the Model) are loaded only once the probe
+  // lets the user in, as in the 3D viewer: A, B, then the other painted models.
+  const loaded = useMemo(() => {
+    if (!is3D || !main) return [];
+    const m = (i: number) => main.options[Math.min(Math.max(i, 0), main.options.length - 1)];
+    return [m(pick[0]), m(pick[1]), ...paintedModels.slice(1).map((p) => p.options[0])];
+  }, [is3D, main, pick, paintedModels]);
+  const probes = useMemo(() => loaded.map((o) => (o ? probeServiceOf(o.body, locale) : undefined)), [loaded, locale]);
+  const authStates = useAuthStates(probes, locale);
+  const modelUrls = loaded.map((o, i) => (o ? authorizedUrl(o.url, authStates[i]) : null));
+  const extraKey = modelUrls.slice(2).join('\n');
+  const extraModels = useMemo(
+    () =>
+      paintedModels
+        .slice(1)
+        .map((m, i) => ({ url: modelUrls[i + 2], position: m.position }))
+        .filter((m): m is { url: string; position: [number, number, number] } => !!m.url),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- modelUrls is rebuilt each render; extraKey holds its content
+    [paintedModels, extraKey],
+  );
   const nameOf = (i: number) => entries[clamp(i)]?.label ?? '';
 
   const sides = useMemo(() => {
@@ -502,11 +522,11 @@ const CompareContent: NextPage = () => {
                   onRemove={removeSource}
                 />
               )}
-              <div className="flex-1 min-h-0">
+              <div className="relative flex-1 min-h-0">
                 {is3D ? (
                   <CompareView
                     mode={shownMode === 'overlay' ? 'side' : shownMode}
-                    urls={[at(pick[0])?.url ?? null, at(pick[1])?.url ?? null]}
+                    urls={[modelUrls[0] ?? null, modelUrls[1] ?? null]}
                     labels={[nameOf(pick[0]), nameOf(pick[1])]}
                     extraModels={extraModels}
                     swipeDirection={direction}
@@ -527,6 +547,7 @@ const CompareContent: NextPage = () => {
                     />
                   )
                 )}
+                {is3D && <AuthPrompt />}
               </div>
             </div>
             {!multi && (

@@ -32,6 +32,9 @@ export {
   type ImageCompareViewProps,
 } from './displays/ImageCompareView';
 export { useCompareSources } from './displays/useCompareSources';
+// IIIF Auth 2.0 for pages that load models themselves (e.g. the compare page)
+export { default as AuthPrompt } from './auth/AuthPrompt';
+export { useAuthStates, type AuthState } from './auth/authStore';
 export * from './compare/CompareParts';
 export {
   default as GeoImageView,

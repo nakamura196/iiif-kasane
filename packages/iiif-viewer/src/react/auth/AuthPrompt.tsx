@@ -9,7 +9,15 @@ import { useAuthPanels } from './authStore';
 // 拒否のままのとき: 理由と「もう一度」。ログインできているときは、ログアウトのリンク。
 export default function AuthPrompt() {
   const t = useTranslations('Viewer');
-  const panels = useAuthPanels();
+  // several probes behind the same access service (models A and B of the compare page) share one
+  // prompt: logging in through it lets the others in too
+  const asked = new Set<string>();
+  const panels = useAuthPanels().filter(({ state }) => {
+    if (state.phase !== 'prompt' || !state.access?.id) return true;
+    if (asked.has(state.access.id)) return false;
+    asked.add(state.access.id);
+    return true;
+  });
   return (
     <>
       {panels.map(({ state, controller }) => {
