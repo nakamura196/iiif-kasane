@@ -7,7 +7,7 @@ import { useAtom } from 'jotai';
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { fetchManifest } from '@nakamura196/iiif-viewer/core';
 import { manifestAtom } from '@nakamura196/iiif-viewer';
-import { CanvasComponent, GeoImageView, useCanvasImages } from '@nakamura196/iiif-viewer';
+import { AuthPrompt, CanvasComponent, GeoImageView, useAuthStates, useCanvasImages } from '@nakamura196/iiif-viewer';
 import ManifestInput from '@/components/Input';
 import RotationControl from '@/components/map/RotationControl';
 import Header from '@/components/Header';
@@ -15,7 +15,7 @@ import { Link } from '@/i18n/routing';
 import { SITE_URL } from '@/lib/site';
 import { USE_CASES, hrefOf } from '@/lib/usecases';
 import MapView, { type MapImageOverlay } from '@/components/map/MapView';
-import { convertToV4 } from '@nakamura196/iiif-viewer/core';
+import { authorizedUrl, convertToV4, probeServiceOf } from '@nakamura196/iiif-viewer/core';
 import {
   parseManifestV4,
   geoAnnotations,
@@ -102,7 +102,13 @@ const GeoRefContent: NextPage = () => {
   const locale = useLocale();
   const [manifestUrl, setManifestUrl] = useAtom(manifestUrlAtom);
   const [manifest, setManifest] = useAtom(manifestAtom);
-  const [glbUrl, setGlbUrl] = useState<string | null>(null);
+  const [modelUrl, setModelUrl] = useState<string | null>(null);
+  const [modelBody, setModelBody] = useState<unknown>(undefined);
+  // A model behind IIIF Auth 2.0 (an AuthProbeService2 on the Model) is loaded only once the probe lets
+  // the user in, as in the 3D viewer; an unprotected one keeps its plain URL.
+  const probes = useMemo(() => [modelBody ? probeServiceOf(modelBody, locale) : undefined], [modelBody, locale]);
+  const [authState] = useAuthStates(probes, locale);
+  const glbUrl = modelUrl ? authorizedUrl(modelUrl, authState) : null;
   // 地点が画像（絵図・古地図）に付いているときは、その Canvas を 3D の代わりに出す
   const [geoCanvasId, setGeoCanvasId] = useState<string | undefined>(undefined);
   const geoCanvas = useCanvasImages(geoCanvasId ? manifestUrl : null, geoCanvasId);
@@ -212,7 +218,7 @@ const GeoRefContent: NextPage = () => {
       if (!raw) return;
       const manifest = convertToV4(raw);
       const parsed = parseManifestV4(manifest);
-      const { modelUrl, annotations } = parsed;
+      const { modelUrl, modelBody, annotations } = parsed;
       let { geoFeatures, geoCanvasId } = parsed;
       // 地点の付いた Canvas が 2 つ以上あれば、URL の canvas のものを開く
       const canvases = geoCanvasId ? geoCanvasesOf(manifest) : [];
@@ -224,7 +230,8 @@ const GeoRefContent: NextPage = () => {
         geoFeatures = fromUrl.features;
         geoCanvasId = fromUrl.id;
       }
-      setGlbUrl(modelUrl);
+      setModelUrl(modelUrl);
+      setModelBody(modelBody);
       setGeoCanvases(canvases);
       setGeoCanvasId(geoCanvasId);
       setManifest(manifest);
@@ -468,6 +475,7 @@ const GeoRefContent: NextPage = () => {
                   <CanvasComponent glbUrl={glbUrl} attribution={attribution} />
                 </Suspense>
               )}
+              {modelUrl && <AuthPrompt />}
             </div>
             {/* Annotations */}
             {/* geo.ldas.jp の search=1・license=1 のリンクは、欄を畳んでいても開いて出す */}
