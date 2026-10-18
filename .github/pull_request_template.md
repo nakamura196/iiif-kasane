@@ -15,4 +15,4 @@
 
 ## Use cases, news and samples
 
-<!-- For new features: should this be added to the use cases (src/lib/usecases.ts), the news (src/lib/news.ts) or the samples (src/lib/samples.ts)? Say yes or no for each, and why. Delete this section for small fixes. -->
+<!-- For new features: should this be added to the use cases (src/lib/usecases.ts), the news (content/news/<id>.md) or the samples (src/lib/samples.ts)? Say yes or no for each, and why. Delete this section for small fixes. -->

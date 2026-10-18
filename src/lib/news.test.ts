@@ -42,3 +42,20 @@ describe('NEWS', () => {
     }
   });
 });
+
+describe('content/news/<id>.md の読み込み', () => {
+  it('front matter の . は入れ子に、usecases はカンマで分け、note は捨てる', async () => {
+    const { parseNewsFile } = await import('../../scripts/build-news.mjs');
+    const n = parseNewsFile('x', '---\ndate: 2026-10-18\norder: 2\ntitle.ja: 題\ntitle.en: Title\naction.viewer: https://example.org/m.json\naction.params: tab=views\nusecases: a, b\nnote: 覚え書き\n---\n\n## ja\n\n本文。\n\n## en\n\nBody.\n');
+    expect(n).toEqual({
+      id: 'x', date: '2026-10-18', order: 2, title: { ja: '題', en: 'Title' },
+      action: { viewer: 'https://example.org/m.json', params: 'tab=views' },
+      usecases: ['a', 'b'], body: { ja: '本文。', en: 'Body.' },
+    });
+  });
+
+  it('「試す」の行き先を組み立てる', () => {
+    const m = NEWS.find((n) => n.id === 'scene-search');
+    expect(m?.action?.href).toBe(`/viewer/?iiif-content=${encodeURIComponent('https://nakamura196.github.io/hongo-campus-iiif/ueno.json')}&tab=contentSearch`);
+  });
+});

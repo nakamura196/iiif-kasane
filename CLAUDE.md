@@ -23,8 +23,9 @@ PR を出す前に次の 3 つを 1 つずつ検討し、**載せるか・載せ
 
 1. **ユースケース** — `src/lib/usecases.ts` に 1 件足す。実在の資料を、その機能が効く開き方（`tab=` など）で開く。
    サムネイルは `scripts/capture-thumbnails.mjs` で撮る（`public/thumbnails/usecases/<id>.webp`）
-2. **お知らせ** — `src/lib/news.ts` の `NEWS` の先頭に 1 件足す（日英の見出しと 2〜3 文の本文、
-   「試す」の行き先、関連するユースケースの id）。トップには新しい 5 件が出て、`/news` に一覧、
+2. **お知らせ** — `content/news/<id>.md` を 1 つ置く（日英の見出しと 2〜3 文の本文、
+   「試す」の行き先、関連するユースケースの id。書き方は `content/news/README.md`）。1 件 1 ファイルなので、
+   並行する PR どうしがぶつからない。トップには新しい 5 件が出て、`/news` に一覧、
    `/news/<id>` に詳細ページができる
 3. **サンプル** — 機能を試せる短いマニフェストがあるなら `src/lib/samples.ts`（IIIF Cookbook のレシピなど）
 
