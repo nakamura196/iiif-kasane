@@ -416,6 +416,21 @@ export const USE_CASES: UseCase[] = [
     video: { ja: 'Trl4ksr5TBU', en: 'etqp6liTkFo' },
   },
   {
+    id: 'degraded-auth',
+    added: '2026-10-17',
+    title: {
+      ja: '国立国会図書館『百鬼夜行絵巻』（同意前は白黒の小さな版、IIIF Auth API 2.0）',
+      en: 'Hyakki yagyō emaki, National Diet Library (a small grayscale version until you consent, IIIF Auth API 2.0)',
+    },
+    note: {
+      ja: 'IIIF Auth API 2.0 の型を試せるデモサイトに置いた、劣化版（substitute）の例です。開くと、まず白黒の小さな版と同意の案内が出ます。同意すると、カラーの高精細な画像に替わります。一度同意すると次からはカラーで開くので、最初から試すときはデモサイトの「Reset / やり直す」を押してください。',
+      en: 'An example of a degraded version (substitute) on a demo site for trying the types of the IIIF Auth API 2.0. It first opens a small grayscale version with a consent prompt. Once you consent, the full-resolution color image replaces it. After consenting it opens in color, so press “Reset / やり直す” on the demo site to try again from the start.',
+    },
+    open: { page: 'viewer', manifest: 'https://iiif-auth-demo.ldas.jp/manifest/degraded/hyakki17.json' },
+    features: ['image', 'auth'],
+    site: 'https://iiif-auth-demo.ldas.jp/',
+  },
+  {
     id: 'video-objects',
     added: '2026-10-15',
     title: {
