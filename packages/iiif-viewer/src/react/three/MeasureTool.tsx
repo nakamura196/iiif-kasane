@@ -47,7 +47,7 @@ export default function MeasureMarks({
         <>
           <Line points={[a, b]} color="#f97316" lineWidth={2} depthTest={false} renderOrder={998} />
           <Html position={mid} center style={{ pointerEvents: 'none' }}>
-            <div className="px-2 py-0.5 rounded bg-white/90 dark:bg-gray-800/90 text-xs font-medium text-gray-900 dark:text-gray-100 shadow whitespace-nowrap">
+            <div className="px-2 py-0.5 rounded bg-white/90 dark:bg-gray-800/90 text-sm font-medium text-gray-900 dark:text-gray-100 shadow whitespace-nowrap">
               {formatLength(distanceBetween(a.toArray(), b.toArray()), scale)}
             </div>
           </Html>

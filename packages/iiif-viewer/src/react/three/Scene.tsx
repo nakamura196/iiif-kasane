@@ -2,7 +2,7 @@
 
 import { startTransition, Suspense, useEffect, useImperativeHandle, useMemo, useRef, type Ref } from 'react';
 import { Clone, useAnimations, useGLTF, Bounds } from '@react-three/drei';
-import { useThree } from '@react-three/fiber';
+import { useThree, type ThreeEvent } from '@react-three/fiber';
 import { Box3, Group, PerspectiveCamera, Points, PointsMaterial, Sphere, Vector3, type Object3D } from 'three';
 import gsap from 'gsap';
 import Annotations from '../three/Annotations';
@@ -125,11 +125,11 @@ export interface PlacedModel {
 
 // A model painted into the Scene besides the main one (e.g. the ground). Each loads
 // in its own Suspense so that switching it does not hide the rest of the scene.
-function PlacedGLTF({ url, position }: PlacedModel) {
+function PlacedGLTF({ url, position, onClick }: PlacedModel & { onClick?: (e: ThreeEvent<MouseEvent>) => void }) {
   const model = useGLTF(url);
   useSizedPoints(model.scene);
   return (
-    <group position={position}>
+    <group position={position} onClick={onClick}>
       <Clone object={model.scene} />
     </group>
   );
@@ -229,7 +229,7 @@ export default function Scene({
         // a model beside the main one that fails to load is left out; the rest stays
         <ModelErrorBoundary key={`${i}:${m.url}`}>
           <Suspense fallback={null}>
-            <PlacedGLTF url={m.url} position={m.position} />
+            <PlacedGLTF url={m.url} position={m.position} onClick={measure.onClick} />
           </Suspense>
         </ModelErrorBoundary>
       ))}
@@ -247,7 +247,7 @@ export default function Scene({
       {/* 測っている間は注釈の印を隠す（印のクリックが計測と混ざらないように） */}
       {model && showAnnotations && !measuring && <Annotations model={model} />}
       {measuring && spatialScale && (
-        <MeasureMarks points={measure.points} scale={spatialScale} size={sphere.radius * 0.01} />
+        <MeasureMarks points={measure.points} scale={spatialScale} size={sphere.radius * 0.012} />
       )}
     </>
   );
