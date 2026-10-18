@@ -431,6 +431,21 @@ export const USE_CASES: UseCase[] = [
     site: 'https://iiif-auth-demo.ldas.jp/',
   },
   {
+    id: 'degraded-auth-3d',
+    added: '2026-10-17',
+    title: {
+      ja: '上野駅周辺の点群（同意前は軽い点群、IIIF Auth API 2.0）',
+      en: 'Ueno station area point cloud (a lighter point cloud until you consent, IIIF Auth API 2.0)',
+    },
+    note: {
+      ja: '劣化版（substitute）の型を 3D モデルに使った例です。開くと、まず軽い点群（1.7 MB）と同意の案内が出ます。同意すると、高精細の点群（17 MB）に替わります。最初から試すときは、デモサイトの「Reset / やり直す」を押してください。',
+      en: 'The degraded version (substitute) pattern applied to a 3D model. It first opens a lighter point cloud (1.7 MB) with a consent prompt. Once you consent, the full point cloud (17 MB) replaces it. To try again from the start, press “Reset / やり直す” on the demo site.',
+    },
+    open: { page: 'viewer', manifest: 'https://iiif-auth-demo.ldas.jp/manifest/degraded3d/ueno.json' },
+    features: ['3d', 'auth'],
+    site: 'https://iiif-auth-demo.ldas.jp/',
+  },
+  {
     id: 'video-objects',
     added: '2026-10-15',
     title: {

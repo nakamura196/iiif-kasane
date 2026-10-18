@@ -49,7 +49,7 @@ export const NEWS: NewsItem[] = [
       en: 'Kasane now supports the IIIF Auth 2.0 pattern that shows a substitute (such as a small grayscale version) before consent or login. It shows the substitute with the prompt, then switches to the full-resolution image once access is granted. An example using Hyakki yagyō emaki from the National Diet Library is in the use cases.',
     },
     action: { href: hrefOfUseCase('degraded-auth') },
-    usecases: ['degraded-auth', 'wellcome-auth'],
+    usecases: ['degraded-auth', 'degraded-auth-3d', 'wellcome-auth'],
   },
   {
     id: 'other-views-tab',
