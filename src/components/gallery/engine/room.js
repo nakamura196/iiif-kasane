@@ -274,10 +274,10 @@ function buildDownlights(placements, roomH) {
     const a = (i / n) * Math.PI * 2 + Math.PI / n;
     const x = Math.sin(a) * ringR;
     const z = Math.cos(a) * ringR;
-    // 発光する器具(ブルームでにじむ・ライトコスト0)
+    // 発光する器具(ブルームでにじむ・ライトコスト0)。ブルームの閾値(1.0)を超えるよう色を 1 より明るくする
     const fix = new THREE.Mesh(
       new THREE.CircleGeometry(0.16, 24),
-      new THREE.MeshBasicMaterial({ color: lightCol, toneMapped: false })
+      new THREE.MeshBasicMaterial({ color: lightCol.clone().multiplyScalar(2), toneMapped: false })
     );
     fix.rotation.x = Math.PI / 2;
     fix.position.set(x, roomH - 0.12, z);

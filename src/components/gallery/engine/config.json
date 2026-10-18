@@ -38,8 +38,8 @@
     "furniture": true
   },
 
-  "$comment_bloom": "照明やハイライトのふんわりした発光。重ければ enabled:false に。",
-  "bloom": { "enabled": true, "strength": 0.4, "radius": 0.5, "threshold": 0.86 },
+  "$comment_bloom": "照明やハイライトのふんわりした発光。重ければ enabled:false に。threshold は 1.0 未満にしない（白い作品が光源扱いになって白飛びする）",
+  "bloom": { "enabled": true, "strength": 0.4, "radius": 0.5, "threshold": 1.0 },
 
   "$comment_motion": "演出。autoRotate=放置で自動回転 / plates=作品の銘板 / flyDuration=近づく秒数",
   "autoRotate": true,
