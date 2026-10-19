@@ -84,3 +84,23 @@ GitHub API の回数上限で issue の検索が一部できていないので�
 - https://iiif.io/api/cookbook/recipe/matrix-v4/
 - https://www.web3d.org/new/node/2830
 - https://glenrobson.github.io/iiif_stuff/3d_prototypes/
+
+## 2026-10-19 Voyager の dev-iiif を手元で動かした
+
+`smithsonian/dpo-voyager` の `dev-iiif`（fdd7d01、2026-07-22）を clone してビルドした。
+package.json は `@iiif/3d-manifesto-dev` を隣のフォルダ（`../manifesto-3d`）から取る設定なので、
+npm に出ている `@iiif/3d-manifesto-dev@0.7.0` を入れて `webpack --mode=development --env=app=explorer` で通した。
+画面の表記は「Voyager Explorer 0.59.0 DEV」。`?iiif-content=<manifest>` で読ませた。
+
+- IIIF/3d の見本 `9_commenting_annotations/astronaut_comment.json`: 模型と 2 つの注釈（Helmet・Glove）が正しく出る。ビルドは正常。
+- 上野（そのまま）: label は出るが描画は空。`Error: unimplemented type for AnnotationBody: FeatureCollection`
+  （Georeference の注釈の body を manifesto-3d が読めず、読み込みが止まる）。
+- 上野から Georeference の注釈と navPlace を外した版: まだ空。例外は 2 つ。
+  - `TypeError: camera.getBehavior is not a function`（Scene の PerspectiveCamera の読み込み）
+  - 模型の取得が 403。Choice の 1 つ目（PLATEAU）は Auth 2.0 の Cookie が要る配信で、Voyager は認証の手順を踏まないため。
+
+記事に書けること: Voyager の IIIF 対応は、草案の基本（模型・注釈・カメラ・光）を見本どおりに描ける段階。
+Georeference・Auth 2.0・Choice のように Kasane が併用している仕様が 1 つでも入ると、上野は表示できなかった。
+「Voyager が劣る」とは書かない（未リリースの作業用ブランチで、3D の計測・ツアーなど Voyager 独自の機能は Kasane より厚い）。
+
+確かめていないこと: 認証の無い模型だけを Choice の先頭に置いた版。カメラの例外がそれで消えるか。
