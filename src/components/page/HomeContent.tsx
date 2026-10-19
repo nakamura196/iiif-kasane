@@ -44,7 +44,7 @@ export default function HomeContent() {
   ] as const;
 
   // ロケール別のデモ動画（YouTube videoId）。日本語版 / 英語版を出し分ける。
-  const demoVideoId = locale === 'en' ? 'Wbhqz5s6ahA' : '_thPJDU_hLA';
+  const demoVideoId = locale === 'en' ? 'WMRHywj5ViU' : 'SuFZgobTTLU';
 
   const handleManifestSubmit = async (manifestUrl: string, tab?: string) => {
     const url = `/${locale}/viewer?${contentParam(manifestUrl)}`;
