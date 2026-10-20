@@ -1,6 +1,7 @@
 // Public API of @nakamura196/iiif-viewer: React components on top of ./core.
 export { Viewer, type ViewerProps, type ViewerActionsState } from './Viewer';
 export { useManifest } from './useManifest';
+export type { ViewerTarget, ViewerSelection } from './navigation';
 export * from './atoms';
 export {
   ViewerEnv,

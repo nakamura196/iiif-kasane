@@ -8,7 +8,7 @@ paging and tables of contents, audio/video with time ranges, annotations, IIIF A
 ## Install
 
 ```sh
-npm install https://github.com/nakamura196/iiif-kasane/releases/download/iiif-viewer-v0.1.0/nakamura196-iiif-viewer-0.1.0.tgz
+npm install https://github.com/nakamura196/iiif-kasane/releases/download/iiif-viewer-v0.1.1/nakamura196-iiif-viewer-0.1.1.tgz
 npm install react react-dom jotai three three-stdlib @react-three/fiber @react-three/drei gsap
 ```
 
@@ -47,10 +47,36 @@ The viewer fills its parent: give the parent a height and pass `className="h-ful
 `theme` is `light`, `dark` or `auto`. The React files are marked `'use client'`, so they can be
 imported from Next.js server components.
 
+### Following the host page
+
+`target` tells the viewer which Canvas (and region) to show, and `onSelect` reports the shown Canvas.
+Use them to keep the viewer in step with something else on the page, such as a transcription
+whose page breaks point to Canvases.
+
+```tsx
+import { Viewer, type ViewerTarget } from '@nakamura196/iiif-viewer';
+
+const [target, setTarget] = useState<ViewerTarget>({ canvasId: 'https://example.org/canvas/p2' });
+
+<Viewer
+  iiifContent={manifestUrl}
+  className="h-full"
+  // xywh: x, y, width, height in Canvas pixels. highlight: false zooms without drawing a box
+  target={{ ...target, xywh: [400, 600, 1200, 800] }}
+  onSelect={({ canvasId, index }) => console.log('shown', index, canvasId)}
+/>
+```
+
+The viewer moves to `target` when the manifest is loaded and whenever `target` points somewhere else
+(a new object with the same values does nothing). The reader can still turn the pages in between.
+`onSelect` is called for the first Canvas, for each page turn, and after moving to `target`;
+while the viewer is on its way to `target`, the Canvas it opens first is not reported.
+An unknown `canvasId` is ignored.
+
 ## The `<iiif-viewer>` tag
 
 ```html
-<script type="module" src="https://kasane.ldas.jp/element/v0.1.0/iiif-viewer.js"></script>
+<script type="module" src="https://kasane.ldas.jp/element/v0.1.1/iiif-viewer.js"></script>
 <iiif-viewer iiif-content="https://iiif.io/api/cookbook/recipe/0001-mvm-image/manifest.json" locale="en"></iiif-viewer>
 ```
 
