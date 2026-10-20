@@ -80,6 +80,12 @@ to start with it closed, for example when the viewer is one pane among others. T
 open it. Without `panelOpen`, the viewer uses the reader's last choice, or opens it on wide screens.
 On the tag, use `options='{"panelOpen":false}'`.
 
+### Hiding the page buttons
+
+A host page that turns the pages itself (through `target`) can pass `pager={false}` to hide the
+previous / next buttons above the image, so that the reader does not see two sets. The arrow keys
+still turn the pages, and `onSelect` still reports them. On the tag, use `options='{"pager":false}'`.
+
 ## The `<iiif-viewer>` tag
 
 ```html
