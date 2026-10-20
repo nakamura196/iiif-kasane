@@ -11,6 +11,7 @@ import { imageCanvasDisplay } from './ImageCanvasDisplay';
 import { OverlayLayer } from './ImageView';
 import { storyOpenAtom } from '../overlays/storyState';
 import { compareAtom, compareMultiAtom, focusAtom, usePageOrder } from './structureState';
+import { containedBox, regionBox, type PageBox } from './pageBox';
 import type { Display, DisplayProps } from './types';
 
 const imageOf = (c: ContainerInfo | undefined): { url: string } | null => {
@@ -135,18 +136,12 @@ function Strip({
   );
 }
 
-interface PageBox {
-  left: number;
-  top: number;
-  width: number;
-  height: number;
-}
-
 const sameBox = (a: PageBox | undefined, b: PageBox) =>
   !!a && Math.abs(a.left - b.left) < 0.5 && Math.abs(a.top - b.top) < 0.5 && Math.abs(a.width - b.width) < 0.5 && Math.abs(a.height - b.height) < 0.5;
 
 // 見開きの各ページにも、画像に重ねる表示（OVERLAYS: 注釈の枠、文字の検索の当たりなど）を載せる。
 // 見開きは拡大しないので、層をページの画像の矩形に合わせるだけでよい。矩形は毎フレーム測る（RegionHighlight と同じ）。
+// 画像は object-contain なので、要素の矩形ではなく、その中で絵が描かれた矩形に合わせる。
 function PageOverlays({ host, pages }: { host: React.RefObject<HTMLDivElement | null>; pages: ContainerInfo[] }) {
   const [boxes, setBoxes] = useState<Record<string, PageBox>>({});
   const ids = pages.map((c) => c.id).join('\n');
@@ -180,7 +175,12 @@ function PageOverlays({ host, pages }: { host: React.RefObject<HTMLDivElement | 
         const b = boxes[c.id];
         if (!b || !c.width || !c.height) return null;
         return (
-          <div key={c.id} className="absolute pointer-events-none" style={b} data-page-overlay={c.id}>
+          <div
+            key={c.id}
+            className="absolute pointer-events-none"
+            style={containedBox(b, c.width, c.height)}
+            data-page-overlay={c.id}
+          >
             <OverlayLayer container={c} canvasWidth={c.width} canvasHeight={c.height} />
           </div>
         );
@@ -197,7 +197,7 @@ function RegionHighlight({ host, container }: { host: React.RefObject<HTMLDivEle
   const storyOpen = useAtomValue(storyOpenAtom);
   const xywh =
     !storyOpen && focus && focus.highlight !== false && focus.target.canvasId === container.id ? focus.target.xywh : undefined;
-  const [box, setBox] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
+  const [box, setBox] = useState<PageBox | null>(null);
   const cw = container.width;
   const ch = container.height;
 
@@ -212,12 +212,9 @@ function RegionHighlight({ host, container }: { host: React.RefObject<HTMLDivEle
         const r = root.getBoundingClientRect();
         const i = img.getBoundingClientRect();
         if (i.width > 0 && i.height > 0) {
-          const next = {
-            left: i.left - r.left + (xywh[0] / cw) * i.width,
-            top: i.top - r.top + (xywh[1] / ch) * i.height,
-            width: (xywh[2] / cw) * i.width,
-            height: (xywh[3] / ch) * i.height,
-          };
+          // 見開きの <img> は object-contain で、要素の中に余白がある。絵の矩形に対して置く
+          const picture = containedBox({ left: i.left - r.left, top: i.top - r.top, width: i.width, height: i.height }, cw, ch);
+          const next = regionBox(picture, xywh, cw, ch);
           setBox((b) =>
             b && Math.abs(b.left - next.left) < 0.5 && Math.abs(b.top - next.top) < 0.5 && Math.abs(b.width - next.width) < 0.5 && Math.abs(b.height - next.height) < 0.5
               ? b
@@ -289,13 +286,21 @@ function PagedDisplay(props: DisplayProps) {
 
   // 0540: content state が複数の Canvas を指しているときは、指された順に並べる（先頭が選択中のとき）
   const comparing = !!multiItems || (compare.length >= 2 && compare[0] === selectedIndex);
-  const group = comparing ? compare : (groups.find((g) => g.includes(selectedIndex)) ?? [selectedIndex]);
+  // 範囲（xywh）を指して開いたときは、見開きでもそのページだけを出して範囲へ寄せる（見開きは拡大できないため）。
+  // ページを送ると focus が消えるので、見開きに戻る
+  const focus = useAtomValue(focusAtom);
+  const focused = !comparing && !!focus?.target.xywh && focus.target.canvasId === container.id;
+  const group = comparing
+    ? compare
+    : focused
+      ? [selectedIndex]
+      : (groups.find((g) => g.includes(selectedIndex)) ?? [selectedIndex]);
   const pages = multiItems
     ? multiItems.map((m) => m.container)
     : group.map((i) => containers[i]).filter((c): c is ContainerInfo => !!c);
   const allImages = pages.length > 1 && pages.every((c) => !!imageOf(c));
 
-  const strip = !comparing && viewing.mode === 'continuous' && containers.length > 1 && containers.every((c) => !!imageOf(c));
+  const strip = !comparing && !focused && viewing.mode === 'continuous' && containers.length > 1 && containers.every((c) => !!imageOf(c));
   let body: React.ReactNode;
   if (strip) {
     body = (

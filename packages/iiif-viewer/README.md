@@ -8,7 +8,7 @@ paging and tables of contents, audio/video with time ranges, annotations, IIIF A
 ## Install
 
 ```sh
-npm install https://github.com/nakamura196/iiif-kasane/releases/download/iiif-viewer-v0.1.2/nakamura196-iiif-viewer-0.1.2.tgz
+npm install https://github.com/nakamura196/iiif-kasane/releases/download/iiif-viewer-v0.1.3/nakamura196-iiif-viewer-0.1.3.tgz
 npm install react react-dom jotai three three-stdlib @react-three/fiber @react-three/drei gsap
 ```
 
@@ -83,7 +83,7 @@ On the tag, use `options='{"panelOpen":false}'`.
 ## The `<iiif-viewer>` tag
 
 ```html
-<script type="module" src="https://kasane.ldas.jp/element/v0.1.2/iiif-viewer.js"></script>
+<script type="module" src="https://kasane.ldas.jp/element/v0.1.3/iiif-viewer.js"></script>
 <iiif-viewer iiif-content="https://iiif.io/api/cookbook/recipe/0001-mvm-image/manifest.json" locale="en"></iiif-viewer>
 ```
 
