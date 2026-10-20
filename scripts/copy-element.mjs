@@ -15,7 +15,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const PREVIOUS = ['0.1.0', '0.1.1', '0.1.2'];
+const PREVIOUS = ['0.1.0', '0.1.1', '0.1.2', '0.1.3'];
 const releaseTgz = (v) =>
   `https://github.com/nakamura196/iiif-kasane/releases/download/iiif-viewer-v${v}/nakamura196-iiif-viewer-${v}.tgz`;
 

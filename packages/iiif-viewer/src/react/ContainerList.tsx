@@ -38,6 +38,8 @@ interface Props {
   containers: ContainerInfo[];
   selected: number;
   onSelect: (index: number) => void;
+  /** false: hide the previous / next buttons (the host page has its own). The arrow keys still work. */
+  pager?: boolean;
 }
 
 const isEditable = (el: EventTarget | null): boolean => {
@@ -56,7 +58,7 @@ const isEditable = (el: EventTarget | null): boolean => {
 // It also receives the requests of the table of contents (right panel), opens the Canvas that
 // the content state or `start` points to, and takes a dropped iiif-content link.
 // Nothing is shown for a single container.
-export default function ContainerList({ containers, selected, onSelect }: Props) {
+export default function ContainerList({ containers, selected, onSelect, pager = true }: Props) {
   const t = useTranslations('Structure');
   const manifest = useAtomValue(manifestAtom);
   const [request, setRequest] = useAtom(navRequestAtom);
@@ -288,7 +290,7 @@ export default function ContainerList({ containers, selected, onSelect }: Props)
     };
   }, []);
 
-  const showPager = !isCollection && containers.length >= 2;
+  const showPager = pager && !isCollection && containers.length >= 2;
   const showBack = canGoBack;
 
   if (!showPager && !showBack) {

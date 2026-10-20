@@ -1,4 +1,4 @@
-// <iiif-viewer iiif-content="..." locale="ja" theme="auto" options='{"tab":"metadata","panelOpen":false}'></iiif-viewer>
+// <iiif-viewer iiif-content="..." locale="ja" theme="auto" options='{"tab":"metadata","panelOpen":false,"pager":false}'></iiif-viewer>
 // Light DOM (no shadow root) so that the host page can set --iiif-viewer-* variables.
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -9,15 +9,16 @@ import type { InfoTab } from '../react/layout/panels/Info';
 
 const TABS: readonly InfoTab[] = ['metadata', 'annotations'];
 
-function parseOptions(raw: string | null): { tab?: InfoTab; panelOpen?: boolean } {
+function parseOptions(raw: string | null): { tab?: InfoTab; panelOpen?: boolean; pager?: boolean } {
   if (!raw) return {};
   try {
     const json: unknown = JSON.parse(raw);
     if (typeof json !== 'object' || json === null) return {};
-    const { tab, panelOpen } = json as { tab?: unknown; panelOpen?: unknown };
+    const { tab, panelOpen, pager } = json as { tab?: unknown; panelOpen?: unknown; pager?: unknown };
     return {
       ...(typeof tab === 'string' && (TABS as readonly string[]).includes(tab) ? { tab: tab as InfoTab } : {}),
       ...(typeof panelOpen === 'boolean' ? { panelOpen } : {}),
+      ...(typeof pager === 'boolean' ? { pager } : {}),
     };
   } catch {
     return {};
@@ -79,6 +80,7 @@ export class IiifViewerElement extends HTMLElement {
         theme,
         tab: this.tab,
         panelOpen: parseOptions(this.getAttribute('options')).panelOpen,
+        pager: parseOptions(this.getAttribute('options')).pager,
         onTabChange: (next) => {
           this.tab = next;
           this.render();

@@ -55,6 +55,11 @@ export interface ViewerProps {
    * last choice, or opens it on wide screens. The reader can still open and close it.
    */
   panelOpen?: boolean;
+  /**
+   * false: hide the previous / next buttons above the image, for a host page that turns the pages
+   * itself (through `target`). The arrow keys still turn the pages, and `onSelect` still reports them.
+   */
+  pager?: boolean;
   className?: string;
 }
 
@@ -80,11 +85,12 @@ function ViewerBody({
   target,
   onSelect,
   panelOpen,
+  pager,
   className = '',
   dark,
 }: Pick<
   ViewerProps,
-  'iiifContent' | 'tab' | 'onTabChange' | 'renderActions' | 'panels' | 'target' | 'onSelect' | 'panelOpen' | 'className'
+  'iiifContent' | 'tab' | 'onTabChange' | 'renderActions' | 'panels' | 'target' | 'onSelect' | 'panelOpen' | 'pager' | 'className'
 > & {
   dark: boolean;
 }) {
@@ -213,7 +219,7 @@ function ViewerBody({
       <CanvasNavigationContext.Provider value={navigation}>
       <div className={`flex flex-col sm:flex-row w-full ${dark ? 'dark' : ''} ${className}`.trim()}>
         <div className="flex-1 min-h-0 min-w-0 sm:h-full flex flex-col bg-gray-100 dark:bg-gray-900">
-          <ContainerList containers={containers} selected={selected} onSelect={select} />
+          <ContainerList containers={containers} selected={selected} onSelect={select} pager={pager} />
           {display && container ? view : <div className="relative flex-1 min-h-0 min-w-0">{view}</div>}
         </div>
         <SidePanel
@@ -244,6 +250,7 @@ export function Viewer({
   target,
   onSelect,
   panelOpen,
+  pager,
   className,
 }: ViewerProps) {
   const [store] = useState(() => createStore());
@@ -262,6 +269,7 @@ export function Viewer({
           target={target}
           onSelect={onSelect}
           panelOpen={panelOpen}
+          pager={pager}
           className={className}
           dark={resolvedTheme === 'dark'}
         />
