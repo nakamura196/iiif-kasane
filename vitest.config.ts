@@ -13,8 +13,12 @@ export default defineConfig({
     ],
   },
   resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-    },
+    // The site reads the viewer package from its sources (same as tsconfig.json paths),
+    // not from the built dist/ that npm users get.
+    alias: [
+      { find: /^@nakamura196\/iiif-viewer$/, replacement: path.resolve(__dirname, './packages/iiif-viewer/src/react/index.ts') },
+      { find: /^@nakamura196\/iiif-viewer\/core$/, replacement: path.resolve(__dirname, './packages/iiif-viewer/src/core/index.ts') },
+      { find: '@', replacement: path.resolve(__dirname, './src') },
+    ],
   },
 });

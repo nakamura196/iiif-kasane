@@ -26,5 +26,7 @@ if (!existsSync(out)) {
 const dest = join(out, 'element', `v${pkg.version}`);
 rmSync(dest, { recursive: true, force: true });
 mkdirSync(dest, { recursive: true });
-cpSync(dist, dest, { recursive: true });
+// dist/lib と dist/types は npm 向け（npm run build -w @nakamura196/iiif-viewer）。配信には要らない
+const npmOnly = new Set([join(dist, 'lib'), join(dist, 'types')]);
+cpSync(dist, dest, { recursive: true, filter: (p) => !npmOnly.has(p) });
 console.log(`out/element/v${pkg.version}/: ${readdirSync(dest).join(', ')}`);

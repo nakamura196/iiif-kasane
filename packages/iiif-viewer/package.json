@@ -3,13 +3,46 @@
   "version": "0.1.0",
   "description": "IIIF viewer building blocks: React components, framework-free core, and the <iiif-viewer> tag.",
   "license": "MIT",
-  "type": "module",
-  "exports": {
-    ".": "./src/react/index.ts",
-    "./core": "./src/core/index.ts",
-    "./element": "./dist/iiif-viewer.js",
-    "./style.css": "./dist/style.css"
+  "author": "Satoru Nakamura",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nakamura196/iiif-kasane.git",
+    "directory": "packages/iiif-viewer"
   },
+  "homepage": "https://github.com/nakamura196/iiif-kasane/tree/main/packages/iiif-viewer#readme",
+  "bugs": {
+    "url": "https://github.com/nakamura196/iiif-kasane/issues"
+  },
+  "keywords": [
+    "iiif",
+    "viewer",
+    "react",
+    "web-component",
+    "digital-humanities"
+  ],
+  "type": "module",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/types/react/index.d.ts",
+      "default": "./dist/lib/index.js"
+    },
+    "./core": {
+      "types": "./dist/types/core/index.d.ts",
+      "default": "./dist/lib/core.js"
+    },
+    "./element": "./dist/iiif-viewer.js",
+    "./style.css": "./dist/style.css",
+    "./package.json": "./package.json"
+  },
+  "sideEffects": [
+    "./dist/iiif-viewer.js",
+    "*.css"
+  ],
   "peerDependencies": {
     "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.8.1",
@@ -20,18 +53,19 @@
     "three": "^0.178.0 || ^0.186.0",
     "three-stdlib": "^2.36.0"
   },
-  "sideEffects": [
-    "./src/element/index.ts",
-    "./dist/*.js",
-    "*.css"
-  ],
+  "dependencies": {
+    "@iiif/parser": "4.0.3"
+  },
   "devDependencies": {
     "vite": "8.3.4"
   },
-  "scripts": {
-    "build:element": "vite build"
+  "publishConfig": {
+    "access": "public"
   },
-  "dependencies": {
-    "@iiif/parser": "4.0.3"
+  "scripts": {
+    "build:element": "vite build",
+    "build:lib": "vite build -c vite.lib.config.ts && tsc -p tsconfig.build.json",
+    "build": "npm run build:element && npm run build:lib",
+    "prepack": "npm run build"
   }
 }

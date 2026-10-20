@@ -25,6 +25,12 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "@nakamura196/iiif-viewer": [
+        "./packages/iiif-viewer/src/react/index.ts"
+      ],
+      "@nakamura196/iiif-viewer/core": [
+        "./packages/iiif-viewer/src/core/index.ts"
       ]
     }
   },
