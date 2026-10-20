@@ -2,7 +2,7 @@ import { createElement, type FunctionComponent } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { ViewerEnv } from './env';
-import { CanvasNavigationContext, indexOfCanvas } from './navigation';
+import { CanvasNavigationContext, indexOfCanvas, targetKey } from './navigation';
 import { Body } from './panels/CanvasAnnotationsPanel';
 
 describe('indexOfCanvas', () => {
@@ -12,6 +12,19 @@ describe('indexOfCanvas', () => {
   });
   it('returns -1 for an unknown id', () => {
     expect(indexOfCanvas(cs, 'https://e/zzz')).toBe(-1);
+  });
+});
+
+describe('targetKey', () => {
+  it('is empty without a target', () => {
+    expect(targetKey(undefined)).toBe('');
+  });
+  it('changes with the Canvas, the region and the highlight', () => {
+    const base = targetKey({ canvasId: 'https://e/c1' });
+    expect(targetKey({ canvasId: 'https://e/c1' })).toBe(base);
+    expect(targetKey({ canvasId: 'https://e/c2' })).not.toBe(base);
+    expect(targetKey({ canvasId: 'https://e/c1', xywh: [1, 2, 3, 4] })).not.toBe(base);
+    expect(targetKey({ canvasId: 'https://e/c1', highlight: false })).not.toBe(base);
   });
 });
 

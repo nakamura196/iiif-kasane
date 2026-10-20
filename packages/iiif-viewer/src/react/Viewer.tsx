@@ -9,7 +9,15 @@ import { DISPLAYS } from './displays/registry';
 import { ViewerEnv, useTranslations, type ResolvedTheme } from './env';
 import Info, { type InfoTab } from './layout/panels/Info';
 import SidePanel from './layout/SidePanel';
-import { CanvasNavigationContext, indexOfCanvas, type CanvasNavigation } from './navigation';
+import { navRequestAtom, nextSeq } from './displays/structureState';
+import {
+  CanvasNavigationContext,
+  indexOfCanvas,
+  targetKey,
+  type CanvasNavigation,
+  type ViewerSelection,
+  type ViewerTarget,
+} from './navigation';
 import type { Panel } from './panels/types';
 import { PlaybackContext, type Playback } from './playback';
 import { useManifest } from './useManifest';
@@ -34,6 +42,14 @@ export interface ViewerProps {
   renderActions?: (state: ViewerActionsState) => ReactNode;
   /** Extra side panel tabs from the host page (e.g. links to its other pages). */
   panels?: Panel[];
+  /**
+   * The Canvas (and region) to show, set by the host page. The viewer moves there when the
+   * manifest is loaded and whenever the value points somewhere else. In between, the reader can
+   * still turn the pages.
+   */
+  target?: ViewerTarget;
+  /** Called when the shown Canvas changes: the first one, the page turns, and moves to `target`. */
+  onSelect?: (selection: ViewerSelection) => void;
   className?: string;
 }
 
@@ -56,9 +72,14 @@ function ViewerBody({
   onTabChange,
   renderActions,
   panels,
+  target,
+  onSelect,
   className = '',
   dark,
-}: Pick<ViewerProps, 'iiifContent' | 'tab' | 'onTabChange' | 'renderActions' | 'panels' | 'className'> & {
+}: Pick<
+  ViewerProps,
+  'iiifContent' | 'tab' | 'onTabChange' | 'renderActions' | 'panels' | 'target' | 'onSelect' | 'className'
+> & {
   dark: boolean;
 }) {
   const t = useTranslations('Viewer');
@@ -106,6 +127,55 @@ function ViewerBody({
     }),
     [containers, iiifContent, setModelChoices],
   );
+
+  // 外（使う側のページ）から指定された Canvas・範囲へ移る。マニフェストが読めてから、値が変わったときだけ。
+  // 移り終わるまでは、途中で出た最初の頁（start など）を onSelect で知らせない。
+  // 知らせると、使う側がそれを target に戻して、指定した頁に着かなくなるため。
+  const setNavRequest = useSetAtom(navRequestAtom);
+  const key = targetKey(target);
+  const targetRef = useRef(target);
+  const onSelectRef = useRef(onSelect);
+  const shownId = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    targetRef.current = target;
+    onSelectRef.current = onSelect;
+    shownId.current = container?.id;
+  });
+  const appliedTarget = useRef<string | null>(null);
+  const waitingFor = useRef<string | null>(null);
+  useEffect(() => {
+    const next = targetRef.current;
+    if (!next || !manifest || containers.length === 0) {
+      if (!next) waitingFor.current = null;
+      return;
+    }
+    const applied = `${manifest.id}|${key}`;
+    if (appliedTarget.current === applied) return;
+    appliedTarget.current = applied;
+    if (indexOfCanvas(containers, next.canvasId) < 0) {
+      waitingFor.current = null;
+      return;
+    }
+    waitingFor.current = shownId.current === next.canvasId ? null : next.canvasId;
+    setNavRequest({
+      seq: nextSeq(),
+      target: { canvasId: next.canvasId, ...(next.xywh ? { xywh: next.xywh } : {}) },
+      highlight: next.highlight,
+    });
+  }, [key, manifest, containers, setNavRequest]);
+
+  const reported = useRef<string | null>(null);
+  useEffect(() => {
+    if (!container || !manifest) return;
+    if (waitingFor.current) {
+      if (container.id !== waitingFor.current) return;
+      waitingFor.current = null;
+    }
+    const shown = `${manifest.id}|${container.id}`;
+    if (reported.current === shown) return;
+    reported.current = shown;
+    onSelectRef.current?.({ canvasId: container.id, index: selected });
+  }, [container, manifest, selected]);
 
   const display = container ? DISPLAYS.find((d) => d.match(container)) : undefined;
 
@@ -162,6 +232,8 @@ export function Viewer({
   onTabChange,
   renderActions,
   panels,
+  target,
+  onSelect,
   className,
 }: ViewerProps) {
   const [store] = useState(() => createStore());
@@ -177,6 +249,8 @@ export function Viewer({
           onTabChange={onTabChange}
           renderActions={renderActions}
           panels={panels}
+          target={target}
+          onSelect={onSelect}
           className={className}
           dark={resolvedTheme === 'dark'}
         />
