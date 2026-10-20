@@ -50,6 +50,11 @@ export interface ViewerProps {
   target?: ViewerTarget;
   /** Called when the shown Canvas changes: the first one, the page turns, and moves to `target`. */
   onSelect?: (selection: ViewerSelection) => void;
+  /**
+   * Whether the side panel (metadata etc.) starts open. Without it the viewer uses the reader's
+   * last choice, or opens it on wide screens. The reader can still open and close it.
+   */
+  panelOpen?: boolean;
   className?: string;
 }
 
@@ -74,11 +79,12 @@ function ViewerBody({
   panels,
   target,
   onSelect,
+  panelOpen,
   className = '',
   dark,
 }: Pick<
   ViewerProps,
-  'iiifContent' | 'tab' | 'onTabChange' | 'renderActions' | 'panels' | 'target' | 'onSelect' | 'className'
+  'iiifContent' | 'tab' | 'onTabChange' | 'renderActions' | 'panels' | 'target' | 'onSelect' | 'panelOpen' | 'className'
 > & {
   dark: boolean;
 }) {
@@ -210,7 +216,10 @@ function ViewerBody({
           <ContainerList containers={containers} selected={selected} onSelect={select} />
           {display && container ? view : <div className="relative flex-1 min-h-0 min-w-0">{view}</div>}
         </div>
-        <SidePanel className="bg-[var(--ds-surface)] shadow-lg overflow-y-auto border-t sm:border-t-0 sm:border-l border-[var(--ds-border)]">
+        <SidePanel
+          initialOpen={panelOpen}
+          className="bg-[var(--ds-surface)] shadow-lg overflow-y-auto border-t sm:border-t-0 sm:border-l border-[var(--ds-border)]"
+        >
           <Info tab={tab} onTabChange={onTabChange} container={container} manifest={manifest} extraPanels={panels} />
         </SidePanel>
       </div>
@@ -234,6 +243,7 @@ export function Viewer({
   panels,
   target,
   onSelect,
+  panelOpen,
   className,
 }: ViewerProps) {
   const [store] = useState(() => createStore());
@@ -251,6 +261,7 @@ export function Viewer({
           panels={panels}
           target={target}
           onSelect={onSelect}
+          panelOpen={panelOpen}
           className={className}
           dark={resolvedTheme === 'dark'}
         />

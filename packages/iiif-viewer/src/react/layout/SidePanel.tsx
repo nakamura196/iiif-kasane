@@ -59,9 +59,17 @@ type Props = {
   className?: string;
   // 畳んだ保存があっても開いて始める（リンクが欄の中身を指しているとき）。保存は書き換えない
   openOnStart?: boolean;
+  // 使う側のページが決めた、始めの開閉。保存より優先する（保存は書き換えない）。openOnStart はさらに優先する
+  initialOpen?: boolean;
 };
 
-export default function SidePanel({ children, breakpoint = 'sm', className = '', openOnStart = false }: Props) {
+export default function SidePanel({
+  children,
+  breakpoint = 'sm',
+  className = '',
+  openOnStart = false,
+  initialOpen,
+}: Props) {
   const t = useTranslations('SidePanel');
   const c = CLASSES[breakpoint];
   const [open, setOpen] = useState(true);
@@ -76,7 +84,8 @@ export default function SidePanel({ children, breakpoint = 'sm', className = '',
     } catch {
       // 保存が使えないときは画面の幅だけで決める
     }
-    setOpen(openOnStart || (saved !== null ? saved === '1' : !window.matchMedia(NARROW).matches));
+    const fallback = saved !== null ? saved === '1' : !window.matchMedia(NARROW).matches;
+    setOpen(openOnStart || (initialOpen ?? fallback));
     try {
       const w = Number(window.localStorage.getItem(WIDTH_KEY));
       if (w >= MIN_WIDTH) setWidth(w);
