@@ -1,5 +1,5 @@
 // Canvas 上の注釈の、手元での絞り込み（右パネルの検索欄）と、選んだ注釈へ画像を寄せるときの範囲。
-// 検索は注釈の本文（HTML は文字だけ）・リンクのラベルと URL を対象にする。全角・半角と大文字・小文字は区別しない。
+// 検索は注釈の見出し・本文（HTML は文字だけ）・タグのキー・リンクのラベルと URL を対象にする。全角・半角と大文字・小文字は区別しない。
 import type { AnnotationRegion, CanvasAnnotation } from './annotations';
 
 /** Normalize for a loose match: NFKC (全角・半角) and lower case. */
@@ -11,7 +11,7 @@ const plain = (html: string) => html.replace(/<[^>]*>/g, ' ');
 const cache = new WeakMap<object, string>();
 
 /** All the text of an annotation that a search looks at, normalized. */
-export const annotationSearchText = (a: Pick<CanvasAnnotation, 'bodies'>): string => {
+export const annotationSearchText = (a: Pick<CanvasAnnotation, 'bodies' | 'title'>): string => {
   let text = cache.get(a);
   if (text === undefined) {
     text = searchTextOf(a);
@@ -20,11 +20,12 @@ export const annotationSearchText = (a: Pick<CanvasAnnotation, 'bodies'>): strin
   return text;
 };
 
-const searchTextOf = (a: Pick<CanvasAnnotation, 'bodies'>): string => {
-  const parts: string[] = [];
+const searchTextOf = (a: Pick<CanvasAnnotation, 'bodies' | 'title'>): string => {
+  const parts: string[] = labelStrings(a.title);
   for (const b of a.bodies) {
     if (b.kind === 'text') {
       parts.push(/html/i.test(b.format ?? '') ? plain(b.value ?? '') : (b.value ?? ''));
+      parts.push(...labelStrings(b.label));
     } else {
       if (b.url) parts.push(b.url);
       parts.push(...labelStrings(b.label));

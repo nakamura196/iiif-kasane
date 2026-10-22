@@ -6,6 +6,7 @@ import {
   annotationSearchText,
   bboxOf,
   groupByRegion,
+  labelIn,
   matchesSearchTerms,
   pickBodies,
   pointPercent,
@@ -118,6 +119,7 @@ export function AnnotationOverlayView({ container, canvasWidth, canvasHeight, st
 }
 
 const titleOf = (a: CanvasAnnotation, locale: string) =>
+  labelIn(a.title, locale) ||
   pickBodies(a.bodies, locale)
     .filter((b) => b.kind === 'text')
     .map((b) => (/html/i.test(b.format ?? '') ? plain(b.value ?? '') : b.value))
