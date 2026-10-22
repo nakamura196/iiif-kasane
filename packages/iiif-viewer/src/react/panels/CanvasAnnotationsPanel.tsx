@@ -53,6 +53,14 @@ const granularityRank = (g: string) => {
 };
 
 const isHtml = (b: AnnotationBodyItem) => /html/i.test(b.format ?? '');
+const plainText = (html: string) => html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+
+// The heading of an annotation (its label), above its text
+function Title({ annotation }: { annotation: CanvasAnnotation }) {
+  const locale = useLocale();
+  const title = labelIn(annotation.title, locale);
+  return title ? <p className="text-sm font-medium text-gray-900 dark:text-gray-50 break-words">{title}</p> : null;
+}
 
 // Wikidata のラベル。同じ項目は 1 回だけ取りに行く。失敗は覚えず、表示は URL のままにする。
 const wikidataCache = new Map<string, Promise<string | undefined>>();
@@ -95,6 +103,16 @@ export function Body({ body, canvasLabels }: { body: AnnotationBodyItem; canvasL
   const { goToCanvas } = useCanvasNavigation();
   const wikidata = useWikidataLabel(body.url ?? '', locale, body.kind !== 'text' && !labelIn(body.label, locale));
   if (body.kind === 'text') {
+    const key = body.tagging ? labelIn(body.label, locale) : '';
+    if (key) {
+      // a keyed tag (Keyed Tag extension): "key: value"
+      return (
+        <p className="text-sm text-gray-800 dark:text-gray-100 break-words" lang={body.language}>
+          <span className="text-gray-500 dark:text-gray-300">{key}: </span>
+          {isHtml(body) ? plainText(body.value ?? '') : body.value}
+        </p>
+      );
+    }
     if (isHtml(body)) {
       // サニタイズ済み（許可したタグ・属性だけ）
       return (
@@ -221,11 +239,13 @@ function Item({
         className={`space-y-1 ${bodyStyle?.color ? '[&_*]:!text-inherit' : ''}`}
         style={bodyStyle}
       >
+        <Title annotation={annotation} />
         {bodies.map((b, i) => (
           <Body key={i} body={b} canvasLabels={canvasLabels} />
         ))}
         {more.map((m) => (
           <div key={m.id} className="space-y-1 border-t border-gray-200 dark:border-gray-700 pt-1" data-annotation-id={m.id}>
+            <Title annotation={m} />
             {pickBodies(m.bodies, locale).map((b, i) => (
               <Body key={i} body={b} canvasLabels={canvasLabels} />
             ))}

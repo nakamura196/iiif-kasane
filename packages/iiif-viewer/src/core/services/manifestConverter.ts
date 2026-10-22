@@ -185,6 +185,7 @@ const convertCommentingAnnotation = (
     type: 'Annotation',
     motivation: motivation.length > 0 ? motivation : ['commenting'],
     target: v4Target,
+    ...(anno.label !== undefined ? { label: anno.label as AnnotationV4['label'] } : {}),
     ...(anno.body !== undefined ? { body: anno.body as AnnotationV4['body'] } : {}),
     ...(anno.bodyValue !== undefined ? { bodyValue: anno.bodyValue } : {}),
     ...(anno.creator !== undefined ? { creator: anno.creator as AnnotationV4['creator'] } : {}),

@@ -37,8 +37,13 @@ export interface AnnotationBodyItem {
   /** resource: the address of the thing linked or tagged */
   url?: string;
   resourceType?: string;
-  /** resource: a label given by the body, as in the manifest (IIIF language map or string) */
+  /**
+   * A label given by the body, as in the manifest (IIIF language map or string). For a resource, its name;
+   * for a tag, the tag's key (Keyed Tag extension).
+   */
   label?: unknown;
+  /** text: the body's purpose is tagging */
+  tagging?: true;
   /** Items of one Choice (for example one per language) share the same number. */
   choice?: number;
 }
@@ -52,6 +57,8 @@ export interface AnnotationCollectionRef {
 export interface CanvasAnnotation extends AnnotationStyleSource {
   id: string;
   motivations: string[];
+  /** The heading (IIIF language map or string): the annotation's label, else its main text body's label. */
+  title?: unknown;
   region: AnnotationRegion;
   bodies: AnnotationBodyItem[];
   /** The AnnotationCollection the page belongs to (`partOf`), if any. */
@@ -286,6 +293,19 @@ const regionIdOf = (target: unknown): string | undefined =>
 
 // ---- bodies ------------------------------------------------------------------
 
+const isTagging = (body: Json): boolean =>
+  Array.isArray(body.purpose) ? body.purpose.includes('tagging') : body.purpose === 'tagging';
+
+// The heading of an annotation: its own label, else the label of the first body that is not a tag
+// (the older convention, as the 3D annotation editor writes it). The 3D list reads it the same way.
+const titleOf = (anno: Json): unknown => {
+  if (anno.label !== undefined) return anno.label;
+  for (const b of asList(anno.body)) {
+    if (isObj(b) && b.type === 'TextualBody' && !isTagging(b)) return b.label;
+  }
+  return undefined;
+};
+
 const bodyItems = (body: unknown, out: AnnotationBodyItem[], counter: { n: number }, choice?: number): void => {
   for (const raw of asList(body)) {
     if (typeof raw === 'string') {
@@ -299,7 +319,15 @@ const bodyItems = (body: unknown, out: AnnotationBodyItem[], counter: { n: numbe
     } else if (raw.type === 'TextualBody' || (raw.value !== undefined && raw.type !== 'SpecificResource')) {
       const value = str(raw.value) ?? '';
       if (!value) continue;
-      out.push({ kind: 'text', value, format: str(raw.format), language: str(raw.language), ...c });
+      out.push({
+        kind: 'text',
+        value,
+        format: str(raw.format),
+        language: str(raw.language),
+        ...(raw.label !== undefined ? { label: raw.label } : {}),
+        ...(isTagging(raw) ? { tagging: true } : {}),
+        ...c,
+      });
     } else if (raw.type === 'SpecificResource' && isObj(raw.source) && raw.source.type === 'TextualBody') {
       // a styled text (recipe 0045): the TextualBody is wrapped in a SpecificResource that carries the styleClass
       const value = str(raw.source.value) ?? '';
@@ -503,9 +531,11 @@ export const readCanvasAnnotations = (
         asList(isObj(rawTarget) ? rawTarget.selector : undefined).some(
           (sel) => isObj(sel) && sel.type === 'PointSelector' && num(sel.instant) === time.start,
         );
+      const title = titleOf(raw);
       out.push({
         id,
         motivations,
+        ...(title !== undefined ? { title } : {}),
         ...sheet,
         ...(targetClasses.length ? { targetClasses } : {}),
         ...(bodyClasses.length ? { bodyClasses } : {}),
