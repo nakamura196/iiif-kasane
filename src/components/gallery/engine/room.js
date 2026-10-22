@@ -135,7 +135,12 @@ function glowPlane(w, h, color, opacity) {
   );
 }
 
+// 作品が少なくても部屋が狭くならないよう、壁の数の下限。3 枚なら三角形(中心から壁まで約 1.8m)になっていた。
+// 下限に満たないときは、作品を間隔を空けて掛け、残りの壁は空けておく。
+const MIN_SIDES = 8;
+
 // 正多角形の「閉じた部屋」。各壁は辺の中点(apothem)に内向きで置き、隣と頂点で接して連続する。
+// 戻り値は作品ごとの配置(添字 = 作品の順番)。部屋を作るための全部の壁は .sides に入れる。
 export function layoutWalls(n) {
   if (G.cfg.layout === "explicit") {
     return (G.cfg.walls || []).map((w) => ({
@@ -150,11 +155,12 @@ export function layoutWalls(n) {
   const gap = p.gap ?? 0.6;
   const hangY = G.cfg.room?.hangCenter ?? 1.55; // 絵の中心高さ(美術館の基準線)
   const seg = wallWidth + gap;
-  const apothem = n > 2 ? seg / (2 * Math.tan(Math.PI / n)) : seg;
-  const placements = [];
-  for (let i = 0; i < n; i++) {
-    const a = ((i + 0.5) / n) * Math.PI * 2;
-    placements.push({
+  const sides = Math.max(n, MIN_SIDES);
+  const apothem = seg / (2 * Math.tan(Math.PI / sides));
+  const all = [];
+  for (let i = 0; i < sides; i++) {
+    const a = ((i + 0.5) / sides) * Math.PI * 2;
+    all.push({
       position: [Math.sin(a) * apothem, hangY, Math.cos(a) * apothem],
       rotationY: a + Math.PI,
       segWidth: seg,
@@ -163,10 +169,13 @@ export function layoutWalls(n) {
       angle: a,
     });
   }
+  const placements = Array.from({ length: n }, (_, i) => all[Math.round((i * sides) / n)]);
+  placements.sides = all;
   return placements;
 }
 
-export function buildRoom(placements) {
+export function buildRoom(artPlacements) {
+  const placements = artPlacements.sides || artPlacements; // 壁・照明・什器は空の壁も含めた全周で作る
   const room = G.cfg.room || {};
   const roomH = room.height || 5.5;
   const root = G.galleryRoot;
