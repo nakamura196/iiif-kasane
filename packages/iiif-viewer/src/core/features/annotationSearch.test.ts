@@ -17,6 +17,13 @@ describe('annotationSearchText', () => {
     expect(text).toContain('黄河');
   });
 
+  it('reads a tag as "key: value", as the 3D list does', () => {
+    const text = annotationSearchText({
+      bodies: [{ kind: 'text', value: 'Europe', tagging: true, label: { en: ['region'] } }],
+    });
+    expect(matchesSearchTerms(text, searchTerms('region: europe'))).toBe(true);
+  });
+
   it('ignores the width of characters and case', () => {
     const text = annotationSearchText({ bodies: [{ kind: 'text', value: 'ＡＢＣ１２' }] });
     expect(matchesSearchTerms(text, searchTerms('abc12'))).toBe(true);

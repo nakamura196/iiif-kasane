@@ -45,6 +45,26 @@ describe('filterAnnotations', () => {
     expect(ids(narrowed)).toEqual(['anno-uk-2']);
   });
 
+  it('ignores the width of characters, as the 2D list does', () => {
+    const q = (query: string) => ids(filterAnnotations(annotations, { ...EMPTY_FILTER, query }));
+    expect(q('ＰＯＬＹＧＯＮ')).toEqual(['anno-area']);
+    expect(q('ｅｕｒｏｐｅ')).toEqual(['anno-uk-2']);
+  });
+
+  it('finds the names and addresses of the pictures and related links on the card', () => {
+    const base = annotations[0];
+    const linked = {
+      ...base,
+      id: 'x#anno-linked',
+      seeAlso: [{ id: 'https://example.org/record/1', label: { ja: ['所蔵先の記録'] } }],
+      images: [{ id: 'https://example.org/photo.jpg', label: 'Photograph of the coast' }],
+    };
+    const q = (query: string) => ids(filterAnnotations([base, linked], { ...EMPTY_FILTER, query }));
+    expect(q('所蔵先')).toEqual(['anno-linked']);
+    expect(q('example.org/record')).toEqual(['anno-linked']);
+    expect(q('photograph coast')).toEqual(['anno-linked']);
+  });
+
   it('matches a tag without a key by its value', () => {
     const r = filterAnnotations(annotations, { ...EMPTY_FILTER, tags: ['example'] });
     expect(ids(r)).toEqual(['anno-uk-2']);

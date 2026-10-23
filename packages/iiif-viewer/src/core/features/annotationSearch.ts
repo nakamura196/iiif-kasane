@@ -1,41 +1,48 @@
 // Canvas 上の注釈の、手元での絞り込み（右パネルの検索欄）と、選んだ注釈へ画像を寄せるときの範囲。
-// 検索は注釈の見出し・本文（HTML は文字だけ）・タグのキー・リンクのラベルと URL を対象にする。全角・半角と大文字・小文字は区別しない。
+// 検索は注釈の見出し・本文（HTML は文字だけ）・タグ（キー: 値）・リンクのラベルと URL を対象にする。全角・半角と大文字・小文字は区別しない。
+// 文字のそろえ方と語の照合は 3D の一覧の絞り込み（core/annotationFilter.ts）も使う。
+import type { AnnotationBodyItem } from './annotationBody';
 import type { AnnotationRegion, CanvasAnnotation } from './annotations';
 
 /** Normalize for a loose match: NFKC (全角・半角) and lower case. */
 export const normalizeSearchText = (s: string): string => s.normalize('NFKC').toLowerCase();
 
-const plain = (html: string) => html.replace(/<[^>]*>/g, ' ');
+/** HTML as the words a reader sees, for a search: tags become spaces, so words on either side stay apart. */
+export const htmlSearchText = (html: string): string => html.replace(/<[^>]*>/g, ' ');
 
-// 同じ注釈（同じ物）は 1 回だけ作る。一覧と画像の上の印の両方が使う
+/**
+ * The text a search looks at, made once per annotation (the same object) and kept:
+ * a list and the marks over the image ask for it again and again.
+ */
 const cache = new WeakMap<object, string>();
-
-/** All the text of an annotation that a search looks at, normalized. */
-export const annotationSearchText = (a: Pick<CanvasAnnotation, 'bodies' | 'title'>): string => {
-  let text = cache.get(a);
+export const cachedSearchText = (key: object, build: () => string[]): string => {
+  let text = cache.get(key);
   if (text === undefined) {
-    text = searchTextOf(a);
-    cache.set(a, text);
+    text = normalizeSearchText(build().join('\n'));
+    cache.set(key, text);
   }
   return text;
 };
 
-const searchTextOf = (a: Pick<CanvasAnnotation, 'bodies' | 'title'>): string => {
-  const parts: string[] = labelStrings(a.title);
-  for (const b of a.bodies) {
-    if (b.kind === 'text') {
-      parts.push(/html/i.test(b.format ?? '') ? plain(b.value ?? '') : (b.value ?? ''));
-      parts.push(...labelStrings(b.label));
-    } else {
-      if (b.url) parts.push(b.url);
-      parts.push(...labelStrings(b.label));
-    }
+/** All the text of an annotation that a search looks at, normalized. */
+export const annotationSearchText = (a: Pick<CanvasAnnotation, 'bodies' | 'title'>): string =>
+  cachedSearchText(a, () => [...labelStrings(a.title), ...a.bodies.flatMap(bodySearchParts)]);
+
+// A tag reads as "key: value", as the 3D list shows and filters it.
+const bodySearchParts = (b: AnnotationBodyItem): string[] => {
+  if (b.kind === 'text') {
+    const value = /html/i.test(b.format ?? '') ? htmlSearchText(b.value ?? '') : (b.value ?? '');
+    const labels = labelStrings(b.label);
+    if (b.tagging) return labels.length > 0 ? labels.map((key) => `${key}: ${value}`) : [value];
+    return [value, ...labels];
   }
-  return normalizeSearchText(parts.join('\n'));
+  return [...(b.url ? [b.url] : []), ...labelStrings(b.label)];
 };
 
-const labelStrings = (label: unknown): string[] => {
+/** The strings of a label: a plain string, or every value of a IIIF language map. */
+export const labelStrings = (label: unknown): string[] => {
   if (typeof label === 'string') return [label];
+  if (Array.isArray(label)) return label.filter((x): x is string => typeof x === 'string');
   if (label && typeof label === 'object') {
     return Object.values(label as Record<string, unknown>).flatMap((v) =>
       Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : typeof v === 'string' ? [v] : [],
