@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useAtom, useAtomValue } from 'jotai';
 import type { ContainerInfo } from '../../core';
 import { labelIn } from '../../core';
-import { useLocale } from '../env';
+import { useLocale, useTranslations } from '../env';
 import { usePlayback } from '../playback';
 import { flatDisplay } from './FlatDisplay';
 import { imageCanvasDisplay } from './ImageCanvasDisplay';
@@ -192,8 +192,10 @@ function PageOverlays({ host, pages }: { host: React.RefObject<HTMLDivElement | 
 // Draws the region that a content state / table of contents entry points to, over the image.
 // The image element is measured every frame, so the box follows zooming and moving.
 // Not while the story tab is open: the story zooms to its scenes and draws its own frame only on request.
+// The × on the box (or Esc) hides it: highlight becomes false, so the page and the zoom stay where they are.
 function RegionHighlight({ host, container }: { host: React.RefObject<HTMLDivElement | null>; container: ContainerInfo }) {
-  const focus = useAtomValue(focusAtom);
+  const t = useTranslations('Structure');
+  const [focus, setFocus] = useAtom(focusAtom);
   const storyOpen = useAtomValue(storyOpenAtom);
   const xywh =
     !storyOpen && focus && focus.highlight !== false && focus.target.canvasId === container.id ? focus.target.xywh : undefined;
@@ -228,13 +230,34 @@ function RegionHighlight({ host, container }: { host: React.RefObject<HTMLDivEle
     return () => cancelAnimationFrame(frame);
   }, [xywh, cw, ch, host, container.id]);
 
+  const shown = !!xywh;
+  useEffect(() => {
+    if (!shown) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setFocus((f) => (f ? { ...f, highlight: false } : f));
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [shown, setFocus]);
+
   if (!xywh || !box) return null;
   return (
     <div
       data-testid="region-highlight"
       className="absolute pointer-events-none border-2 border-yellow-400 bg-yellow-300/25 shadow-[0_0_0_9999px_rgba(0,0,0,0.25)]"
       style={{ left: box.left, top: box.top, width: box.width, height: box.height }}
-    />
+    >
+      <button
+        type="button"
+        data-testid="region-highlight-clear"
+        aria-label={t('clearRegion')}
+        title={t('clearRegion')}
+        onClick={() => setFocus((f) => (f ? { ...f, highlight: false } : f))}
+        className="pointer-events-auto absolute -right-3 -top-3 flex h-6 w-6 items-center justify-center rounded-full border border-yellow-500 bg-white text-sm leading-none text-gray-700 shadow hover:bg-yellow-100"
+      >
+        ×
+      </button>
+    </div>
   );
 }
 

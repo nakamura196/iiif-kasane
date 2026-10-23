@@ -26,6 +26,7 @@
     "openError": "開けませんでした",
     "dropHint": "iiif-content のリンクをここに落とすと開きます",
     "region": "指定された場所",
+    "clearRegion": "枠を消す（Esc）",
     "continuous": "つながったページ",
     "collectionOrder": "並べ方",
     "orderCollection": "コレクションの順",
