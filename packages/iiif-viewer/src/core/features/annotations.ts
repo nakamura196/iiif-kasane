@@ -7,10 +7,12 @@
 
 import type { ManifestV4 } from '../types/iiif';
 
+import { annotationTitleOf, readAnnotationBodies, type AnnotationBodyItem } from './annotationBody';
 import { parseStyleClasses, readStylesheetField, type AnnotationStyleSource } from './annotationStyle';
 import { targetTimeOf } from './temporal';
 
 export { sanitizeAnnotationHtml, safeAnnotationUrl } from './annotationHtml';
+export { pickBodies, type AnnotationBodyItem } from './annotationBody';
 
 type Json = Record<string, unknown>;
 type Point = [number, number];
@@ -27,26 +29,6 @@ export type AnnotationRegion =
   | ({ type: 'rect' } & Box)
   | { type: 'point'; x: number; y: number }
   | { type: 'polygon'; rings: Point[][]; bbox: Box };
-
-export interface AnnotationBodyItem {
-  kind: 'text' | 'resource';
-  /** text: the value (plain text or HTML, see `format`) */
-  value?: string;
-  format?: string;
-  language?: string;
-  /** resource: the address of the thing linked or tagged */
-  url?: string;
-  resourceType?: string;
-  /**
-   * A label given by the body, as in the manifest (IIIF language map or string). For a resource, its name;
-   * for a tag, the tag's key (Keyed Tag extension).
-   */
-  label?: unknown;
-  /** text: the body's purpose is tagging */
-  tagging?: true;
-  /** Items of one Choice (for example one per language) share the same number. */
-  choice?: number;
-}
 
 export interface AnnotationCollectionRef {
   id: string;
@@ -291,93 +273,6 @@ const parseTarget = (target: unknown, w?: number, h?: number): ParsedTarget | nu
 const regionIdOf = (target: unknown): string | undefined =>
   isObj(target) && target.type === 'SpecificResource' ? str(target.id) : undefined;
 
-// ---- bodies ------------------------------------------------------------------
-
-const isTagging = (body: Json): boolean =>
-  Array.isArray(body.purpose) ? body.purpose.includes('tagging') : body.purpose === 'tagging';
-
-// The heading of an annotation: its own label, else the label of the first body that is not a tag
-// (the older convention, as the 3D annotation editor writes it). The 3D list reads it the same way.
-const titleOf = (anno: Json): unknown => {
-  if (anno.label !== undefined) return anno.label;
-  for (const b of asList(anno.body)) {
-    if (isObj(b) && b.type === 'TextualBody' && !isTagging(b)) return b.label;
-  }
-  return undefined;
-};
-
-const bodyItems = (body: unknown, out: AnnotationBodyItem[], counter: { n: number }, choice?: number): void => {
-  for (const raw of asList(body)) {
-    if (typeof raw === 'string') {
-      out.push({ kind: 'resource', url: raw, ...(choice !== undefined ? { choice } : {}) });
-      continue;
-    }
-    if (!isObj(raw)) continue;
-    const c = choice !== undefined ? { choice } : {};
-    if (raw.type === 'Choice') {
-      bodyItems(raw.items, out, counter, counter.n++);
-    } else if (raw.type === 'TextualBody' || (raw.value !== undefined && raw.type !== 'SpecificResource')) {
-      const value = str(raw.value) ?? '';
-      if (!value) continue;
-      out.push({
-        kind: 'text',
-        value,
-        format: str(raw.format),
-        language: str(raw.language),
-        ...(raw.label !== undefined ? { label: raw.label } : {}),
-        ...(isTagging(raw) ? { tagging: true } : {}),
-        ...c,
-      });
-    } else if (raw.type === 'SpecificResource' && isObj(raw.source) && raw.source.type === 'TextualBody') {
-      // a styled text (recipe 0045): the TextualBody is wrapped in a SpecificResource that carries the styleClass
-      const value = str(raw.source.value) ?? '';
-      if (!value) continue;
-      out.push({ kind: 'text', value, format: str(raw.source.format), language: str(raw.source.language), ...c });
-    } else if (raw.type === 'SpecificResource') {
-      const url = idOf(raw.source);
-      if (!url) continue;
-      const src = isObj(raw.source) ? raw.source : {};
-      out.push({
-        kind: 'resource',
-        url,
-        resourceType: str(src.type),
-        label: src.label ?? raw.label,
-        format: str(src.format),
-        ...c,
-      });
-    } else {
-      const url = idOf(raw);
-      if (!url) continue;
-      out.push({ kind: 'resource', url, resourceType: str(raw.type), label: raw.label, format: str(raw.format), ...c });
-    }
-  }
-};
-
-// Among the alternatives of a Choice, the one in the wanted language (else the first).
-// Items outside a Choice are all kept, in order.
-export const pickBodies = (bodies: AnnotationBodyItem[], locale: string): AnnotationBodyItem[] => {
-  const out: AnnotationBodyItem[] = [];
-  const groups = new Map<number, AnnotationBodyItem[]>();
-  for (const b of bodies) {
-    if (b.choice === undefined) {
-      out.push(b);
-      continue;
-    }
-    const g = groups.get(b.choice);
-    if (g) g.push(b);
-    else {
-      groups.set(b.choice, [b]);
-      out.push(b); // placeholder, replaced below
-    }
-  }
-  return out.map((b) => {
-    if (b.choice === undefined) return b;
-    const g = groups.get(b.choice) ?? [b];
-    const lang = (l?: string) => l?.toLowerCase().split('-')[0];
-    return g.find((x) => lang(x.language) === lang(locale)) ?? g[0];
-  });
-};
-
 // ---- pages and annotations ---------------------------------------------------
 
 const motivationsOf = (anno: Json): string[] =>
@@ -487,8 +382,7 @@ export const readCanvasAnnotations = (
     for (const raw of asList(page.items)) {
       if (!isObj(raw)) continue;
       const motivations = motivationsOf(raw);
-      const bodies: AnnotationBodyItem[] = [];
-      bodyItems(raw.body, bodies, { n: 0 });
+      const bodies = readAnnotationBodies(raw);
       const painting = motivations.includes('painting');
       if (painting && !bodies.some((b) => b.kind === 'text')) continue; // images etc. are painted elsewhere
       const layerInfo = isObj(page.__layer) ? (page.__layer as Json) : undefined;
@@ -531,7 +425,7 @@ export const readCanvasAnnotations = (
         asList(isObj(rawTarget) ? rawTarget.selector : undefined).some(
           (sel) => isObj(sel) && sel.type === 'PointSelector' && num(sel.instant) === time.start,
         );
-      const title = titleOf(raw);
+      const title = annotationTitleOf(raw);
       out.push({
         id,
         motivations,

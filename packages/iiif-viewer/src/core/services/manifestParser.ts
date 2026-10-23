@@ -16,6 +16,16 @@ import type {
 } from '../types/iiif';
 import type { Annotation, AnnotationImage, AnnotationTag } from '../types/main';
 import { sceneOf } from './containers';
+import {
+  annotationTitleOf,
+  imageOfBody,
+  isImageBody,
+  isTagBody,
+  localizedString,
+  pickBodies,
+  readAnnotationBodies,
+  tagOfBody,
+} from '../features/annotationBody';
 import { labelIn, paintedModelsOf } from './paintedModels';
 
 export interface GeoFeatureName {
@@ -214,40 +224,9 @@ const extractGeoFeatures = (annos: AnnotationV4[], locale: string): GeoFeature[]
   return out;
 };
 
-// A label may be a plain string or a IIIF language map: the reader's locale first.
-const localizedString = (label: unknown, locale: string): string =>
-  Array.isArray(label) ? label.map(String).join(' ') : labelIn(label, locale);
-
-const hasPurpose = (body: Record<string, unknown>, purpose: string): boolean => {
-  const p = body.purpose;
-  return Array.isArray(p) ? p.includes(purpose) : p === purpose;
-};
-
-const firstOf = (v: unknown): Record<string, unknown> | undefined => {
-  const item = Array.isArray(v) ? v[0] : v;
-  return item && typeof item === 'object' ? (item as Record<string, unknown>) : undefined;
-};
-
-// An Image body (§5 Images in an annotation, Region & Tag extension draft).
-const parseImage = (body: Record<string, unknown>, locale: string): AnnotationImage | null => {
-  if (typeof body.id !== 'string') return null;
-  const service = firstOf(body.service);
-  const homepage = firstOf(body.homepage);
-  const serviceId = service?.id ?? service?.['@id'];
-  return {
-    id: body.id,
-    ...(body.label ? { label: localizedString(body.label, locale) } : {}),
-    ...(typeof body.format === 'string' ? { format: body.format } : {}),
-    ...(hasPurpose(body, 'linking') ? { purpose: 'linking' } : hasPurpose(body, 'describing') ? { purpose: 'describing' } : {}),
-    ...(typeof serviceId === 'string' ? { service: serviceId.replace(/\/info\.json$/, '') } : {}),
-    ...(typeof homepage?.id === 'string' ? { homepage: homepage.id } : {}),
-    ...(homepage?.label ? { homepageLabel: localizedString(homepage.label, locale) } : {}),
-  };
-};
-
-// The first non-tagging, non-Image body is the description. Tagging bodies become tags,
-// with the body's label as the tag's key (Keyed Tag extension). Image bodies are
-// pictures of the annotated place.
+// The description is the first text body that is not a tag, in the reader's language when a Choice offers
+// several. Tagging bodies become tags, with the body's label as the tag's key (Keyed Tag extension). Image
+// bodies are pictures of the annotated place. How a body is read is shared with the 2D annotation list.
 const parseBodies = (
   anno: AnnotationV4,
   locale: string,
@@ -255,27 +234,11 @@ const parseBodies = (
   if (typeof anno.bodyValue === 'string') {
     return { value: anno.bodyValue, label: anno.bodyValue, tags: [], images: [] };
   }
-  const raw = anno.body;
-  const bodies = (Array.isArray(raw) ? raw : raw ? [raw] : []) as Record<string, unknown>[];
-  const tags: AnnotationTag[] = [];
-  const images: AnnotationImage[] = [];
-  let main: Record<string, unknown> | undefined;
-  for (const body of bodies) {
-    if (!body || typeof body !== 'object') continue;
-    if (hasPurpose(body, 'tagging')) {
-      if (typeof body.value !== 'string' || body.value === '') continue;
-      const key = localizedString(body.label, locale);
-      tags.push(key ? { key, value: body.value } : { value: body.value });
-    } else if (body.type === 'Image') {
-      const image = parseImage(body, locale);
-      if (image) images.push(image);
-    } else if (!main) {
-      main = body;
-    }
-  }
-  const value = typeof main?.value === 'string' ? main.value : '';
-  const label = localizedString(main?.label, locale);
-  return { value, label, tags, images };
+  const items = pickBodies(readAnnotationBodies({ body: anno.body }), locale);
+  const tags = items.filter(isTagBody).map((b) => tagOfBody(b, locale));
+  const images = items.filter((b) => isImageBody(b) && b.url).map((b) => imageOfBody(b, locale));
+  const main = items.find((b) => b.kind === 'text' && !b.tagging);
+  return { value: main?.value ?? '', label: localizedString(main?.label, locale), tags, images };
 };
 
 const creatorName = (creator: AnnotationV4['creator']): string => {
@@ -327,7 +290,8 @@ const buildAnnotation = (
   const bodies = parseBodies(anno, locale);
   const { value, tags, images } = bodies;
   // The Annotation's own label is the heading; a body label is the older convention.
-  const label = localizedString(anno.label, locale) || bodies.label;
+  const label =
+    localizedString(anno.label, locale) || localizedString(annotationTitleOf({ body: anno.body }), locale) || bodies.label;
   const regionId = typeof anno.target === 'object' ? anno.target.id : undefined;
 
   return {
