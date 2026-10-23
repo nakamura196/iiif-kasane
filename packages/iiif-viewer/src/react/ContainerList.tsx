@@ -82,10 +82,10 @@ export default function ContainerList({ containers, selected, onSelect, pager = 
   const arrows = stepArrows(viewing.direction);
 
   const go = useCallback(
-    (index: number, target?: CanvasTarget, highlight?: boolean) => {
+    (index: number, target?: CanvasTarget, highlight?: boolean, instant?: boolean) => {
       if (index < 0 || index >= containers.length) return;
       if (index !== selected) onSelect(index);
-      setFocus(target && (target.xywh || target.t) ? { seq: nextSeq(), target, highlight } : null);
+      setFocus(target && (target.xywh || target.t) ? { seq: nextSeq(), target, highlight, instant } : null);
       setCompare([]);
       multiRun.current++;
       setCompareMulti(null);
@@ -177,7 +177,8 @@ export default function ContainerList({ containers, selected, onSelect, pager = 
       if (target) matched = [target];
     }
     if (matched.length > 0) {
-      go(matched[0].index, matched[0]);
+      // リンク（content state・canvas=・pos=）や読み込み時の start で開いたときは、動きを付けずにその場所を出す
+      go(matched[0].index, matched[0], undefined, true);
       // 0540: 複数の Canvas を指すときは、並べて見せる
       setCompare(compareIndexesOf(matched));
       startMulti(allTargets, matched[0].index);
@@ -185,7 +186,7 @@ export default function ContainerList({ containers, selected, onSelect, pager = 
     }
     const start = startOf(manifest, containers);
     // a region (#xywh=) or a time in `start` is highlighted
-    if (start) go(start.index, start);
+    if (start) go(start.index, start, undefined, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [manifest, containers]);
 

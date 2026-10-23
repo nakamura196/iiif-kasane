@@ -32,6 +32,8 @@ export interface NavRequest {
   target: CanvasTarget;
   /** false: move there without drawing the box around the region (the asker marks it itself). */
   highlight?: boolean;
+  /** true: show the region at once, without the glide (opening from a link: the reader came for that place). */
+  instant?: boolean;
 }
 
 export const navRequestAtom = atom<NavRequest | null>(null);

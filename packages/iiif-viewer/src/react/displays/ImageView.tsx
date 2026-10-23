@@ -250,10 +250,11 @@ export default function ImageView({
   }, [maxScale]);
 
   // A move of the table of contents or a story step to a region of this Canvas: zoom there (once per move),
-  // with a short glide. Without `container` the view does not follow (compare views, previews).
+  // with a short glide (none when opened from a link: `instant`). Without `container` the view does not follow (compare views, previews).
   const focus = useAtomValue(focusAtom);
   const focusXywh = container && focus?.target.canvasId === container.id ? focus.target.xywh : undefined;
   const focusSeq = focus?.seq ?? 0;
+  const focusInstant = !!focus?.instant;
   const doneFocus = useRef(0);
   // the glide under way: where it started and how long it takes
   const [gliding, setGliding] = useState<{ from: ViewState; ms: number } | null>(null);
@@ -267,7 +268,7 @@ export default function ImageView({
       from.rotation,
     );
     window.clearTimeout(glideTimer.current);
-    if (reducedMotion()) {
+    if (focusInstant || reducedMotion()) {
       setGliding(null);
     } else {
       const ms = glideTime(from, to, size);
@@ -275,7 +276,7 @@ export default function ImageView({
       glideTimer.current = window.setTimeout(() => setGliding(null), ms + 100);
     }
     setView(to);
-  }, [focusXywh, focusSeq, cw, ch, stageW, stageH, size, setView]);
+  }, [focusXywh, focusSeq, focusInstant, cw, ch, stageW, stageH, size, setView]);
   useEffect(() => () => window.clearTimeout(glideTimer.current), []);
 
   useEffect(() => {

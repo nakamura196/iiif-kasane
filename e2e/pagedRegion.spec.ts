@@ -111,3 +111,52 @@ test('見開きのまま開いたとき、画像の上の層は余白ではな�
   expect(b.width / b.height).toBeCloseTo(W / H, 1);
   expect(Math.abs(b.y + b.height / 2 - (el.y + el.height / 2))).toBeLessThan(2);
 });
+
+test('枠の × か Esc で枠だけが消え、ページと寄せた位置はそのまま', async ({ page }) => {
+  await serve(page);
+  await open(page, `${BASE}/canvas/3#xywh=${XYWH.join(',')}`);
+
+  const highlight = page.getByTestId('region-highlight');
+  await expect(highlight).toBeVisible();
+  await expect.poll(async () => (await highlight.boundingBox())?.height ?? 0).toBeGreaterThan(300);
+  const note = page.locator(`[data-annotation-id="${BASE}/canvas/3/note"]`).first();
+  // 寄せる動きが止まってから測る
+  let last = '';
+  await expect
+    .poll(async () => {
+      const b = await note.boundingBox();
+      const now = b ? [b.x, b.y, b.width, b.height].map(Math.round).join(',') : '';
+      const still = now !== '' && now === last;
+      last = now;
+      return still;
+    })
+    .toBe(true);
+  const before = (await note.boundingBox())!;
+
+  await page.getByTestId('region-highlight-clear').click();
+  await expect(highlight).toHaveCount(0);
+  // 拡大できる 1 枚の表示のまま、同じ所に寄せたまま
+  await expect(page.locator('[data-iiif-stage]')).toBeVisible();
+  const after = (await note.boundingBox())!;
+  expect(Math.abs(after.x - before.x)).toBeLessThan(3);
+  expect(Math.abs(after.height - before.height)).toBeLessThan(3);
+
+  // Esc でも消える
+  await open(page, `${BASE}/canvas/3#xywh=${XYWH.join(',')}`);
+  await expect(highlight).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(highlight).toHaveCount(0);
+});
+
+test('リンクから範囲を指して開いたときは、寄せる動きを付けずにその場所を出す', async ({ page }) => {
+  await serve(page);
+  await open(page, `${BASE}/canvas/3#xywh=${XYWH.join(',')}`);
+
+  const highlight = page.getByTestId('region-highlight');
+  await expect(highlight).toBeVisible();
+  // 動き（CSS の transition）が付いていない
+  const transition = await page.locator('[data-iiif-stage]').evaluate((el) => (el as HTMLElement).style.transition);
+  expect(transition).toBe('');
+  // 現れた時点で、もう範囲へ寄っている
+  expect((await highlight.boundingBox())!.height).toBeGreaterThan(300);
+});

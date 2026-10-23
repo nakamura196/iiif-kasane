@@ -26,6 +26,7 @@
     "openError": "Could not open it",
     "dropHint": "Drop an iiif-content link here to open it",
     "region": "Target region",
+    "clearRegion": "Hide the box (Esc)",
     "continuous": "Continuous pages",
     "collectionOrder": "Order",
     "orderCollection": "As listed",
