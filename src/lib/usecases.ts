@@ -577,6 +577,21 @@ export const USE_CASES: UseCase[] = [
     features: ['image', 'puzzle'],
     video: { ja: '-DT_kGvJOpU', en: 'zujWTk3s66U' },
   },
+  {
+    id: 'bodleian-change-discovery',
+    added: '2026-10-22',
+    title: {
+      ja: 'ボドリアン図書館の更新一覧から、最近公開された資料を探す',
+      en: 'Recently published resources from the Bodleian Libraries’ change stream',
+    },
+    note: {
+      ja: 'オックスフォード大学ボドリアン図書館が公開する更新一覧（IIIF Change Discovery API）を、検索のページで開きます。2026 年 10 月時点で 2 万件を超える出来事が記録されています。そこから最近追加・更新された資料を新しい順に 100 件まで並べ、メタデータで絞り込めます。削除・移動された資料は除きます。',
+      en: 'The change stream (IIIF Change Discovery API) published by the Bodleian Libraries, University of Oxford, opened on the search page. As of October 2026 it records more than 20,000 events. Kasane lists up to 100 recently created or updated resources, newest first, which can be filtered by their metadata. Deleted and moved resources are left out.',
+    },
+    open: { page: 'search', url: 'https://iiif.bodleian.ox.ac.uk/iiif/activity/all-changes' },
+    features: ['image', 'search'],
+    site: 'https://digital.bodleian.ox.ac.uk/',
+  },
 ];
 
 /** 新しく足した順。同じ日なら定義の順のまま */

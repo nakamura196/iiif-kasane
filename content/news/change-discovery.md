@@ -2,7 +2,8 @@
 date: 2026-10-22
 title.ja: 機関の「更新一覧」から、最近公開された資料を探せるようになりました
 title.en: Browse recently published resources from a change stream
-action.href: /search?u=https%3A%2F%2Fiiif.bodleian.ox.ac.uk%2Fiiif%2Factivity%2Fall-changes
+action.usecase: bodleian-change-discovery
+usecases: bodleian-change-discovery
 note: IIIF Change Discovery API 1.0。例は Bodleian（2026-10-22 に 21,857 件、CORS あり）。あわせて、対応している規格の一覧に Content Search API と Text Granularity 拡張（どちらも実装済みで載っていなかった）を足した
 ---
 
