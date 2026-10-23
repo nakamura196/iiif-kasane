@@ -1,7 +1,15 @@
 // Text search and creator / tag facets for the annotation list.
 // Within one facet the selected values are OR-ed; across facets (and with the
-// text query) they are AND-ed.
+// text query) they are AND-ed. The text is matched as in the 2D list (core/features/annotationSearch.ts):
+// the width of characters and case do not matter, and every word must be found.
 
+import {
+  cachedSearchText,
+  htmlSearchText,
+  labelStrings,
+  matchesSearchTerms,
+  searchTerms,
+} from './features/annotationSearch';
 import type { Annotation, AnnotationTag } from './types/main';
 
 export interface AnnotationFilter {
@@ -19,26 +27,28 @@ export const isFilterActive = (f: AnnotationFilter): boolean =>
 export const tagKey = (tag: AnnotationTag): string =>
   tag.key ? `${tag.key}: ${tag.value}` : tag.value;
 
-const stripHtml = (html: string): string => html.replace(/<[^>]*>/g, ' ');
-
-const searchableText = (a: Annotation): string =>
-  [a.title, stripHtml(a.description), a.creator, ...(a.tags ?? []).map(tagKey)]
-    .join('\n')
-    .toLowerCase();
+// What the card shows: heading, description, creator, tags, pictures and related links.
+export const annotationListSearchText = (a: Annotation): string =>
+  cachedSearchText(a, () => [
+    a.title,
+    htmlSearchText(a.description),
+    a.creator,
+    ...(a.tags ?? []).map(tagKey),
+    ...(a.images ?? []).flatMap((i) => [i.id, ...labelStrings(i.label)]),
+    ...(a.seeAlso ?? []).flatMap((l) => [l.id, ...labelStrings(l.label)]),
+  ]);
 
 export const filterAnnotations = (
   annotations: Annotation[],
   filter: AnnotationFilter,
 ): Annotation[] => {
-  const terms = filter.query.toLowerCase().split(/\s+/).filter(Boolean);
+  const terms = searchTerms(filter.query);
   return annotations.filter((a) => {
     if (filter.creators.length > 0 && !filter.creators.includes(a.creator)) return false;
     if (filter.tags.length > 0 && !(a.tags ?? []).some((t) => filter.tags.includes(tagKey(t)))) {
       return false;
     }
-    if (terms.length === 0) return true;
-    const text = searchableText(a);
-    return terms.every((term) => text.includes(term));
+    return terms.length === 0 || matchesSearchTerms(annotationListSearchText(a), terms);
   });
 };
 

@@ -69,7 +69,9 @@ test('注釈が 5000 件でも見えている行だけを描き、検索欄で�
   await expect(list.getByText('地名 0', { exact: true })).toBeVisible();
   // 描いている行は、見えている分とその前後だけ
   expect(await list.locator('[data-key]').count()).toBeLessThan(100);
-  await expect(page.locator('[data-overlay="annotations"] [data-annotation-id]')).toHaveCount(N);
+  // 印が見えている範囲に 500 個を超えるので、1 枚の canvas にまとめて描く（押せる印は作らない）
+  await expect(page.locator('[data-overlay="annotations"] [data-annotation-canvas]')).toBeVisible();
+  await expect(page.locator('[data-overlay="annotations"] [data-annotation-id]')).toHaveCount(0);
 
   // 一番下までスクロールすると、最後の注釈が描かれる
   await list.evaluate((el) => (el.scrollTop = el.scrollHeight));
