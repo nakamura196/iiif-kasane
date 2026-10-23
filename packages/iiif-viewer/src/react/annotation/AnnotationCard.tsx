@@ -2,7 +2,7 @@ import type { ReactNode, Ref } from 'react';
 import { useTranslations } from '../env';
 import { SeeAlso, type PrimitivesExternalWebResource } from '../iiif/primitives';
 import AnnotationImages from '../annotation/AnnotationImages';
-import { tagKey } from '../../core';
+import { sanitizeAnnotationHtml, tagKey } from '../../core';
 import type { Annotation } from '../../core';
 
 // One annotation as a card: number, label, description, images, tags, creator, seeAlso.
@@ -74,10 +74,10 @@ export default function AnnotationCard({
           </div>
         </div>
 
-        {/* コンテンツ部分 */}
+        {/* コンテンツ部分。マニフェストに書かれた HTML なので、許可したタグ・属性だけにしてから出す */}
         <div
           className="text-gray-700 dark:text-gray-300 text-sm pl-9"
-          dangerouslySetInnerHTML={{ __html: annotation.data.body.value }}
+          dangerouslySetInnerHTML={{ __html: sanitizeAnnotationHtml(annotation.data.body.value) }}
         />
 
         {/* 画像は、場所そのものの写真と、関連する外部の資料（purpose: linking）を分けて見せる */}
