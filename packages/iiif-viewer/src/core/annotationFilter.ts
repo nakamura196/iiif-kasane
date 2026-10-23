@@ -3,7 +3,9 @@
 // text query) they are AND-ed. The text is matched as in the 2D list (core/features/annotationSearch.ts):
 // the width of characters and case do not matter, and every word must be found.
 
+import { otherBodies } from './features/annotationBody';
 import {
+  bodySearchParts,
   cachedSearchText,
   htmlSearchText,
   labelStrings,
@@ -27,11 +29,12 @@ export const isFilterActive = (f: AnnotationFilter): boolean =>
 export const tagKey = (tag: AnnotationTag): string =>
   tag.key ? `${tag.key}: ${tag.value}` : tag.value;
 
-// What the card shows: heading, description, creator, tags, pictures and related links.
+// What the card shows: heading, description and the other bodies, creator, tags, pictures and related links.
 export const annotationListSearchText = (a: Annotation): string =>
   cachedSearchText(a, () => [
     a.title,
     htmlSearchText(a.description),
+    ...otherBodies(a.bodies ?? []).flatMap((b) => bodySearchParts(b, true)),
     a.creator,
     ...(a.tags ?? []).map(tagKey),
     ...(a.images ?? []).flatMap((i) => [i.id, ...labelStrings(i.label)]),

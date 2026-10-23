@@ -2,10 +2,11 @@ import type { ReactNode, Ref } from 'react';
 import { useTranslations } from '../env';
 import { SeeAlso, type PrimitivesExternalWebResource } from '../iiif/primitives';
 import AnnotationImages from '../annotation/AnnotationImages';
-import { sanitizeAnnotationHtml, tagKey } from '../../core';
+import AnnotationBody from './AnnotationBody';
+import { otherBodies, sanitizeAnnotationHtml, tagKey } from '../../core';
 import type { Annotation } from '../../core';
 
-// One annotation as a card: number, label, description, images, tags, creator, seeAlso.
+// One annotation as a card: number, label, description and other bodies, images, tags, creator, seeAlso.
 // Shared by the viewer's annotation list and the georeferencing page, so that what an
 // annotation shows (for example its images) is defined in one place.
 export default function AnnotationCard({
@@ -25,6 +26,7 @@ export default function AnnotationCard({
   children?: ReactNode;
 }) {
   const t = useTranslations('Annotation');
+  const others = otherBodies(annotation.bodies ?? []);
   return (
     <div
       ref={cardRef}
@@ -79,6 +81,15 @@ export default function AnnotationCard({
           className="text-gray-700 dark:text-gray-300 text-sm pl-9"
           dangerouslySetInnerHTML={{ __html: sanitizeAnnotationHtml(annotation.data.body.value) }}
         />
+
+        {/* 2 つ目以降の本文やリンク（Wikidata など）。見せ方は 2D の注釈一覧と同じ部品 */}
+        {others.length > 0 && (
+          <div className="mt-2 pl-9 space-y-1">
+            {others.map((b, i) => (
+              <AnnotationBody key={i} body={b} assumeHtml />
+            ))}
+          </div>
+        )}
 
         {/* 画像は、場所そのものの写真と、関連する外部の資料（purpose: linking）を分けて見せる */}
         {[
