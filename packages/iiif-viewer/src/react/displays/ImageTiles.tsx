@@ -125,6 +125,9 @@ export default function ImageLayerView({
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   // the base image whose `full` request failed and is asked again as pixels (see below)
   const [retriedBase, setRetriedBase] = useState<string | null>(null);
+  // The tiles wait until the base image has come (or failed). Servers on HTTP/1.1 take 6 requests at a
+  // time, so a hundred tiles asked together hold the base image back and the picture shows late.
+  const [baseSettled, setBaseSettled] = useState(false);
   const hidden = !!auth && !allowed && !location;
 
   if (state.status === 'loading') {
@@ -206,7 +209,7 @@ export default function ImageLayerView({
   // tiles for what is visible now
   let tiles: ReturnType<typeof tilesForView> = [];
   const scheme = tileSchemeOf(info);
-  if (scheme && stage.boxW > 0 && stage.stageW > 0) {
+  if (scheme && baseSettled && stage.boxW > 0 && stage.stageW > 0) {
     const toCanvas = canvasWidth / stage.stageW;
     // the box seen from the stage: its centre turned back, and the bounds of the turned box
     const seen = (v: { scale: number; tx: number; ty: number }) => {
@@ -241,7 +244,11 @@ export default function ImageLayerView({
     const local = canvasRectToLayer(place, visibleCanvas);
     const visible = intersect({ x: local.x + region.x, y: local.y + region.y, w: local.w, h: local.h }, region);
     if (visible) {
-      tiles = tilesForView(service, info, scheme, screenPerSource, visible);
+      // nearest the middle of the view first: the browser asks for them in this order
+      const mx = visible.x + visible.w / 2;
+      const my = visible.y + visible.h / 2;
+      const away = (t: { x: number; y: number; w: number; h: number }) => Math.hypot(t.x + t.w / 2 - mx, t.y + t.h / 2 - my);
+      tiles = tilesForView(service, info, scheme, screenPerSource, visible).sort((a, b) => away(a) - away(b));
     }
   }
 
@@ -252,11 +259,19 @@ export default function ImageLayerView({
         src={bust(base, epoch)}
         alt=""
         draggable={false}
+        fetchPriority="high"
         className="absolute inset-0 w-full h-full"
-        onLoad={onLoaded}
+        onLoad={() => {
+          setBaseSettled(true);
+          onLoaded?.();
+        }}
         onError={() => {
-          if (fullBase !== null && !retrying) setRetriedBase(fullBase);
-          else if (failedUrl !== base) onFailed?.();
+          if (fullBase !== null && !retrying) {
+            setRetriedBase(fullBase);
+            return;
+          }
+          setBaseSettled(true);
+          if (failedUrl !== base) onFailed?.();
         }}
       />
       {tiles.map((tile) => (
