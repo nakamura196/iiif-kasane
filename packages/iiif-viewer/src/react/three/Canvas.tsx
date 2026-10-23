@@ -12,6 +12,7 @@ import { useProgress } from '@react-three/drei';
 import { useTheme } from '../env';
 import { useLocale, useTranslations } from '../env';
 import * as THREE from 'three';
+import { Spinner } from '../layout/Loading';
 import type { OrbitControls as OrbitControlsType } from 'three-stdlib';
 
 // MapLibre風のイージング関数
@@ -24,18 +25,16 @@ const LoadingScreen = ({ loadingText }: { loadingText: string }) => {
 
   return (
     <Html center>
-      <div className="flex flex-col items-center bg-white/80 dark:bg-gray-800/80 p-6 rounded-lg backdrop-blur-sm">
-        <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <div className="text-gray-700 dark:text-gray-300 font-medium mb-2">
-          {loadingText}
-        </div>
-        <div className="w-48 bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mb-2">
+      <div className="flex flex-col items-center gap-3 rounded-lg bg-[var(--ds-surface)]/80 px-6 py-5 backdrop-blur-sm" role="status">
+        <Spinner />
+        <div className="text-sm text-[var(--ds-fg)]">{loadingText}</div>
+        <div className="w-48 bg-[var(--ds-border)] rounded-full h-1.5">
           <div
-            className="bg-blue-500 h-2.5 rounded-full transition-all duration-300"
+            className="bg-[var(--ds-primary)] h-1.5 rounded-full transition-all duration-300"
             style={{ width: `${progress}%` }}
           ></div>
         </div>
-        <div className="text-sm text-gray-500 dark:text-gray-400">
+        <div className="text-xs text-[var(--ds-fg-muted)]">
           {Math.round(progress)}% ({(loaded / 1024 / 1024).toFixed(2)}MB /{' '}
           {(total / 1024 / 1024).toFixed(2)}MB)
         </div>
