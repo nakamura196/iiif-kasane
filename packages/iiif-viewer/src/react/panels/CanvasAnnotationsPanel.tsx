@@ -12,7 +12,9 @@ import {
   type RegionGroup,
   embeddedCanvasAnnotations,
   groupByRegion,
+  imageOfBody,
   isAnnotationAt,
+  isImageBody,
   rawCanvasOf,
   labelIn,
   pickBodies,
@@ -134,9 +136,9 @@ export function Body({ body, canvasLabels }: { body: AnnotationBodyItem; canvasL
   const own = canvasLabels.get(url);
   const givenLabel = labelIn(body.label, locale) || own;
   const label = givenLabel || wikidata || url;
-  if (isWeb && (body.resourceType === 'Image' || /^image\//i.test(body.format ?? ''))) {
-    // a picture in the annotation (recipe 0377): show it; the picture opens the full image
-    return <AnnotationImages images={[{ id: url, label: labelIn(body.label, locale) || undefined }]} />;
+  if (isWeb && isImageBody(body)) {
+    // a picture in the annotation (recipe 0377): show it; the picture opens the holding institution's page, else the full image
+    return <AnnotationImages images={[imageOfBody(body, locale)]} />;
   }
   if (own !== undefined) {
     // a Canvas of this item: the button moves the viewer there
