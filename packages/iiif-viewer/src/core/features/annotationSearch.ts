@@ -26,12 +26,16 @@ export const cachedSearchText = (key: object, build: () => string[]): string => 
 
 /** All the text of an annotation that a search looks at, normalized. */
 export const annotationSearchText = (a: Pick<CanvasAnnotation, 'bodies' | 'title'>): string =>
-  cachedSearchText(a, () => [...labelStrings(a.title), ...a.bodies.flatMap(bodySearchParts)]);
+  cachedSearchText(a, () => [...labelStrings(a.title), ...a.bodies.flatMap((b) => bodySearchParts(b))]);
 
-// A tag reads as "key: value", as the 3D list shows and filters it.
-const bodySearchParts = (b: AnnotationBodyItem): string[] => {
+/**
+ * The text of one body that a search looks at. A tag reads as "key: value", as the 3D list shows and filters it.
+ * `assumeHtml`: read a text without a format as HTML (as the 3D list shows it).
+ */
+export const bodySearchParts = (b: AnnotationBodyItem, assumeHtml = false): string[] => {
   if (b.kind === 'text') {
-    const value = /html/i.test(b.format ?? '') ? htmlSearchText(b.value ?? '') : (b.value ?? '');
+    const html = b.format ? /html/i.test(b.format) : assumeHtml;
+    const value = html ? htmlSearchText(b.value ?? '') : (b.value ?? '');
     const labels = labelStrings(b.label);
     if (b.tagging) return labels.length > 0 ? labels.map((key) => `${key}: ${value}`) : [value];
     return [value, ...labels];

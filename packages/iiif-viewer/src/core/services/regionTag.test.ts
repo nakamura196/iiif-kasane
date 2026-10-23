@@ -4,6 +4,7 @@ import extensionSample from '../../../../../public/manifests/sample-manifest-reg
 import { convertToV4 } from './manifestConverter';
 import { parseManifestV4 } from './manifestParser';
 import { groupByRegion } from '../regions';
+import { otherBodies } from '../features/annotationBody';
 
 const load = (manifest: unknown) => parseManifestV4(convertToV4(manifest));
 
@@ -112,6 +113,34 @@ describe('Keyed Tag extension', () => {
       { key: 'place type', value: 'country name' },
       { value: 'example' },
     ]);
+  });
+});
+
+// A second text and a link after the description: kept, so the card can show them (otherBodies).
+describe('bodies after the description', () => {
+  const withMore = () => {
+    const m = structuredClone(extensionSample) as typeof extensionSample;
+    const anno = m.items[0].annotations[0].items[1] as { body: unknown[] };
+    anno.body.push(
+      { type: 'TextualBody', format: 'text/plain', value: 'Also called Britain.' },
+      { type: 'SpecificResource', source: { id: 'http://www.wikidata.org/entity/Q145', type: 'Dataset' } },
+    );
+    return load(m).annotations.find((a) => a.id.endsWith('#anno-uk-2'));
+  };
+
+  it('keeps the description, the tags and every other body', () => {
+    const a = withMore();
+    expect(a?.description).toContain('second annotation');
+    expect(a?.tags).toHaveLength(3);
+    expect(otherBodies(a?.bodies ?? []).map((b) => b.value ?? b.url)).toEqual([
+      'Also called Britain.',
+      'http://www.wikidata.org/entity/Q145',
+    ]);
+  });
+
+  it('has no other bodies when there is only a description and tags', () => {
+    const a = load(extensionSample).annotations.find((x) => x.id.endsWith('#anno-uk-2'));
+    expect(otherBodies(a?.bodies ?? [])).toEqual([]);
   });
 });
 

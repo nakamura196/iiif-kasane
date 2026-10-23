@@ -167,6 +167,10 @@ export const pickBodies = (bodies: AnnotationBodyItem[], locale: string): Annota
   });
 };
 
+/** The description of an annotation: its first text that is not a tag. */
+export const mainTextBody = (bodies: AnnotationBodyItem[]): AnnotationBodyItem | undefined =>
+  bodies.find((b) => b.kind === 'text' && !b.tagging);
+
 /** A tagging body as a tag; its label is the tag's key (Keyed Tag extension). */
 export const isTagBody = (b: AnnotationBodyItem): boolean => b.kind === 'text' && b.tagging === true;
 
@@ -191,4 +195,13 @@ export const imageOfBody = (b: AnnotationBodyItem, locale: string): AnnotationIm
     ...(b.homepage ? { homepage: b.homepage } : {}),
     ...(homepageLabel ? { homepageLabel } : {}),
   };
+};
+
+/**
+ * The bodies a 3D annotation card shows below its description: not the description itself, a tag or a picture
+ * (the card shows those on their own). For example a second text, or a link to a Wikidata item.
+ */
+export const otherBodies = (bodies: AnnotationBodyItem[]): AnnotationBodyItem[] => {
+  const main = mainTextBody(bodies);
+  return bodies.filter((b) => b !== main && !isTagBody(b) && !isImageBody(b));
 };
