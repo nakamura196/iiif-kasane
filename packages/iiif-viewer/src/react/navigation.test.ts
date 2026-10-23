@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { ViewerEnv } from './env';
 import { CanvasNavigationContext, indexOfCanvas, targetKey } from './navigation';
-import { Body } from './panels/CanvasAnnotationsPanel';
+import AnnotationBody from './annotation/AnnotationBody';
 
 describe('indexOfCanvas', () => {
   const cs = [{ id: 'https://e/c1' }, { id: 'https://e/c2' }];
@@ -37,7 +37,7 @@ describe('annotation link body', () => {
         createElement(
           CanvasNavigationContext.Provider,
           { value: { goToCanvas: () => true } },
-          createElement(Body, { body: { kind: 'resource', url }, canvasLabels: labels }),
+          createElement(AnnotationBody, { body: { kind: 'resource', url }, canvasLabels: labels }),
         ),
       ),
     );

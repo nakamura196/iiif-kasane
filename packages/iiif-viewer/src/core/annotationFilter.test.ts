@@ -65,6 +65,25 @@ describe('filterAnnotations', () => {
     expect(q('photograph coast')).toEqual(['anno-linked']);
   });
 
+  it('finds the texts and links after the description', () => {
+    const base = annotations[0];
+    const more = {
+      ...base,
+      id: 'x#anno-more',
+      bodies: [
+        ...(base.bodies ?? []),
+        { kind: 'text' as const, value: '<p>Also called <b>Britain</b></p>' },
+        { kind: 'resource' as const, url: 'http://www.wikidata.org/entity/Q145', label: { ja: ['連合王国'] } },
+      ],
+    };
+    const q = (query: string) => ids(filterAnnotations([base, more], { ...EMPTY_FILTER, query }));
+    expect(q('called britain')).toEqual(['anno-more']);
+    expect(q('Q145')).toEqual(['anno-more']);
+    expect(q('連合王国')).toEqual(['anno-more']);
+    // a text without a format is read as HTML, as the card shows it
+    expect(q('<b>')).toEqual([]);
+  });
+
   it('matches a tag without a key by its value', () => {
     const r = filterAnnotations(annotations, { ...EMPTY_FILTER, tags: ['example'] });
     expect(ids(r)).toEqual(['anno-uk-2']);

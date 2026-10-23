@@ -22,9 +22,11 @@ import {
   isImageBody,
   isTagBody,
   localizedString,
+  mainTextBody,
   pickBodies,
   readAnnotationBodies,
   tagOfBody,
+  type AnnotationBodyItem,
 } from '../features/annotationBody';
 import { labelIn, paintedModelsOf } from './paintedModels';
 
@@ -230,15 +232,15 @@ const extractGeoFeatures = (annos: AnnotationV4[], locale: string): GeoFeature[]
 const parseBodies = (
   anno: AnnotationV4,
   locale: string,
-): { value: string; label: string; tags: AnnotationTag[]; images: AnnotationImage[] } => {
+): { value: string; label: string; tags: AnnotationTag[]; images: AnnotationImage[]; items: AnnotationBodyItem[] } => {
   if (typeof anno.bodyValue === 'string') {
-    return { value: anno.bodyValue, label: anno.bodyValue, tags: [], images: [] };
+    return { value: anno.bodyValue, label: anno.bodyValue, tags: [], images: [], items: [] };
   }
   const items = pickBodies(readAnnotationBodies({ body: anno.body }), locale);
   const tags = items.filter(isTagBody).map((b) => tagOfBody(b, locale));
   const images = items.filter((b) => isImageBody(b) && b.url).map((b) => imageOfBody(b, locale));
-  const main = items.find((b) => b.kind === 'text' && !b.tagging);
-  return { value: main?.value ?? '', label: localizedString(main?.label, locale), tags, images };
+  const main = mainTextBody(items);
+  return { value: main?.value ?? '', label: localizedString(main?.label, locale), tags, images, items };
 };
 
 const creatorName = (creator: AnnotationV4['creator']): string => {
@@ -288,7 +290,7 @@ const buildAnnotation = (
     : undefined;
 
   const bodies = parseBodies(anno, locale);
-  const { value, tags, images } = bodies;
+  const { value, tags, images, items } = bodies;
   // The Annotation's own label is the heading; a body label is the older convention.
   const label =
     localizedString(anno.label, locale) || localizedString(annotationTitleOf({ body: anno.body }), locale) || bodies.label;
@@ -307,6 +309,7 @@ const buildAnnotation = (
     ...(regionId ? { regionId } : {}),
     ...(tags.length > 0 ? { tags } : {}),
     ...(images.length > 0 ? { images } : {}),
+    ...(items.length > 0 ? { bodies: items } : {}),
     ...(anno.created ? { created: anno.created } : {}),
     data: {
       body: { value, label },

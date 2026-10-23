@@ -1,4 +1,5 @@
 import type { Vector3 } from 'three';
+import type { AnnotationBodyItem } from '../features/annotationBody';
 
 export interface AnnotationLink {
   id: string;
@@ -50,6 +51,9 @@ export interface Annotation {
   tags?: AnnotationTag[];
   // Image bodies (pictures of the annotated place)
   images?: AnnotationImage[];
+  // Every body, in the reader's language (one item of each Choice). The description, the tags and the
+  // images above are read from them; the card shows the others (otherBodies).
+  bodies?: AnnotationBodyItem[];
   created?: string;
   data: {
     body: {
