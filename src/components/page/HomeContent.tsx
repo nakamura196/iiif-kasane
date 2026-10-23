@@ -36,8 +36,11 @@ export default function HomeContent() {
     { key: 'specPhysdim', href: 'https://iiif.io/api/annex/services/#physical-dimensions' },
     { key: 'specContentState', href: 'https://iiif.io/api/content-state/1.0/' },
     { key: 'specAuth', href: 'https://iiif.io/api/auth/2.0/' },
+    { key: 'specContentSearch', href: 'https://iiif.io/api/search/2.0/' },
+    { key: 'specDiscovery', href: 'https://iiif.io/api/discovery/1.0/' },
     { key: 'specGeoref', href: 'https://iiif.io/api/extension/georef/' },
     { key: 'specNavPlace', href: 'https://iiif.io/api/extension/navplace/' },
+    { key: 'specTextGranularity', href: 'https://iiif.io/api/extension/text-granularity/' },
     { key: 'specCuration', href: 'https://codh.rois.ac.jp/iiif/curation/' },
     // 研究段階のため公開ページには出さない（掲載の了承が得られたら戻す）
     // { key: 'specRegionTag', href: 'https://github.com/nakamura196/iiif-region-tag-extension' },

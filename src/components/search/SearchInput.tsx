@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { buttonClass } from '@nakamura196/react-ui';
+import { DISCOVERY_MAX_ITEMS } from '@nakamura196/iiif-viewer/core';
 import { SEARCH_EXAMPLES } from './examples';
 
 /** URL を入れる最初の画面。onOpen で読み込む URL を親に渡す。 */
@@ -25,7 +26,7 @@ export default function SearchInput({ onOpen }: { onOpen: (url: string) => void 
       <h2 className="text-2xl font-bold text-[var(--ds-fg)] mb-2" style={{ fontFamily: 'var(--ds-font-serif)' }}>
         {t('title')}
       </h2>
-      <p className="text-sm text-[var(--ds-fg-muted)] mb-6">{t('lead')}</p>
+      <p className="text-sm text-[var(--ds-fg-muted)] mb-6">{t('lead', { max: DISCOVERY_MAX_ITEMS })}</p>
       <form onSubmit={submit} className="space-y-3">
         <input
           type="text"
@@ -46,7 +47,7 @@ export default function SearchInput({ onOpen }: { onOpen: (url: string) => void 
           {SEARCH_EXAMPLES.map((ex) => (
             <li key={ex.key}>
               <button onClick={() => go(ex.url)} className="text-left text-[var(--ds-primary)] hover:underline">
-                {t(`examples.${ex.key}`)}
+                {t(`examples.${ex.key}`, { max: DISCOVERY_MAX_ITEMS })}
               </button>
             </li>
           ))}

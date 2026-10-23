@@ -152,10 +152,16 @@
     "specContentStateNote": "iiif-content パラメータで、開く資料・Canvas・場所を指定できます。",
     "specAuthTitle": "IIIF Authorization Flow API 2.0",
     "specAuthNote": "閲覧に同意やログインが要る画像を表示できます（active・kiosk・external の 3 つの方式）。今は画像だけが対象です。",
+    "specContentSearchTitle": "IIIF Content Search API 2.0",
+    "specContentSearchNote": "マニフェストに検索の service があれば、本文を語句で検索し、当たった場所を画像の上に示します。service が無くても、読み込んだ文字起こしの注釈を、ブラウザの中で検索できます（1.0 の service も読みます）。",
+    "specDiscoveryTitle": "IIIF Change Discovery API 1.0",
+    "specDiscoveryNote": "検索のページに更新一覧の URL を入れると、最近追加・更新された資料を新しい順に並べます。削除・移動された資料は除きます。",
     "specGeorefTitle": "IIIF Georeference Extension",
     "specGeorefNote": "地図連携ビューアで使います。平面の画像向けの形式を、3 次元の座標に広げて使っています。",
     "specNavPlaceTitle": "IIIF navPlace Extension",
     "specNavPlaceNote": "マニフェスト・Canvas・Range・コレクションに付いた場所を、地図のタブに表示します。",
+    "specTextGranularityTitle": "IIIF Text Granularity Extension",
+    "specTextGranularityNote": "注釈の文字の単位（ページ・ブロック・段落・行・語・文字）を表示し、注釈と検索の結果をその単位で絞り込めます。ブラウザ内の OCR で作った行にも付けます。",
     "specCurationTitle": "IIIF Curation API 1.0（CODH）",
     "specCurationNote": "複数の資料から集めた画像や領域を、1 つの資料として順に表示します。ギャラリーと検索でも読み込めます。",
     "specRegionTagTitle": "Shared Region and Keyed Tag Extension（独自の拡張・草案）",
@@ -351,8 +357,8 @@
   },
   "Search": {
     "title": "コレクション・キュレーションの検索",
-    "lead": "IIIF のコレクションかキュレーション（Curation API）の URL を入れると、中身をメタデータで絞り込める一覧にします。コレクションは、各マニフェストを読んでメタデータを集めます。",
-    "inputLabel": "コレクションかキュレーションの URL",
+    "lead": "IIIF のコレクションかキュレーション（Curation API）の URL を入れると、中身をメタデータで絞り込める一覧にします。コレクションは、各マニフェストを読んでメタデータを集めます。Change Discovery API の更新一覧を入れると、最近追加・更新された資料を新しい順に {max} 件まで並べます（削除・移動されたものは除きます）。",
+    "inputLabel": "コレクション・キュレーション・更新一覧の URL",
     "submit": "開いて検索",
     "invalidUrl": "URL の形になっていません",
     "privacy": "読み込みと集計はすべてブラウザの中で行います。URL や画像がサーバに送られることはありません。CORS に対応していないサーバのものは読めません。",
@@ -363,7 +369,7 @@
     "change": "別の URL を開く",
     "loading": "読み込んでいます…",
     "loadingManifests": "マニフェストを読んでいます（{done} / {total}）",
-    "error": "読み込めませんでした。コレクションかキュレーションの URL か、CORS に対応しているかを確かめてください。",
+    "error": "読み込めませんでした。コレクション・キュレーション・更新一覧（Change Discovery）の URL か、CORS に対応しているかを確かめてください。",
     "failed": "{count} 冊のマニフェストを読めませんでした（その分はメタデータとサムネイルがありません）",
     "remove": "{value} を外す",
     "clear": "すべて外す",
@@ -372,11 +378,13 @@
     "examplesHeading": "例",
     "examples": {
       "curation": "キュレーション: 江戸の花見（顔 121 点、NDL 顔検出）",
-      "collection": "コレクション: e-codices ボドメール文庫（214 冊）"
+      "collection": "コレクション: e-codices ボドメール文庫（214 冊）",
+      "discovery": "更新一覧: Bodleian 図書館（Change Discovery、新しい {max} 件）"
     },
     "kinds": {
       "curation": "キュレーション",
-      "collection": "コレクション"
+      "collection": "コレクション",
+      "discovery": "更新一覧（Change Discovery）"
     }
   },
   "OtherViews": {

@@ -3,8 +3,10 @@
 import type { ReadContext, SearchReader, SearchSource } from '../types';
 import { collectionReader } from './collection';
 import { curationReader } from './curation';
+import { discoveryReader } from './discovery';
 
-export const SEARCH_READERS: SearchReader[] = [curationReader, collectionReader];
+// discovery は collection より先に置く（OrderedCollection も型名が Collection で終わるため）
+export const SEARCH_READERS: SearchReader[] = [curationReader, discoveryReader, collectionReader];
 
 /** 入力の JSON を読める読み手。無ければ undefined。 */
 export const readerFor = (json: unknown, readers = SEARCH_READERS): SearchReader | undefined =>
@@ -14,7 +16,7 @@ export const readerFor = (json: unknown, readers = SEARCH_READERS): SearchReader
 export async function loadSearchSource(ctx: ReadContext, readers = SEARCH_READERS): Promise<SearchSource> {
   const json = await ctx.fetchJson(ctx.url);
   const reader = readerFor(json, readers);
-  if (!reader) throw new Error('unsupported resource: not a collection or a curation');
+  if (!reader) throw new Error('unsupported resource: not a collection, a curation or a change discovery stream');
   const read = await reader.read(json, ctx);
   return { kind: reader.kind, url: ctx.url, ...read };
 }

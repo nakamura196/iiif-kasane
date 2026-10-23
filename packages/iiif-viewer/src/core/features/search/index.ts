@@ -8,3 +8,4 @@ export { canvasThumbnail, manifestThumbnail, regionOf, sizeParam } from './thumb
 export { SEARCH_READERS, loadSearchSource, readerFor } from './readers';
 export { curationReader } from './readers/curation';
 export { collectionReader } from './readers/collection';
+export { DISCOVERY_MAX_ITEMS, discoveryReader, recentManifests } from './readers/discovery';

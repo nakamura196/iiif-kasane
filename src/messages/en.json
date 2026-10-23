@@ -152,10 +152,16 @@
     "specContentStateNote": "The iiif-content parameter selects the resource, Canvas and region to open.",
     "specAuthTitle": "IIIF Authorization Flow API 2.0",
     "specAuthNote": "Shows images that need consent or a login before viewing (active, kiosk and external profiles). Images only for now.",
+    "specContentSearchTitle": "IIIF Content Search API 2.0",
+    "specContentSearchNote": "When a Manifest has a search service, searches its text and marks the hits on the image. Without a service, searches the loaded transcription annotations in your browser (1.0 services are read too).",
+    "specDiscoveryTitle": "IIIF Change Discovery API 1.0",
+    "specDiscoveryNote": "Enter the URL of a change stream on the search page to list recently created or updated resources, newest first. Deleted and moved resources are left out.",
     "specGeorefTitle": "IIIF Georeference Extension",
     "specGeorefNote": "Used by the map viewer. The format, defined for 2D images, is extended to 3D coordinates.",
     "specNavPlaceTitle": "IIIF navPlace Extension",
     "specNavPlaceNote": "Shows places attached to Manifests, Canvases, Ranges and Collections in the map tab.",
+    "specTextGranularityTitle": "IIIF Text Granularity Extension",
+    "specTextGranularityNote": "Shows the text unit of each annotation (page, block, paragraph, line, word, glyph) and filters annotations and search hits by it. Lines from the in-browser OCR carry it too.",
     "specCurationTitle": "IIIF Curation API 1.0 (CODH)",
     "specCurationNote": "Shows images and regions gathered from several resources, in order, as a single resource. Also readable by the gallery and search.",
     "specRegionTagTitle": "Shared Region and Keyed Tag Extension (own extension, draft)",
@@ -351,8 +357,8 @@
   },
   "Search": {
     "title": "Search a collection or curation",
-    "lead": "Enter the URL of a IIIF Collection or a Curation (Curation API) to browse its contents with metadata facets. For a Collection, each Manifest is read to gather its metadata.",
-    "inputLabel": "URL of a Collection or Curation",
+    "lead": "Enter the URL of a IIIF Collection or a Curation (Curation API) to browse its contents with metadata facets. For a Collection, each Manifest is read to gather its metadata. For a Change Discovery stream, the {max} most recently created or updated Manifests are listed, newest first (deleted and moved ones are left out).",
+    "inputLabel": "URL of a Collection, Curation or change stream",
     "submit": "Open & search",
     "invalidUrl": "Not a valid URL",
     "privacy": "Everything is fetched and aggregated in your browser; no URL or image is sent to a server. Servers without CORS support cannot be read.",
@@ -363,7 +369,7 @@
     "change": "Open another URL",
     "loading": "Loading…",
     "loadingManifests": "Reading manifests ({done} / {total})",
-    "error": "Could not load it. Check that the URL is a Collection or a Curation and that the server supports CORS.",
+    "error": "Could not load it. Check that the URL is a Collection, a Curation or a Change Discovery stream and that the server supports CORS.",
     "failed": "{count} manifests could not be read (they have no metadata or thumbnail)",
     "remove": "Remove {value}",
     "clear": "Clear all",
@@ -372,11 +378,13 @@
     "examplesHeading": "Examples",
     "examples": {
       "curation": "Curation: Edo cherry-blossom viewing (121 faces, NDL face detection)",
-      "collection": "Collection: e-codices, Fondation Martin Bodmer (214 manuscripts)"
+      "collection": "Collection: e-codices, Fondation Martin Bodmer (214 manuscripts)",
+      "discovery": "Change stream: Bodleian Libraries (Change Discovery, {max} newest)"
     },
     "kinds": {
       "curation": "Curation",
-      "collection": "Collection"
+      "collection": "Collection",
+      "discovery": "Change stream (Change Discovery)"
     }
   },
   "OtherViews": {
