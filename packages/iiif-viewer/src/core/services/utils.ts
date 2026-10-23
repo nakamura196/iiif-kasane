@@ -25,7 +25,35 @@ export const fetchJson = async (url: string): Promise<unknown> => {
   }
 };
 
-export const fetchManifest = async (manifestUrl: string) => {
+// 同じマニフェストを、画面の準備・画像の表示・ページ側がそれぞれ取りに来る（開いた直後に 3 回）。
+// 東大の画像サーバのように遅い所では、後から来た取得の待ちがそのまま絵の出る遅れになるので、
+// 同じ URL は 1 回の取得を分け合う。結果は少しのあいだだけ覚える（編集中の取り直しと、多数のマニフェストを開く Collection のため）。
+const MANIFEST_REUSE_MS = 60_000;
+const manifestCache = new Map<string, ReturnType<typeof readManifest>>();
+
+/**
+ * The manifest at the URL, made into Presentation 3 (null when it could not be read).
+ * Calls for the same URL within a minute share one request.
+ */
+export const fetchManifest = (manifestUrl: string): ReturnType<typeof readManifest> => {
+  let p = manifestCache.get(manifestUrl);
+  if (!p) {
+    p = readManifest(manifestUrl);
+    manifestCache.set(manifestUrl, p);
+    const own = p;
+    p.then((raw) => {
+      // a failure is asked again next time; a success is reused for a while
+      const forget = () => {
+        if (manifestCache.get(manifestUrl) === own) manifestCache.delete(manifestUrl);
+      };
+      if (raw === null) forget();
+      else setTimeout(forget, MANIFEST_REUSE_MS);
+    });
+  }
+  return p;
+};
+
+const readManifest = async (manifestUrl: string) => {
   try {
     const raw = await fetchJson(manifestUrl);
     // 画像 1 枚の info.json は、その画像だけを載せた仮のマニフェストにする

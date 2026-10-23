@@ -1,6 +1,6 @@
 {
   "name": "@nakamura196/iiif-viewer",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "IIIF viewer building blocks: React components, framework-free core, and the <iiif-viewer> tag.",
   "license": "MIT",
   "author": "Satoru Nakamura",
