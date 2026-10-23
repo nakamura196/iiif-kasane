@@ -1,4 +1,4 @@
-// 検索画面の入力欄の下に出す例。どちらも CORS に対応している（2026-10-13 に確認）。
+// 検索画面の入力欄の下に出す例。どれも CORS に対応している（2026-10-13・2026-10-22 に確認）。
 // label は messages の Search.examples.<key>。
 export const SEARCH_EXAMPLES = [
   {
@@ -10,5 +10,10 @@ export const SEARCH_EXAMPLES = [
     key: 'collection',
     // e-codices のボドメール文庫（Presentation 2、214 冊）。各マニフェストが metadata を持つ
     url: 'https://www.e-codices.unifr.ch/metadata/iiif/collection/fmb.json',
+  },
+  {
+    key: 'discovery',
+    // Bodleian 図書館の Change Discovery の更新一覧（21,857 件・219 ページ、毎日更新される）
+    url: 'https://iiif.bodleian.ox.ac.uk/iiif/activity/all-changes',
   },
 ] as const;
