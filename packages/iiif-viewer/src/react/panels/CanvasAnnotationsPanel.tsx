@@ -1,13 +1,13 @@
 'use client';
 
 import { useAtom, useSetAtom } from 'jotai';
-import { useDeferredValue, useEffect, useEffectEvent, useMemo, useRef } from 'react';
+import { useDeferredValue, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import {
-  annotationSearchText,
   annotationSourcesOf,
+  canvasTagFacets,
   containersOf,
   focusBoxOf,
-  matchesSearchTerms,
+  matchesCanvasAnnotation,
   searchTerms,
   type RegionGroup,
   embeddedCanvasAnnotations,
@@ -25,6 +25,7 @@ import {
   canvasAnnotationFocusOnSelectAtom,
   canvasAnnotationGranularityAtom,
   canvasAnnotationQueryAtom,
+  canvasAnnotationTagsAtom,
   selectedCanvasAnnotationAtom,
 } from '../overlays/canvasAnnotationState';
 import { navRequestAtom, nextSeq } from '../displays/structureState';
@@ -39,6 +40,9 @@ const KNOWN_MOTIVATIONS = new Set([
   'commenting', 'tagging', 'linking', 'describing', 'identifying', 'classifying',
   'bookmarking', 'highlighting', 'questioning', 'replying', 'editing', 'moderating', 'painting',
 ]);
+
+// タグの札は、多い順にこの数まで出す（残りは「すべて表示」で開く）。値がばらばらのタグで札がパネルを埋めないように
+const TAG_LIMIT = 20;
 
 const isKnownGranularity = (g: string) => (TEXT_GRANULARITIES as readonly string[]).includes(g);
 const granularityRank = (g: string) => {
@@ -158,6 +162,8 @@ export function CanvasAnnotationsPanelBody({ container, manifest }: PanelContext
   const [granularity, setGranularity] = useAtom(canvasAnnotationGranularityAtom);
   const [query, setQuery] = useAtom(canvasAnnotationQueryAtom);
   const [focusOnSelect, setFocusOnSelect] = useAtom(canvasAnnotationFocusOnSelectAtom);
+  const [chosenTags, setChosenTags] = useAtom(canvasAnnotationTagsAtom);
+  const [allTagsShown, setAllTagsShown] = useState(false);
   const setRequest = useSetAtom(navRequestAtom);
   // 打っている間は入力を先に返し、一覧の絞り込みは後から追いつかせる
   const deferredQuery = useDeferredValue(query);
@@ -174,6 +180,19 @@ export function CanvasAnnotationsPanelBody({ container, manifest }: PanelContext
     [all, activeGranularity],
   );
   const terms = useMemo(() => searchTerms(deferredQuery), [deferredQuery]);
+  // タグ（「キー: 値」）の札。件数は一覧の行と同じく、場所の数で数える
+  const tagFacets = useMemo(() => canvasTagFacets(groupByRegion(annotations), locale), [annotations, locale]);
+  // 選んだタグのうち、今の Canvas と単位にあるものだけで絞る（無いタグで一覧が空にならないように）
+  const tags = useMemo(
+    () => chosenTags.filter((v) => tagFacets.some((f) => f.value === v)),
+    [chosenTags, tagFacets],
+  );
+  const filtering = terms.length > 0 || tags.length > 0;
+  const toggleTag = (v: string) =>
+    setChosenTags((cur) => (cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v]));
+  const shownTagFacets = allTagsShown
+    ? tagFacets
+    : tagFacets.filter((f, i) => i < TAG_LIMIT || tags.includes(f.value));
   const { currentTime, seek } = usePlayback();
   const timed = annotations.some((a) => a.time);
 
@@ -189,7 +208,7 @@ export function CanvasAnnotationsPanelBody({ container, manifest }: PanelContext
   }, [manifest, locale]);
 
   // group by AnnotationCollection (annotations of no collection come first), then by region;
-  // a region is kept when one of its annotations has all the words of the search
+  // a region is kept when one of its annotations has all the words of the search (and one of the chosen tags)
   const { rows, shown } = useMemo(() => {
     const groups = new Map<string, { label: unknown; items: CanvasAnnotation[] }>();
     for (const a of annotations) {
@@ -203,7 +222,7 @@ export function CanvasAnnotationsPanelBody({ container, manifest }: PanelContext
     let count = 0;
     for (const [key, g] of ordered) {
       const regions = groupByRegion(g.items).filter(
-        (rg) => terms.length === 0 || rg.annotations.some((a) => matchesSearchTerms(annotationSearchText(a), terms)),
+        (rg) => !filtering || rg.annotations.some((a) => matchesCanvasAnnotation(a, terms, tags, locale)),
       );
       if (regions.length === 0) continue;
       if (key) out.push({ kind: 'header', key: `h:${key}`, label: g.label, fallback: key, count: regions.length });
@@ -211,8 +230,8 @@ export function CanvasAnnotationsPanelBody({ container, manifest }: PanelContext
       count += regions.length;
     }
     return { rows: out, shown: count };
-  }, [annotations, terms]);
-  const total = useMemo(() => (terms.length === 0 ? shown : groupByRegion(annotations).length), [annotations, terms, shown]);
+  }, [annotations, filtering, terms, tags, locale]);
+  const total = useMemo(() => (filtering ? groupByRegion(annotations).length : shown), [annotations, filtering, shown]);
 
   const scroller = useRef<HTMLDivElement>(null);
   const keys = useMemo(() => rows.map((r) => r.key), [rows]);
@@ -252,7 +271,7 @@ export function CanvasAnnotationsPanelBody({ container, manifest }: PanelContext
     setSelected(isSelected ? null : a.id);
   };
 
-  const searching = query.trim().length > 0;
+  const searching = query.trim().length > 0 || tags.length > 0;
 
   return (
     <div className="h-full min-h-0 flex flex-col">
@@ -312,10 +331,49 @@ export function CanvasAnnotationsPanelBody({ container, manifest }: PanelContext
             ))}
           </div>
         ) : null}
+        {tagFacets.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-1 text-xs" role="group" aria-label={t('canvasAnnotationsTags')}>
+            <span className="text-gray-500 dark:text-gray-300 mr-1">{t('canvasAnnotationsTags')}</span>
+            {shownTagFacets.map((f) => (
+              <button
+                key={f.value}
+                type="button"
+                aria-pressed={tags.includes(f.value)}
+                onClick={() => toggleTag(f.value)}
+                className={`px-2 py-0.5 rounded-full border ${
+                  tags.includes(f.value)
+                    ? 'border-blue-600 bg-blue-600 text-white'
+                    : 'border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800'
+                }`}
+              >
+                {f.value} ({f.count})
+              </button>
+            ))}
+            {tagFacets.length > TAG_LIMIT ? (
+              <button
+                type="button"
+                aria-expanded={allTagsShown}
+                onClick={() => setAllTagsShown((v) => !v)}
+                className="px-1 text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                {allTagsShown ? t('canvasAnnotationsTagsFewer') : t('canvasAnnotationsTagsAll', { count: tagFacets.length })}
+              </button>
+            ) : null}
+            {tags.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => setChosenTags([])}
+                className="px-1 text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                {t('canvasAnnotationsTagsClear')}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
         {!loading && annotations.length === 0 ? (
           <p className="text-sm text-gray-500 dark:text-gray-300">{t('canvasAnnotationsEmpty')}</p>
         ) : null}
-        {annotations.length > 0 && rows.length === 0 && terms.length > 0 ? (
+        {annotations.length > 0 && rows.length === 0 && filtering ? (
           <p className="text-sm text-gray-500 dark:text-gray-300">{t('canvasAnnotationsNoMatch')}</p>
         ) : null}
       </div>

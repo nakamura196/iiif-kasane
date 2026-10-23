@@ -3,12 +3,12 @@
 import { useAtom, useAtomValue } from 'jotai';
 import { memo, useCallback, useDeferredValue, useLayoutEffect, useMemo, useRef } from 'react';
 import {
-  annotationSearchText,
   bboxOf,
   groupByRegion,
   labelIn,
-  matchesSearchTerms,
+  matchesCanvasAnnotation,
   pickBodies,
+  presentCanvasTags,
   pointPercent,
   regionBoxPercent,
   sanitizeAnnotationHtml,
@@ -19,7 +19,12 @@ import {
 } from '../../core';
 import { manifestAtom } from '../atoms';
 import { useLocale } from '../env';
-import { canvasAnnotationGranularityAtom, canvasAnnotationQueryAtom, selectedCanvasAnnotationAtom } from './canvasAnnotationState';
+import {
+  canvasAnnotationGranularityAtom,
+  canvasAnnotationQueryAtom,
+  canvasAnnotationTagsAtom,
+  selectedCanvasAnnotationAtom,
+} from './canvasAnnotationState';
 import { storyFrameAtom, storyOpenAtom } from './storyState';
 import { DOM_MARK_LIMIT, boxOfRegion, overlaps, pixelsPerUnit, visibleBoxOf, type Box } from './annotationMarks';
 import type { Overlay, OverlayProps } from './types';
@@ -48,9 +53,21 @@ export function AnnotationOverlayView({ container, canvasWidth, canvasHeight, st
   const storyOpen = useAtomValue(storyOpenAtom);
   const storyFrame = useAtomValue(storyFrameAtom);
   const granularity = useAtomValue(canvasAnnotationGranularityAtom);
-  // 右パネルの検索欄に文字があれば、当たった注釈の印だけを出す（選んでいる注釈は残す）
+  // 右パネルの検索欄に文字があるか、タグを選んでいれば、当たった注釈の印だけを出す（選んでいる注釈は残す）
   const query = useDeferredValue(useAtomValue(canvasAnnotationQueryAtom));
   const terms = useMemo(() => searchTerms(query), [query]);
+  // 右パネルで選んだタグ。今の単位の注釈に無いタグは、右パネルと同じく無視する
+  const chosenTags = useAtomValue(canvasAnnotationTagsAtom);
+  const tags = useMemo(
+    () =>
+      presentCanvasTags(
+        granularity ? annotations.filter((a) => a.granularity === granularity) : annotations,
+        chosenTags,
+        locale,
+      ),
+    [annotations, granularity, chosenTags, locale],
+  );
+  const filtering = terms.length > 0 || tags.length > 0;
 
   // Annotations that share a region (Shared Region extension) are drawn as one box, in the order of the list.
   // A story shows only its current scene, so the chosen annotation matters to the list only then.
@@ -60,15 +77,15 @@ export function AnnotationOverlayView({ container, canvasWidth, canvasHeight, st
       .filter((a) => a.region.type !== 'canvas' && !a.layer) // layer annotations are drawn by the layer itself
       .filter((a) => storySelected === null || a.id === storySelected)
       .filter((a) => !granularity || a.granularity === granularity || a.motivations.includes('highlighting'))
-      .filter((a) => terms.length === 0 || matchesSearchTerms(annotationSearchText(a), terms));
+      .filter((a) => !filtering || matchesCanvasAnnotation(a, terms, tags, locale));
     return groupByRegion(shown).sort((a, b) => areaOf(b.annotations[0]) - areaOf(a.annotations[0]));
-  }, [annotations, storySelected, granularity, terms]);
-  // the chosen one stays drawn when a search would hide it
+  }, [annotations, storySelected, granularity, filtering, terms, tags, locale]);
+  // the chosen one stays drawn when a search or a tag would hide it
   const chosen = useMemo(() => {
-    if (!selected || terms.length === 0 || drawn.some((g) => g.annotations.some((m) => m.id === selected))) return [];
+    if (!selected || !filtering || drawn.some((g) => g.annotations.some((m) => m.id === selected))) return [];
     const a = annotations.find((x) => x.id === selected && x.region.type !== 'canvas' && !x.layer);
     return a ? groupByRegion([a]) : [];
-  }, [selected, terms, drawn, annotations]);
+  }, [selected, filtering, drawn, annotations]);
   const toggle = useCallback((id: string, isSel: boolean) => setSelected(isSel ? null : id), [setSelected]);
   const all = useMemo(
     () => [...drawn, ...chosen].map((g) => ({ group: g, box: boxOfRegion(g.annotations[0]) })),
