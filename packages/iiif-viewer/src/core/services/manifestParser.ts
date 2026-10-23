@@ -236,7 +236,7 @@ const parseBodies = (
   if (typeof anno.bodyValue === 'string') {
     return { value: anno.bodyValue, label: anno.bodyValue, tags: [], images: [], items: [] };
   }
-  const items = pickBodies(readAnnotationBodies({ body: anno.body }), locale);
+  const items = pickBodies(readAnnotationBodies({ body: anno.body, motivation: anno.motivation }), locale);
   const tags = items.filter(isTagBody).map((b) => tagOfBody(b, locale));
   const images = items.filter((b) => isImageBody(b) && b.url).map((b) => imageOfBody(b, locale));
   const main = mainTextBody(items);
@@ -293,7 +293,7 @@ const buildAnnotation = (
   const { value, tags, images, items } = bodies;
   // The Annotation's own label is the heading; a body label is the older convention.
   const label =
-    localizedString(anno.label, locale) || localizedString(annotationTitleOf({ body: anno.body }), locale) || bodies.label;
+    localizedString(anno.label, locale) || localizedString(annotationTitleOf({ body: anno.body, motivation: anno.motivation }), locale) || bodies.label;
   const regionId = typeof anno.target === 'object' ? anno.target.id : undefined;
 
   return {

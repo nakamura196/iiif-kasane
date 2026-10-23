@@ -151,3 +151,51 @@ describe('2D and 3D read an annotation the same way', () => {
     expect(read3D({ ...rest, bodyValue: '短い本文' })[0].description).toBe('短い本文');
   });
 });
+
+// An annotation whose motivation is tagging, with bodies that carry no purpose (as an object detector writes it)
+describe('motivation tagging', () => {
+  const tagged = {
+    id: 'https://example.org/m#t1',
+    type: 'Annotation',
+    motivation: ['tagging'],
+    body: [
+      { type: 'TextualBody', value: 'Person', language: 'en', label: 'key' },
+      { type: 'TextualBody', purpose: 'describing', value: '人物の説明', label: '見出し' },
+    ],
+  };
+
+  it('reads a body without a purpose as a tag, and one with a purpose as it says', () => {
+    expect(readAnnotationBodies(tagged).map((b) => [b.value, b.tagging])).toEqual([
+      ['Person', true],
+      ['人物の説明', undefined],
+    ]);
+  });
+
+  it('reads the bodies of a Choice as tags too', () => {
+    const items = readAnnotationBodies({
+      motivation: 'tagging',
+      body: { type: 'Choice', items: [{ type: 'TextualBody', value: '人', language: 'ja' }, { type: 'TextualBody', value: 'Person', language: 'en' }] },
+    });
+    expect(items.every((b) => b.tagging)).toBe(true);
+  });
+
+  it('does not make tags when the annotation has other motivations as well', () => {
+    expect(readAnnotationBodies({ ...tagged, motivation: ['commenting', 'tagging'] })[0].tagging).toBeUndefined();
+    expect(readAnnotationBodies({ ...tagged, motivation: 'commenting' })[0].tagging).toBeUndefined();
+  });
+
+  it('does not take the heading from a tag', () => {
+    expect(annotationTitleOf(tagged)).toBe('見出し');
+  });
+
+  it('gives the same tags in 2D and 3D', () => {
+    const [a2] = read2D(tagged);
+    const [a3] = read3D(tagged);
+    expect(pickBodies(a2.bodies, 'ja').filter(isTagBody).map((b) => tagOfBody(b, 'ja'))).toEqual([
+      { key: 'key', value: 'Person' },
+    ]);
+    expect(a3.tags).toEqual([{ key: 'key', value: 'Person' }]);
+    expect(a3.description).toBe('人物の説明');
+    expect(a3.title).toBe('見出し');
+  });
+});
