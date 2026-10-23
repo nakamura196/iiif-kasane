@@ -37,6 +37,7 @@ import AuthPrompt from '../auth/AuthPrompt';
 import { useAuthPanels } from '../auth/authStore';
 import { AnnotationBoxes, MediaCover } from './ImageExtras';
 import ImageLayerView from './ImageTiles';
+import { LoadingChip, LoadingOverlay } from '../layout/Loading';
 import ImageView from './ImageView';
 import PhysicalRuler from './PhysicalRuler';
 import { useRawManifest } from './rawManifest';
@@ -75,8 +76,12 @@ function ImageBody({
   paintings: CanvasPainting[];
   physdim?: Physdim;
 }) {
+  const t = useTranslations('Viewer');
   const { container } = props;
   const [failedBase, setFailedBase] = useState(false);
+  // the bottom image whose picture has come (until then the ring is shown), and its tiles still coming
+  const [shownBase, setShownBase] = useState<string | null>(null);
+  const [pendingTiles, setPendingTiles] = useState(0);
   // 認証の確認中・案内中は、画像が届かないのが当然なので「読み込めませんでした」を出さない
   const authPending = useAuthPanels().some(({ state }) => state.phase !== 'ok');
   const settings = useAtomValue(layerSettingsAtom);
@@ -147,6 +152,10 @@ function ImageBody({
   // the same for every visibility and order, so switching layers keeps the zoom
   const key = items.map((it) => it.layer.url).join('|');
   const base = items[0]?.id;
+  const baseLayer = drawn.find((it) => it.id === base)?.layer;
+  const baseShown = !!baseLayer && shownBase === baseLayer.url;
+  // only for an image that is drawn, has a size and is not waiting for a login
+  const waitingBase = !!baseLayer && !!width && !!height && !baseShown && !failedBase && !authPending;
   const compared = imageChoiceOf(images);
 
   return (
@@ -189,7 +198,16 @@ function ImageBody({
                   opacity={layerOpacity(it, settings)}
                   onFailed={it.id === base ? () => setFailedBase(true) : undefined}
                   // ログイン前に失敗していても、ログイン後に読めたら「読み込めませんでした」を消す
-                  onLoaded={it.id === base ? () => setFailedBase(false) : undefined}
+                  onLoaded={
+                    it.id === base
+                      ? () => {
+                          setFailedBase(false);
+                          setShownBase(it.layer.url);
+                        }
+                      : undefined
+                  }
+                  onTilesPending={it.id === base ? setPendingTiles : undefined}
+                  showLoading={false}
                 />
               ))
             }
@@ -200,6 +218,8 @@ function ImageBody({
         )}
         <AuthPrompt />
         {failedBase && items.length === 1 && !authPending && <FailedHint />}
+        {waitingBase && <LoadingOverlay label={t('imageLoading')} />}
+        {!waitingBase && baseShown && pendingTiles > 0 && <LoadingChip label={t('imageSharpening')} />}
       </div>
     </>
   );
@@ -316,7 +336,11 @@ function ImageCanvasDisplay(props: DisplayProps) {
   const imagePaintings = useMemo(() => images.paintings.filter(paintsImage), [images]);
 
   if (waiting) {
-    return <div className="p-4 text-sm text-[var(--ds-fg)]">{t('imageLoading')}</div>;
+    return (
+      <div className="relative flex-1 min-h-0 min-w-0">
+        <LoadingOverlay label={t('imageLoading')} />
+      </div>
+    );
   }
 
   const delegate = () => {

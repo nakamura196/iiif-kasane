@@ -21,6 +21,7 @@ import {
 import type { Panel } from './panels/types';
 import { PlaybackContext, type Playback } from './playback';
 import { useManifest } from './useManifest';
+import { LoadingOverlay } from './layout/Loading';
 
 export interface ViewerActionsState {
   iiifContent: string;
@@ -195,7 +196,11 @@ function ViewerBody({
   if (failed) {
     view = <div className="p-4 text-sm text-[var(--ds-fg)]" role="alert">{t('manifestError')}</div>;
   } else if (!manifest) {
-    view = <div className="p-4 text-sm text-[var(--ds-fg)]">{t('loadingManifest')}</div>;
+    view = (
+      <div className="relative w-full h-full min-h-40">
+        <LoadingOverlay label={t('loadingManifest')} />
+      </div>
+    );
   } else if (!container) {
     view = <div className="p-4 text-sm text-[var(--ds-fg)]">{t('empty')}</div>;
   } else if (!display) {

@@ -92,6 +92,8 @@ export default function ImageLayerView({
   opacity = 1,
   onFailed,
   onLoaded,
+  onTilesPending,
+  showLoading = true,
 }: {
   layer: ImageLayer;
   canvasWidth: number;
@@ -102,6 +104,10 @@ export default function ImageLayerView({
   onFailed?: () => void;
   /** The image (the base image or one of its tiles) was read: clears an earlier failure, e.g. before signing in. */
   onLoaded?: () => void;
+  /** How many tiles for the current view have not come yet (0 once all are in). */
+  onTilesPending?: (count: number) => void;
+  /** Show the words while the image information is read (false when the parent shows its own sign). */
+  showLoading?: boolean;
 }) {
   const t = useTranslations('Viewer');
   const locale = useLocale();
@@ -128,9 +134,13 @@ export default function ImageLayerView({
   // The tiles wait until the base image has come (or failed). Servers on HTTP/1.1 take 6 requests at a
   // time, so a hundred tiles asked together hold the base image back and the picture shows late.
   const [baseSettled, setBaseSettled] = useState(false);
+  // tiles that have come (or failed), by key
+  const [settledTiles, setSettledTiles] = useState<ReadonlySet<string>>(() => new Set());
+  const settleTile = (key: string) => setSettledTiles((s) => (s.has(key) ? s : new Set(s).add(key)));
   const hidden = !!auth && !allowed && !location;
 
   if (state.status === 'loading') {
+    if (!showLoading) return null;
     return (
       <div className="absolute inset-0 grid place-items-center text-sm text-[var(--ds-fg)]">{t('imageLoading')}</div>
     );
@@ -252,6 +262,8 @@ export default function ImageLayerView({
     }
   }
 
+  const pending = tiles.filter((tile) => !settledTiles.has(`${tile.key}:${epoch}`)).length;
+
   return (
     <div style={frame} data-auth-blurred={hidden || undefined}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -289,14 +301,28 @@ export default function ImageLayerView({
             height: pct(tile.h / region.h),
           }}
           // a tile drawn means the image is there, even if the small base image failed
-          onLoad={onLoaded}
+          onLoad={() => {
+            settleTile(`${tile.key}:${epoch}`);
+            onLoaded?.();
+          }}
           onError={(e) => {
             e.currentTarget.style.display = 'none';
+            settleTile(`${tile.key}:${epoch}`);
           }}
         />
       ))}
+      {onTilesPending && <TellCount count={pending} onChange={onTilesPending} />}
     </div>
   );
+}
+
+/** Tells the parent a count after each change, and 0 when it goes away. */
+function TellCount({ count, onChange }: { count: number; onChange: (count: number) => void }) {
+  useEffect(() => {
+    onChange(count);
+  }, [count, onChange]);
+  useEffect(() => () => onChange(0), [onChange]);
+  return null;
 }
 
 /** The images of a Canvas, drawn in painting order. `onBaseFailed`: the first (bottom) image could not be read. */
