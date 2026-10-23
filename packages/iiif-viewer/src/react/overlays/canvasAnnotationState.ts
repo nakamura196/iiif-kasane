@@ -21,5 +21,9 @@ export const localAnnotationPagesAtom = atom<LocalAnnotationPage[]>([]);
 // 右パネルの注釈の検索欄の文字。画像の上の印も、当たった注釈だけに絞る。
 export const canvasAnnotationQueryAtom = atom<string>('');
 
+// 右パネルで選んだタグ（「キー: 値」）。どれか 1 つを持つ注釈だけを一覧と画像の上の印に出す。
+// 今の Canvas に無いタグは無視する（別の Canvas へ移っても選択は残す）。
+export const canvasAnnotationTagsAtom = atom<string[]>([]);
+
 // 一覧で注釈を選んだとき、画像をその場所へ寄せるか（既定は寄せない）。
 export const canvasAnnotationFocusOnSelectAtom = atom<boolean>(false);

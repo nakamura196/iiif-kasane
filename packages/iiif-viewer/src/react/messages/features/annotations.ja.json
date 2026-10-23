@@ -37,6 +37,10 @@
     "canvasAnnotationsTotal": "{count} 件",
     "canvasAnnotationsSearchCount": "{count} 件 / 全 {total} 件",
     "canvasAnnotationsNoMatch": "当てはまる注釈がありません",
+    "canvasAnnotationsTags": "タグ",
+    "canvasAnnotationsTagsAll": "すべて表示（{count} 種）",
+    "canvasAnnotationsTagsFewer": "少なく表示",
+    "canvasAnnotationsTagsClear": "タグの選択を解除",
     "canvasAnnotationsFocusOnSelect": "選んだ注釈へ画像を寄せる"
   }
 }

@@ -7,12 +7,18 @@ import { otherBodies } from './features/annotationBody';
 import {
   bodySearchParts,
   cachedSearchText,
+  countBy,
   htmlSearchText,
   labelStrings,
   matchesSearchTerms,
   searchTerms,
+  tagKey,
+  type Facet,
 } from './features/annotationSearch';
-import type { Annotation, AnnotationTag } from './types/main';
+import type { Annotation } from './types/main';
+
+// tagKey and Facet are shared with the 2D list; they are still exported from here for older imports.
+export { tagKey, type Facet };
 
 export interface AnnotationFilter {
   query: string;
@@ -25,9 +31,6 @@ export const EMPTY_FILTER: AnnotationFilter = { query: '', creators: [], tags: [
 
 export const isFilterActive = (f: AnnotationFilter): boolean =>
   f.query.trim() !== '' || f.creators.length > 0 || f.tags.length > 0;
-
-export const tagKey = (tag: AnnotationTag): string =>
-  tag.key ? `${tag.key}: ${tag.value}` : tag.value;
 
 // What the card shows: heading, description and the other bodies, creator, tags, pictures and related links.
 export const annotationListSearchText = (a: Annotation): string =>
@@ -53,17 +56,6 @@ export const filterAnnotations = (
     }
     return terms.length === 0 || matchesSearchTerms(annotationListSearchText(a), terms);
   });
-};
-
-export interface Facet {
-  value: string;
-  count: number;
-}
-
-const countBy = (values: string[]): Facet[] => {
-  const counts = new Map<string, number>();
-  for (const v of values) counts.set(v, (counts.get(v) ?? 0) + 1);
-  return [...counts].map(([value, count]) => ({ value, count }));
 };
 
 export const creatorFacets = (annotations: Annotation[]): Facet[] =>

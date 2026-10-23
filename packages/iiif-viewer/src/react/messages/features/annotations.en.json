@@ -37,6 +37,10 @@
     "canvasAnnotationsTotal": "{count} annotations",
     "canvasAnnotationsSearchCount": "{count} of {total}",
     "canvasAnnotationsNoMatch": "No annotations match",
+    "canvasAnnotationsTags": "Tags",
+    "canvasAnnotationsTagsAll": "Show all ({count})",
+    "canvasAnnotationsTagsFewer": "Show fewer",
+    "canvasAnnotationsTagsClear": "Clear tags",
     "canvasAnnotationsFocusOnSelect": "Zoom to the chosen annotation"
   }
 }
