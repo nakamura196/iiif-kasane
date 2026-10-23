@@ -47,6 +47,15 @@ const hasPurpose = (body: Json, purpose: string): boolean =>
 
 const isTagging = (body: Json): boolean => hasPurpose(body, 'tagging');
 
+// A body without a purpose takes the annotation's motivation (W3C Web Annotation §3.3.5). Only an annotation
+// whose sole motivation is tagging makes such bodies tags: with several motivations it is unclear which one applies.
+const tagsByMotivation = (anno: Json): boolean => {
+  const m = asList(anno.motivation);
+  return m.length > 0 && m.every((x) => x === 'tagging');
+};
+const isTagIn = (body: Json, byMotivation: boolean): boolean =>
+  isTagging(body) || (byMotivation && body.purpose == null);
+
 // What a linked resource says about itself: purpose, Image API service, homepage (§5 Images in an annotation,
 // Region & Tag extension draft).
 const resourceDetails = (body: Json, src: Json): Partial<AnnotationBodyItem> => {
@@ -62,7 +71,13 @@ const resourceDetails = (body: Json, src: Json): Partial<AnnotationBodyItem> => 
   };
 };
 
-const bodyItems = (body: unknown, out: AnnotationBodyItem[], counter: { n: number }, choice?: number): void => {
+const bodyItems = (
+  body: unknown,
+  out: AnnotationBodyItem[],
+  counter: { n: number },
+  byMotivation: boolean,
+  choice?: number,
+): void => {
   for (const raw of asList(body)) {
     if (typeof raw === 'string') {
       out.push({ kind: 'resource', url: raw, ...(choice !== undefined ? { choice } : {}) });
@@ -71,7 +86,7 @@ const bodyItems = (body: unknown, out: AnnotationBodyItem[], counter: { n: numbe
     if (!isObj(raw)) continue;
     const c = choice !== undefined ? { choice } : {};
     if (raw.type === 'Choice') {
-      bodyItems(raw.items, out, counter, counter.n++);
+      bodyItems(raw.items, out, counter, byMotivation, counter.n++);
     } else if (raw.type === 'TextualBody' || (raw.value !== undefined && raw.type !== 'SpecificResource')) {
       const value = str(raw.value) ?? '';
       if (!value) continue;
@@ -81,7 +96,7 @@ const bodyItems = (body: unknown, out: AnnotationBodyItem[], counter: { n: numbe
         format: str(raw.format),
         language: str(raw.language),
         ...(raw.label !== undefined ? { label: raw.label } : {}),
-        ...(isTagging(raw) ? { tagging: true } : {}),
+        ...(isTagIn(raw, byMotivation) ? { tagging: true } : {}),
         ...c,
       });
     } else if (raw.type === 'SpecificResource' && isObj(raw.source) && raw.source.type === 'TextualBody') {
@@ -120,13 +135,14 @@ const bodyItems = (body: unknown, out: AnnotationBodyItem[], counter: { n: numbe
 
 /**
  * The bodies of an annotation, in order, with every alternative of a Choice kept (pick one with pickBodies).
- * A `bodyValue` (the short form of a single text body) comes first.
+ * A `bodyValue` (the short form of a single text body) comes first. When the annotation's only motivation is
+ * tagging, its text bodies without a purpose are tags.
  */
 export const readAnnotationBodies = (anno: Json): AnnotationBodyItem[] => {
   const out: AnnotationBodyItem[] = [];
   const bodyValue = str(anno.bodyValue);
   if (bodyValue) out.push({ kind: 'text', value: bodyValue });
-  bodyItems(anno.body, out, { n: 0 });
+  bodyItems(anno.body, out, { n: 0 }, tagsByMotivation(anno));
   return out;
 };
 
@@ -136,8 +152,9 @@ export const readAnnotationBodies = (anno: Json): AnnotationBodyItem[] => {
  */
 export const annotationTitleOf = (anno: Json): unknown => {
   if (anno.label !== undefined) return anno.label;
+  const byMotivation = tagsByMotivation(anno);
   for (const b of asList(anno.body)) {
-    if (isObj(b) && b.type === 'TextualBody' && !isTagging(b)) return b.label;
+    if (isObj(b) && b.type === 'TextualBody' && !isTagIn(b, byMotivation)) return b.label;
   }
   return undefined;
 };
