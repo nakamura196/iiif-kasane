@@ -570,10 +570,10 @@ export const USE_CASES: UseCase[] = [
       en: 'A jigsaw puzzle of the Ōmi provincial map (a copy of the Tenpō kuniezu)',
     },
     note: {
-      ja: 'スタンフォード大学図書館が所蔵する近江国絵図（天保国絵図の写し）を、右の「パズル」タブでジグソーパズルにします。マスの数（3 × 3〜8 × 8）を選んで「はじめる」を押すと、画像が切り分けられて混ざります。2 つのピースを順に押すと入れ替わり、元の絵に戻せば完成です。ほかの資料でも、開いてこのタブを選べば同じように遊べます。所蔵: スタンフォード大学図書館。',
-      en: 'A copy of the Tenpō provincial map of Ōmi, held by Stanford University Libraries, turned into a jigsaw puzzle in the Puzzle tab on the right. Choose a grid (3 × 3 to 8 × 8) and press Start to cut up and shuffle the image. Click two pieces in turn to swap them, and finish by putting the picture back together. Any other image works the same way: open it and pick this tab. Holder: Stanford University Libraries.',
+      ja: 'スタンフォード大学図書館が所蔵する近江国絵図（天保国絵図の写し）を、右の「ほかの表示」タブの「パズルで遊ぶ」でジグソーパズルにします。マスの数（3 × 3〜8 × 8）を選んで「はじめる」を押すと、画像が切り分けられて混ざります。2 つのピースを順に押すと入れ替わり、元の絵に戻せば完成です。ほかの資料でも、開いて同じ欄を使えば遊べます。所蔵: スタンフォード大学図書館。',
+      en: 'A copy of the Tenpō provincial map of Ōmi, held by Stanford University Libraries, turned into a jigsaw puzzle under “Play a jigsaw puzzle” in the Other views tab on the right. Choose a grid (3 × 3 to 8 × 8) and press Start to cut up and shuffle the image. Click two pieces in turn to swap them, and finish by putting the picture back together. Any other image works the same way. Holder: Stanford University Libraries.',
     },
-    open: { page: 'viewer', manifest: 'https://purl.stanford.edu/hs631zg4177/iiif/manifest', tab: 'puzzle' },
+    open: { page: 'viewer', manifest: 'https://purl.stanford.edu/hs631zg4177/iiif/manifest', tab: 'views' },
     features: ['image', 'puzzle'],
     video: { ja: '-DT_kGvJOpU', en: 'zujWTk3s66U' },
   },

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import type { Panel } from '@nakamura196/iiif-viewer';
+import { Puzzle, canPlayPuzzle, type Panel, type PanelContext } from '@nakamura196/iiif-viewer';
 import { Link } from '@/i18n/routing';
 import { contentParam } from '@nakamura196/iiif-viewer/core';
 import { OTHER_VIEWS_TAB } from '@/lib/viewerTabs';
@@ -21,6 +21,8 @@ import {
 // 以前はビューアの左下に常にボタンを出していたが、絵や動画に重なるのでタブに移した。
 // 比較は、表示中の模型か画像に候補（Choice）が 2 つ以上あるときだけ出す。
 // 美術館は歩き方・内装・画質・枚数を選んでから開く（どれも /gallery/ の URL 引数になる）。
+// パズルはビューアのタブにあったものをここへ移した（読む道具ではないので）。ほかと違い、別のページへは移らず
+// その場で開くので、いちばん下に置く。
 
 const BUTTON =
   'inline-block px-3 py-1.5 rounded text-sm text-white bg-blue-600 hover:bg-blue-700 no-underline';
@@ -36,7 +38,7 @@ interface Props {
   compare: CompareTarget;
 }
 
-function OtherViews({ manifestUrl, hasGeo, galleryOk, compare }: Props) {
+function OtherViews({ manifestUrl, hasGeo, galleryOk, compare, ctx }: Props & { ctx: PanelContext }) {
   const t = useTranslations('OtherViews');
   const [mode, setMode] = useState<GalleryMode>('orbit');
   const [look, setLook] = useState<GalleryLook>('standard');
@@ -115,16 +117,22 @@ function OtherViews({ manifestUrl, hasGeo, galleryOk, compare }: Props) {
           </Link>
         </section>
       )}
+      {canPlayPuzzle(ctx) && (
+        <section className="space-y-2">
+          <h3 className="font-semibold">{t('puzzleHeading')}</h3>
+          <Puzzle {...ctx} className="space-y-3" />
+        </section>
+      )}
     </div>
   );
 }
 
-/** 比較・地図・美術館のどれかに渡せる資料のときだけ出すタブ。 */
+/** 比較・地図・美術館のどれかに渡せる資料か、パズルにできる画像のときだけ出すタブ。 */
 export const otherViewsPanel = (props: Props, label: string): Panel => ({
   id: OTHER_VIEWS_TAB,
   // パズル（110）の後ろ、いちばん右
   order: 120,
   label,
-  available: () => !!props.compare || props.hasGeo || props.galleryOk,
-  Component: () => <OtherViews {...props} />,
+  available: (ctx) => !!props.compare || props.hasGeo || props.galleryOk || canPlayPuzzle(ctx),
+  Component: (ctx) => <OtherViews {...props} ctx={ctx} />,
 });

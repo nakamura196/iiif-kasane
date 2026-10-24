@@ -4,7 +4,7 @@ order: 4
 title.ja: 表示中の画像でジグソーパズルができるようになりました
 title.en: Turn the current image into a jigsaw puzzle
 action.viewer: https://purl.stanford.edu/hs631zg4177/iiif/manifest
-action.params: tab=puzzle
+action.params: tab=views
 video.ja: -DT_kGvJOpU
 video.en: zujWTk3s66U
 usecases: puzzle-kuniezu

@@ -11,7 +11,7 @@ import ManifestInput from '@/components/Input';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { convertToV4, fetchManifest, manifestFromParams, parseManifestV4 } from '@nakamura196/iiif-viewer/core';
-import { isViewerTab } from '@/lib/viewerTabs';
+import { HIDDEN_VIEWER_TABS, viewerTabOf } from '@/lib/viewerTabs';
 import { canOpenInGallery } from '@/lib/gallery';
 import { otherViewsPanel, type CompareTarget } from '@/components/OtherViewsPanel';
 
@@ -66,7 +66,7 @@ const ViewerContent: NextPage = () => {
     };
   }, [manifestUrl]);
 
-  // 比較・地図・3D の美術館へは、右の「ほかの表示」タブから行く
+  // 比較・地図・3D の美術館とパズルへは、右の「ほかの表示」タブから行く
   const otherViewsLabel = to('tab');
   const panels = useMemo(
     () =>
@@ -77,7 +77,7 @@ const ViewerContent: NextPage = () => {
   );
 
   const tabParam = searchParams?.get('tab');
-  const tab = isViewerTab(tabParam) ? tabParam : undefined;
+  const tab = viewerTabOf(tabParam);
 
   const handleTabChange = (next: InfoTab) => {
     const params = new URLSearchParams(searchParams?.toString() || '');
@@ -99,6 +99,7 @@ const ViewerContent: NextPage = () => {
             tab={tab}
             onTabChange={handleTabChange}
             panels={panels}
+            hidePanels={HIDDEN_VIEWER_TABS}
             // 左下には何も出さず、候補があるかだけを受け取って「ほかの表示」タブの比較に渡す
             renderActions={({ hasChoices, selectedIndex }) => (
               <CompareReport target={hasChoices ? selectedIndex : null} onChange={setCompare} />

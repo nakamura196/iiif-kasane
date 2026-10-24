@@ -86,6 +86,12 @@ A host page that turns the pages itself (through `target`) can pass `pager={fals
 previous / next buttons above the image, so that the reader does not see two sets. The arrow keys
 still turn the pages, and `onSelect` still reports them. On the tag, use `options='{"pager":false}'`.
 
+### Hiding a side panel tab
+
+Pass `hidePanels` with tab ids (e.g. `hidePanels={['puzzle']}`) to leave out some of the viewer's
+own tabs. A host page can then put the same controls in a tab of its own: `Puzzle` is the puzzle's
+start controls, and `canPlayPuzzle` says whether the shown Canvas has an image for it.
+
 ## The `<iiif-viewer>` tag
 
 ```html
