@@ -9,6 +9,7 @@ import { fetchManifest } from '@nakamura196/iiif-viewer/core';
 import { manifestAtom } from '@nakamura196/iiif-viewer';
 import { AuthPrompt, CanvasComponent, GeoImageView, useAuthStates, useCanvasImages } from '@nakamura196/iiif-viewer';
 import ManifestInput from '@/components/Input';
+import ManifestParamWatcher from '@/components/ManifestParamWatcher';
 import RotationControl from '@/components/map/RotationControl';
 import Header from '@/components/Header';
 import { Link } from '@/i18n/routing';
@@ -138,7 +139,8 @@ const GeoRefContent: NextPage = () => {
   // 右の欄で出すもの（地点の一覧か権利）。URL の search・license と同じ
   const [sideTab, setSideTab] = useState<GeorefSideTab>('list');
 
-  useEffect(() => {
+  // 開いたとき、また入口のリンクで URL の資料が変わったときに読む
+  const readUrl = useCallback(() => {
     const params = new URLSearchParams(window.location.search);
     const state = readGeorefParams(params, manifestFromParams(params));
     setUrlState(state);
@@ -364,6 +366,9 @@ const GeoRefContent: NextPage = () => {
 
   return (
     <div className="flex flex-col h-dvh">
+      <Suspense fallback={null}>
+        <ManifestParamWatcher onChange={readUrl} />
+      </Suspense>
       <Header />
       <main className="flex-1 flex overflow-hidden">
         {/* URL を読み終えてから地図と画像を作る（開いたときの縮尺・中心を渡すため） */}
