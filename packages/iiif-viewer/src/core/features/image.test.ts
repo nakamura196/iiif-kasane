@@ -18,6 +18,7 @@ import {
   tileSchemeOf,
   tilesCovering,
   tilesForView,
+  mergedScheme,
   type CanvasImages,
 } from './image';
 
@@ -215,6 +216,38 @@ describe('tiles', () => {
     expect(tiles[tiles.length - 1].key).toBe('4/10/8');
     // a view that fits keeps the sharpest factor
     expect(tilesForView(service, big, scheme, 0.43, { x: 0, y: 0, w: 2000, h: 1500 })[0].key).toBe('2/0/0');
+  });
+
+  it('asks for 2 x 2 declared tiles at once on servers that cut any region', () => {
+    // the University of Tokyo's server: level 2, 512 px tiles, 7442 x 5592
+    const ut = parseImageInfo({
+      '@context': 'http://iiif.io/api/image/2/context.json',
+      '@id': 'https://h/i',
+      width: 7442,
+      height: 5592,
+      profile: ['http://iiif.io/api/image/2/level2.json'],
+      tiles: [{ width: 512, height: 512, scaleFactors: [1, 2, 4, 8, 16] }],
+    })!;
+    const scheme = tileSchemeOf(ut)!;
+    const view = { x: 0, y: 0, w: 6600, h: 5000 };
+    // 13 x 10 = 130 declared tiles become 7 x 5 = 35 requests of the same sharpness
+    const tiles = tilesForView(service, ut, scheme, 1, view);
+    expect(tiles).toHaveLength(35);
+    expect(tiles[0].key).toBe('m1/0/0');
+    expect(tiles[0].url).toBe('https://h/i/0,0,1024,1024/1024,/0/default.jpg');
+    // a view of a few tiles keeps the declared ones
+    expect(tilesForView(service, ut, scheme, 1, { x: 0, y: 0, w: 1000, h: 1000 })[0].key).toBe('1/0/0');
+    // not on level 0, nor beyond the server's maxWidth
+    expect(tilesForView(service, { ...ut, level: 0 }, scheme, 1, view)).toHaveLength(130);
+    expect(mergedScheme({ ...ut, maxWidth: 800 }, scheme)).toBeNull();
+    expect(mergedScheme(ut, { width: 1024, height: 1024 })).toBeNull();
+  });
+
+  it('parseImageInfo reads maxWidth from the v2 profile and the v3 info.json', () => {
+    const v2 = parseImageInfo({ '@id': 'https://h/i', width: 10, height: 10, profile: ['level2', { maxWidth: 800 }] })!;
+    expect([v2.maxWidth, v2.maxHeight, v2.maxArea]).toEqual([800, 800, undefined]);
+    const v3 = parseImageInfo({ width: 10, height: 10, profile: 'level2', maxArea: 1000000 })!;
+    expect([v3.maxWidth, v3.maxArea]).toEqual([undefined, 1000000]);
   });
 
   it('level 0 without tiles: a listed size, never a region', () => {
