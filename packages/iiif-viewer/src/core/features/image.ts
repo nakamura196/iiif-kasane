@@ -529,6 +529,10 @@ export interface ImageInfo {
   level: number;
   tiles: { width: number; height: number; scaleFactors: number[] }[];
   sizes: { width: number; height: number }[];
+  /** The largest image the server gives (`maxWidth` / `maxHeight` / `maxArea`), when it says so. */
+  maxWidth?: number;
+  maxHeight?: number;
+  maxArea?: number;
 }
 
 export const parseImageInfo = (json: unknown): ImageInfo | null => {
@@ -563,7 +567,22 @@ export const parseImageInfo = (json: unknown): ImageInfo | null => {
     .filter((s) => s.width > 0 && s.height > 0)
     .sort((a, b) => a.width - b.width);
 
-  return { width, height, version, level: Number.isFinite(level) ? level : 0, tiles, sizes };
+  // v3 puts the limits on the info.json, v2 on the profile object
+  const limit = (k: string) => num(json[k]) ?? (isObj(profileObj) ? num(profileObj[k]) : undefined);
+  const maxWidth = limit('maxWidth');
+  const maxHeight = limit('maxHeight') ?? maxWidth;
+  const maxArea = limit('maxArea');
+  return {
+    width,
+    height,
+    version,
+    level: Number.isFinite(level) ? level : 0,
+    tiles,
+    sizes,
+    ...(maxWidth ? { maxWidth } : {}),
+    ...(maxHeight ? { maxHeight } : {}),
+    ...(maxArea ? { maxArea } : {}),
+  };
 };
 
 export const imageInfoUrl = (service: ImageServiceRef): string => `${service.id}/info.json`;
@@ -640,7 +659,32 @@ export const tilesForView = (
   for (const f of [...scheme.scaleFactors].sort((a, b) => a - b)) {
     if (f > sf && tileCountOf(info, scheme, sf, visible) > limit) sf = f;
   }
+  const merged = mergedScheme(info, scheme);
+  if (merged && tileCountOf(info, scheme, sf, visible) > MERGE_ABOVE) return tilesCovering(service, info, merged, sf, visible, limit, 'm');
   return tilesCovering(service, info, scheme, sf, visible, limit);
+};
+
+/** Below this many tiles the view comes in one round of the 6 requests a browser makes at a time. */
+const MERGE_ABOVE = 6;
+
+/**
+ * Each request asks for 2 x 2 of the declared tiles at once, when the server can cut any region (level 1
+ * or above) and the larger image stays within 1024 px and the server's limits. A slow server spends most of
+ * a request before it starts to answer, so a quarter of the requests brings the same pixels sooner
+ * (measured on the University of Tokyo's server: 72 tiles 4.5-5.0 s, 18 merged tiles 2.9 s; docs/notes/load-time.md).
+ */
+export const mergedScheme = (
+  info: ImageInfo,
+  scheme: { width: number; height: number },
+): { width: number; height: number } | null => {
+  if (info.level < 1) return null;
+  const width = scheme.width * 2;
+  const height = scheme.height * 2;
+  if (width > 1024 || height > 1024) return null;
+  if (info.maxWidth && width > info.maxWidth) return null;
+  if (info.maxHeight && height > info.maxHeight) return null;
+  if (info.maxArea && width * height > info.maxArea) return null;
+  return { width, height };
 };
 
 /** Tiles of one scale factor that cover `visible` (source pixels). At most `limit` tiles. */
@@ -651,6 +695,8 @@ export const tilesCovering = (
   scaleFactor: number,
   visible: ImageRegion,
   limit = 150,
+  /** Marks the keys of merged tiles, so that they do not stand for the declared tiles of the same place. */
+  keyPrefix = '',
 ): Tile[] => {
   const spanW = scheme.width * scaleFactor;
   const spanH = scheme.height * scaleFactor;
@@ -668,7 +714,7 @@ export const tilesCovering = (
       if (w <= 0 || h <= 0) continue;
       const outW = Math.ceil(w / scaleFactor);
       out.push({
-        key: `${scaleFactor}/${tx}/${ty}`,
+        key: `${keyPrefix}${scaleFactor}/${tx}/${ty}`,
         x,
         y,
         w,
