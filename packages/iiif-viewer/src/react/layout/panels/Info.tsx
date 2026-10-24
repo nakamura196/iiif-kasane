@@ -23,6 +23,8 @@ type Props = {
   manifest?: ManifestV4 | null;
   /** Tabs added by the host page (links to its own pages etc.), mixed in by order. */
   extraPanels?: Panel[];
+  /** Ids of the viewer's own tabs not to show. */
+  hiddenPanels?: string[];
 };
 
 const TAB_CLASS = (active: boolean) =>
@@ -32,7 +34,7 @@ const TAB_CLASS = (active: boolean) =>
       : 'border-transparent text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'
   }`;
 
-const Info = ({ tab, onTabChange, container, manifest, extraPanels }: Props) => {
+const Info = ({ tab, onTabChange, container, manifest, extraPanels, hiddenPanels }: Props) => {
   const t = useTranslations('Info');
   const [inner, setInner] = useState<InfoTab | null>(null);
   const annotationCount = useAtomValue(annotationsAtom).length;
@@ -41,7 +43,7 @@ const Info = ({ tab, onTabChange, container, manifest, extraPanels }: Props) => 
   // 文字の検索の印そのものは数えない（印だけが残ってタブが消えなくなるため）
   const localAnnotationCount = localPages.filter((l) => l.source !== CONTENT_SEARCH_SOURCE).length + inferenceCount;
   const ctx = { container, manifest, annotationCount, localAnnotationCount };
-  const available = withExtraPanels(extraPanels).filter((p) => p.available(ctx));
+  const available = withExtraPanels(extraPanels).filter((p) => !hiddenPanels?.includes(p.id) && p.available(ctx));
   const ids = available.map((p) => p.id);
   // 「資料情報」は前の「資料情報（about）」タブも兼ねる。古いリンクの ?tab=about はそこへ
   const asked = tab === 'about' ? 'metadata' : tab;

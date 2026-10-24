@@ -179,7 +179,8 @@ function PuzzleDialog({ picture, size, onClose, t }: { picture: Picture; size: n
   );
 }
 
-function PuzzleView({ container, manifest }: PanelContext) {
+/** The puzzle's start controls (grid size and Start) for the shown image. Also for a host page that puts it in a tab of its own. */
+export function Puzzle({ container, manifest, className = 'p-3 space-y-3 text-sm' }: PanelContext & { className?: string }) {
   const t = useTranslations('Puzzle');
   const fromAtom = useAtomValue(manifestAtom);
   const m: ManifestV4 | null | undefined = manifest ?? fromAtom;
@@ -205,7 +206,7 @@ function PuzzleView({ container, manifest }: PanelContext) {
 
   if (!container) return null;
   return (
-    <div className="p-3 space-y-3 text-sm">
+    <div className={className}>
       <p className="text-xs text-gray-600 dark:text-gray-300">{t('hint')}</p>
       <label className="flex items-center gap-2 text-xs">
         {t('size')}
@@ -230,9 +231,13 @@ function PuzzleView({ container, manifest }: PanelContext) {
   );
 }
 
+/** Whether the puzzle can be played on this container (a Canvas with an image). */
+export const canPlayPuzzle = ({ container }: PanelContext) =>
+  container?.kind === 'Canvas' && imageLayerCount(container.painting) > 0;
+
 export const puzzlePanel: Panel = {
   id: 'puzzle',
   order: 110,
-  available: ({ container }) => container?.kind === 'Canvas' && imageLayerCount(container.painting) > 0,
-  Component: (ctx) => <PuzzleView {...ctx} />,
+  available: canPlayPuzzle,
+  Component: (ctx) => <Puzzle {...ctx} />,
 };

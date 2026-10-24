@@ -397,6 +397,7 @@
     "mapHint": "Overlay the georeferenced map or picture on a present-day map.",
     "galleryHeading": "View in 3D gallery",
     "galleryHint": "Hang the images of this item on the walls of a 3D room and walk around. Choose the settings, then press View.",
+    "puzzleHeading": "Play a jigsaw puzzle",
     "mode": "Mode",
     "modes": {
       "orbit": "Look around",

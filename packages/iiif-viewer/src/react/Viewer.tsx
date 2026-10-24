@@ -43,6 +43,8 @@ export interface ViewerProps {
   renderActions?: (state: ViewerActionsState) => ReactNode;
   /** Extra side panel tabs from the host page (e.g. links to its other pages). */
   panels?: Panel[];
+  /** Ids of the viewer's own side panel tabs not to show (e.g. a host page that puts the puzzle in a tab of its own). */
+  hidePanels?: string[];
   /**
    * The Canvas (and region) to show, set by the host page. The viewer moves there when the
    * manifest is loaded and whenever the value points somewhere else. In between, the reader can
@@ -83,6 +85,7 @@ function ViewerBody({
   onTabChange,
   renderActions,
   panels,
+  hidePanels,
   target,
   onSelect,
   panelOpen,
@@ -91,7 +94,17 @@ function ViewerBody({
   dark,
 }: Pick<
   ViewerProps,
-  'iiifContent' | 'tab' | 'onTabChange' | 'renderActions' | 'panels' | 'target' | 'onSelect' | 'panelOpen' | 'pager' | 'className'
+  | 'iiifContent'
+  | 'tab'
+  | 'onTabChange'
+  | 'renderActions'
+  | 'panels'
+  | 'hidePanels'
+  | 'target'
+  | 'onSelect'
+  | 'panelOpen'
+  | 'pager'
+  | 'className'
 > & {
   dark: boolean;
 }) {
@@ -231,7 +244,14 @@ function ViewerBody({
           initialOpen={panelOpen}
           className="bg-[var(--ds-surface)] shadow-lg overflow-y-auto border-t sm:border-t-0 sm:border-l border-[var(--ds-border)]"
         >
-          <Info tab={tab} onTabChange={onTabChange} container={container} manifest={manifest} extraPanels={panels} />
+          <Info
+            tab={tab}
+            onTabChange={onTabChange}
+            container={container}
+            manifest={manifest}
+            extraPanels={panels}
+            hiddenPanels={hidePanels}
+          />
         </SidePanel>
       </div>
       </CanvasNavigationContext.Provider>
@@ -252,6 +272,7 @@ export function Viewer({
   onTabChange,
   renderActions,
   panels,
+  hidePanels,
   target,
   onSelect,
   panelOpen,
@@ -271,6 +292,7 @@ export function Viewer({
           onTabChange={onTabChange}
           renderActions={renderActions}
           panels={panels}
+          hidePanels={hidePanels}
           target={target}
           onSelect={onSelect}
           panelOpen={panelOpen}

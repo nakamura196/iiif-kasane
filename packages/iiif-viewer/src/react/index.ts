@@ -22,6 +22,8 @@ export { PANEL_IDS } from './panels/registry';
 export type { Panel, PanelContext } from './panels/types';
 // 権利のタブ（/georef の右の欄でも使う）
 export { rightsPanel } from './panels/AboutPanel';
+// パズルの始める欄（タブを隠して、使う側のタブに置くとき）
+export { Puzzle, canPlayPuzzle } from './panels/PuzzlePanel';
 export { default as AnnotationList } from './annotation/AnnotationList';
 export { default as AnnotationCard } from './annotation/AnnotationCard';
 export { default as Metadata } from './metadata/Metadata';
