@@ -1,16 +1,17 @@
 'use client';
 
 import type { NextPage } from 'next';
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useAtom } from 'jotai';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useTheme } from 'next-themes';
 import { Viewer, manifestUrlAtom, type InfoTab } from '@nakamura196/iiif-viewer';
 import ManifestInput from '@/components/Input';
+import ManifestParamWatcher from '@/components/ManifestParamWatcher';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import { convertToV4, fetchManifest, manifestFromParams, parseManifestV4 } from '@nakamura196/iiif-viewer/core';
+import { convertToV4, fetchManifest, parseManifestV4 } from '@nakamura196/iiif-viewer/core';
 import { HIDDEN_VIEWER_TABS, viewerTabOf } from '@/lib/viewerTabs';
 import { canOpenInGallery } from '@/lib/gallery';
 import { otherViewsPanel, type CompareTarget } from '@/components/OtherViewsPanel';
@@ -42,10 +43,13 @@ const ViewerContent: NextPage = () => {
   // 表示中の模型か画像に候補が 2 つ以上あれば、比較のページに渡す Canvas / Scene の番号（ビューアが知らせる）
   const [compare, setCompare] = useState<CompareTarget>(null);
 
-  useEffect(() => {
-    const manifestParam = manifestFromParams(new URLSearchParams(window.location.search));
-    if (manifestParam) setManifestUrl(manifestParam);
-  }, [setManifestUrl]);
+  // 開いたとき、また入口の事例のリンクで URL の資料が変わったときに読む
+  const readUrl = useCallback(
+    (manifestParam: string | null) => {
+      if (manifestParam) setManifestUrl(manifestParam);
+    },
+    [setManifestUrl],
+  );
 
   useEffect(() => {
     setHasGeoCanvas(false);
@@ -89,6 +93,9 @@ const ViewerContent: NextPage = () => {
   return (
     // h-dvh: スマホではブラウザのツールバーの分だけ 100vh が見える範囲より高く、下端が隠れるため
     <div className="flex flex-col h-dvh">
+      <Suspense fallback={null}>
+        <ManifestParamWatcher onChange={readUrl} />
+      </Suspense>
       <Header compact />
       <main className="flex-1 flex overflow-hidden relative">
         {manifestUrl ? (

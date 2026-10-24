@@ -1,7 +1,7 @@
 'use client';
 
 import type { NextPage } from 'next';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAtom, useAtomValue } from 'jotai';
 import { useLocale, useTranslations } from 'next-intl';
 import {
@@ -23,6 +23,7 @@ import {
 import Header from '@/components/Header';
 import { Link } from '@/i18n/routing';
 import ManifestInput from '@/components/Input';
+import ManifestParamWatcher from '@/components/ManifestParamWatcher';
 import CompareView, { type CompareMode3D } from '@/components/three/CompareView';
 import {
   alignmentOf,
@@ -186,7 +187,8 @@ const CompareContent: NextPage = () => {
   // b= was given: keep it (otherwise two sources of the same size open at their first pair)
   const pickGiven = useRef(false);
 
-  useEffect(() => {
+  // 開いたとき、また入口の事例のリンクで URL の資料が変わったときに読む
+  const readUrl = useCallback(() => {
     const params = new URLSearchParams(window.location.search);
     const m = manifestFromParams(params);
     if (m) setManifestUrl(m);
@@ -394,6 +396,9 @@ const CompareContent: NextPage = () => {
 
   return (
     <div className="flex flex-col h-dvh">
+      <Suspense fallback={null}>
+        <ManifestParamWatcher onChange={readUrl} />
+      </Suspense>
       <Header compact />
       <main className="flex-1 flex overflow-hidden">
         {manifestUrl || srcs.length > 0 ? (
