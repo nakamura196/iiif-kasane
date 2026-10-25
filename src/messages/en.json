@@ -296,7 +296,8 @@
       "measure": "Real size",
       "gallery": "Gallery",
       "inference": "Inference",
-      "puzzle": "Puzzle"
+      "puzzle": "Puzzle",
+      "browse": "Browse in 3D"
     },
     "back": "Back to all use cases",
     "details": "Details",
