@@ -14,6 +14,7 @@ import Footer from '@/components/Footer';
 import { convertToV4, fetchManifest, parseManifestV4 } from '@nakamura196/iiif-viewer/core';
 import { HIDDEN_VIEWER_TABS, viewerTabOf } from '@/lib/viewerTabs';
 import { canOpenInGallery } from '@/lib/gallery';
+import { canOpenInBrowse } from '@/lib/browse';
 import { otherViewsPanel, type CompareTarget } from '@/components/OtherViewsPanel';
 
 // ビューアが左下に置く場所（renderActions）から、比較に渡せるかを受け取るだけの部品。何も描かない。
@@ -40,6 +41,8 @@ const ViewerContent: NextPage = () => {
   const [hasGeoCanvas, setHasGeoCanvas] = useState(false);
   // 画像を含み、3D の美術館（/gallery/）の壁に掛けられるか
   const [galleryOk, setGalleryOk] = useState(false);
+  // Collection か、Canvas が 2 つ以上ある Manifest で、3D の一覧（/browse/）に渡せるか
+  const [browseOk, setBrowseOk] = useState(false);
   // 表示中の模型か画像に候補が 2 つ以上あれば、比較のページに渡す Canvas / Scene の番号（ビューアが知らせる）
   const [compare, setCompare] = useState<CompareTarget>(null);
 
@@ -54,6 +57,7 @@ const ViewerContent: NextPage = () => {
   useEffect(() => {
     setHasGeoCanvas(false);
     setGalleryOk(false);
+    setBrowseOk(false);
     if (!manifestUrl) return;
     let cancelled = false;
     fetchManifest(manifestUrl)
@@ -63,6 +67,7 @@ const ViewerContent: NextPage = () => {
         const { geoCanvasId, geoFeatures } = parseManifestV4(convertToV4(raw));
         setHasGeoCanvas(!!geoCanvasId || geoFeatures.length > 0);
         setGalleryOk(canOpenInGallery(raw));
+        setBrowseOk(canOpenInBrowse(raw));
       })
       .catch(() => {});
     return () => {
@@ -70,14 +75,14 @@ const ViewerContent: NextPage = () => {
     };
   }, [manifestUrl]);
 
-  // 比較・地図・3D の美術館とパズルへは、右の「ほかの表示」タブから行く
+  // 比較・地図・3D の美術館・3D の一覧とパズルへは、右の「ほかの表示」タブから行く
   const otherViewsLabel = to('tab');
   const panels = useMemo(
     () =>
       manifestUrl
-        ? [otherViewsPanel({ manifestUrl, hasGeo: hasGeoCanvas, galleryOk, compare }, otherViewsLabel)]
+        ? [otherViewsPanel({ manifestUrl, hasGeo: hasGeoCanvas, galleryOk, browseOk, compare }, otherViewsLabel)]
         : [],
-    [manifestUrl, hasGeoCanvas, galleryOk, compare, otherViewsLabel],
+    [manifestUrl, hasGeoCanvas, galleryOk, browseOk, compare, otherViewsLabel],
   );
 
   const tabParam = searchParams?.get('tab');

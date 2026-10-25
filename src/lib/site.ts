@@ -11,7 +11,7 @@ export const OLD_HOSTS = ['nakamura196.github.io/iiif-3d-viewer', '3d-iiif-viewe
 export const LOCALES = ['ja', 'en'] as const;
 
 // sitemap に載せるページ(ロケールの後ろのパス。trailingSlash: true)
-export const PUBLIC_PATHS = ['', 'viewer/', 'georef/', 'usecases/', 'inference-models/', 'gallery/', 'structure-share-embed/', 'news/', 'samples/', 'samples/kasane/', 'search/', 'help/', 'privacy/', 'terms/'];
+export const PUBLIC_PATHS = ['', 'viewer/', 'georef/', 'usecases/', 'inference-models/', 'gallery/', 'browse/', 'structure-share-embed/', 'news/', 'samples/', 'samples/kasane/', 'search/', 'help/', 'privacy/', 'terms/'];
 
 /**
  * ページの canonical と言語の組。metadataBase (SITE_URL) からの相対で返す。
