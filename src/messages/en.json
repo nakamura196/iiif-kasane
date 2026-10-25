@@ -26,7 +26,8 @@
     "samplesAll": "Cookbook samples",
     "samplesOwn": "Kasane samples",
     "useCasesAll": "Use cases",
-    "gallery": "IIIF VR Gallery"
+    "gallery": "IIIF VR Gallery",
+    "browse": "Browse in 3D"
   },
   "News": {
     "heading": "News",
@@ -418,6 +419,69 @@
     },
     "limit": "Works",
     "limitDefault": "Default",
-    "limitOption": "Up to {n}"
+    "limitOption": "Up to {n}",
+    "browseHeading": "Browse in 3D",
+    "browseHint": "Lay out the items of this collection (or the pages of this item) as thumbnail cards in a 3D space.",
+    "layout": "Layout"
+  },
+  "Browse": {
+    "stage": "Cards laid out in 3D. Drag to rotate, scroll to zoom",
+    "loading": "Loading…",
+    "unreadable": "This URL could not be read. Enter the URL of an IIIF Collection or Manifest.",
+    "empty": "No items to lay out were found.",
+    "layout": "Layout",
+    "layouts": {
+      "table": "Table",
+      "sphere": "Sphere",
+      "helix": "Helix",
+      "grid": "Grid",
+      "flat": "2D"
+    },
+    "prev": "Previous",
+    "next": "Next",
+    "billboard": "Face front",
+    "billboardHint": "Always turn the cards toward you",
+    "resetView": "Reset view",
+    "settings": "Settings",
+    "list": "List",
+    "sidebar": "Items and settings",
+    "untitled": "(Untitled)",
+    "count": "{count} items",
+    "countFiltered": "{shown} of {total} items",
+    "close": "Close",
+    "search": "Filter…",
+    "urlLabel": "IIIF URL",
+    "urlPlaceholder": "Collection / Manifest URL",
+    "open": "Open",
+    "displayMode": "Display mode",
+    "gridFront": "Face front in the grid",
+    "dragMove": "Shift + drag to move a card",
+    "spacing": "Spacing",
+    "spacings": {
+      "compact": "Compact",
+      "standard": "Standard",
+      "wide": "Wide",
+      "custom": "Custom"
+    },
+    "spacingType": "Spacing type",
+    "spacingTypes": {
+      "absolute": "Absolute (px)",
+      "relative": "Relative to card size",
+      "equal": "Equal in both directions"
+    },
+    "spacingX": "Horizontal spacing: {value}",
+    "spacingY": "Vertical spacing: {value}",
+    "limit": "Items to lay out",
+    "limitOption": "Up to {n}",
+    "detail": "Open in viewer",
+    "enlarge": "Enlarge",
+    "keep": "Keep",
+    "kept": "Kept",
+    "keepHint": "Double-click a card to keep it (compare with 2 or more)",
+    "keepHeading": "Kept ({count})",
+    "compare": "Compare",
+    "clear": "Clear",
+    "noMatch": "No matching items",
+    "defaultTitle": "Kasane use cases"
   }
 }

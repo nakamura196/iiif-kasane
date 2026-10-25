@@ -26,7 +26,8 @@
     "samplesAll": "Cookbook のサンプル",
     "samplesOwn": "Kasane 独自のサンプル",
     "useCasesAll": "ユースケース",
-    "gallery": "IIIF バーチャル美術館"
+    "gallery": "IIIF バーチャル美術館",
+    "browse": "3D で一覧する"
   },
   "News": {
     "heading": "お知らせ",
@@ -418,6 +419,69 @@
     },
     "limit": "枚数",
     "limitDefault": "既定",
-    "limitOption": "{n} 枚まで"
+    "limitOption": "{n} 枚まで",
+    "browseHeading": "3D で一覧する",
+    "browseHint": "このコレクション（または各ページ）を、サムネイルのカードにして 3D の空間に並べ、一覧します。",
+    "layout": "並べ方"
+  },
+  "Browse": {
+    "stage": "カードを 3D で並べた表示。ドラッグで回転、ホイールで拡大",
+    "loading": "読み込み中…",
+    "unreadable": "この URL は読み込めませんでした。IIIF の Collection か Manifest の URL を入れてください。",
+    "empty": "並べられる資料が見つかりませんでした。",
+    "layout": "並べ方",
+    "layouts": {
+      "table": "テーブル",
+      "sphere": "球",
+      "helix": "らせん",
+      "grid": "グリッド",
+      "flat": "2D"
+    },
+    "prev": "前へ",
+    "next": "次へ",
+    "billboard": "正面",
+    "billboardHint": "カードを常に正面に向ける",
+    "resetView": "視点を戻す",
+    "settings": "設定",
+    "list": "一覧",
+    "sidebar": "資料の一覧と設定",
+    "untitled": "（無題）",
+    "count": "{count} 点",
+    "countFiltered": "{shown} / {total} 点",
+    "close": "閉じる",
+    "search": "絞り込み…",
+    "urlLabel": "IIIF の URL",
+    "urlPlaceholder": "Collection / Manifest の URL",
+    "open": "開く",
+    "displayMode": "表示モード",
+    "gridFront": "グリッドで正面を向ける",
+    "dragMove": "Shift + ドラッグでカードを動かす",
+    "spacing": "間隔",
+    "spacings": {
+      "compact": "狭い",
+      "standard": "標準",
+      "wide": "広い",
+      "custom": "自分で決める"
+    },
+    "spacingType": "間隔の種類",
+    "spacingTypes": {
+      "absolute": "絶対値（px）",
+      "relative": "カードの大きさとの比",
+      "equal": "縦横を等しく"
+    },
+    "spacingX": "横の間隔: {value}",
+    "spacingY": "縦の間隔: {value}",
+    "limit": "並べる数",
+    "limitOption": "最大 {n} 点",
+    "detail": "詳細を見る",
+    "enlarge": "拡大",
+    "keep": "Keep する",
+    "kept": "Keep 済み",
+    "keepHint": "カードをダブルクリックで Keep（2 点以上で比較できます）",
+    "keepHeading": "Keep（{count}）",
+    "compare": "比較",
+    "clear": "クリア",
+    "noMatch": "該当する資料がありません",
+    "defaultTitle": "Kasane のユースケース"
   }
 }

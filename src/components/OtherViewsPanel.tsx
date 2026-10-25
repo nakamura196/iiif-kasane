@@ -16,6 +16,7 @@ import {
   type GalleryMode,
   type GalleryQuality,
 } from '@/lib/gallery';
+import { BROWSE_LAYOUTS, browseQuery, type BrowseLayout } from '@/lib/browse';
 
 // 右パネルの「ほかの表示」タブ。同じ資料を Kasane の別のページ（比較・地図・3D の美術館）で開く。
 // 以前はビューアの左下に常にボタンを出していたが、絵や動画に重なるのでタブに移した。
@@ -35,11 +36,14 @@ interface Props {
   manifestUrl: string;
   hasGeo: boolean;
   galleryOk: boolean;
+  browseOk: boolean;
   compare: CompareTarget;
 }
 
-function OtherViews({ manifestUrl, hasGeo, galleryOk, compare, ctx }: Props & { ctx: PanelContext }) {
+function OtherViews({ manifestUrl, hasGeo, galleryOk, browseOk, compare, ctx }: Props & { ctx: PanelContext }) {
   const t = useTranslations('OtherViews');
+  const tb = useTranslations('Browse');
+  const [browseLayout, setBrowseLayout] = useState<BrowseLayout>('table');
   const [mode, setMode] = useState<GalleryMode>('orbit');
   const [look, setLook] = useState<GalleryLook>('standard');
   const [quality, setQuality] = useState<GalleryQuality>('auto');
@@ -65,6 +69,25 @@ function OtherViews({ manifestUrl, hasGeo, galleryOk, compare, ctx }: Props & { 
           <p className="text-xs text-gray-600 dark:text-gray-300">{t('mapHint')}</p>
           <Link href={`/georef?${contentParam(manifestUrl)}`} className={BUTTON}>
             {t('open')}
+          </Link>
+        </section>
+      )}
+      {browseOk && (
+        <section className="space-y-2">
+          <h3 className="font-semibold">{t('browseHeading')}</h3>
+          <p className="text-xs text-gray-600 dark:text-gray-300">{t('browseHint')}</p>
+          <div className="grid grid-cols-[auto_1fr] items-center gap-x-2 text-xs">
+            <label htmlFor="browse-layout">{t('layout')}</label>
+            <select id="browse-layout" className={SELECT} value={browseLayout} onChange={(e) => setBrowseLayout(e.target.value as BrowseLayout)}>
+              {BROWSE_LAYOUTS.map((l) => (
+                <option key={l} value={l}>
+                  {tb(`layouts.${l}`)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <Link href={`/browse?${browseQuery(manifestUrl, { layout: browseLayout })}`} className={BUTTON}>
+            {t('view')}
           </Link>
         </section>
       )}
@@ -133,6 +156,6 @@ export const otherViewsPanel = (props: Props, label: string): Panel => ({
   // パズル（110）の後ろ、いちばん右
   order: 120,
   label,
-  available: (ctx) => !!props.compare || props.hasGeo || props.galleryOk || canPlayPuzzle(ctx),
+  available: (ctx) => !!props.compare || props.hasGeo || props.galleryOk || props.browseOk || canPlayPuzzle(ctx),
   Component: (ctx) => <OtherViews {...props} ctx={ctx} />,
 });
