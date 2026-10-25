@@ -67,6 +67,8 @@ const PREPARE = {
   'cma-fukutomi-story': `[...document.querySelectorAll('button')].find((e) => e.textContent.includes('次へ') || e.textContent.includes('Next'))?.click()`,
   // 開いた直後はコレクションの一覧なので、ページの言語の動画集を押して、1 本目の動画を開いた画面を撮る
   'youtube-tutorials': `[...document.querySelectorAll('button, a')].find((e) => e.textContent.includes(location.pathname.includes('/en/') ? '(English)' : '（日本語）'))?.click()`,
+  // 3D 一覧は操作の案内が左上に出てカードに重なるので、閉じてから撮る
+  'browse-edonohanami': `document.querySelector('button[aria-label="案内を閉じる"], button[aria-label="Dismiss"]')?.click()`,
 };
 // 操作のあと撮るまでの待ち時間（既定 3 秒）。深く寄ると、細かいタイルが届くまで時間がかかる
 const PREPARE_WAIT = { 'ndl-emaki-story': 12000, 'cma-fukutomi-story': 12000, 'youtube-tutorials': 10000 };

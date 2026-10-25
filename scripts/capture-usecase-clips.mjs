@@ -176,6 +176,30 @@ const CLIPS = {
       await sleep(1500);
     },
   },
+  'browse-edonohanami': {
+    wait: 30000,
+    seconds: 9,
+    // 操作の案内を閉じ、グループ表示で落ち着いたところから、並び方（テーブル・球・らせん・グループ）を順に切り替える。
+    // 並び方の切り替えボタンは言語で名前が変わるので、radiogroup の順番（table, sphere, helix, grid）で選ぶ
+    prepare: async (page) => {
+      await page.getByRole('button', { name: /^(Dismiss|案内を閉じる)$/ }).first().click({ timeout: 3000 }).catch(() => {});
+      await sleep(2500);
+    },
+    // 3D の部分だけ（上の操作バーは含めない）
+    rect: (page) =>
+      page.evaluate(() => {
+        const r = document.querySelector('.bw-stage').getBoundingClientRect();
+        return { x: Math.round(r.left), y: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height) };
+      }),
+    act: async (page) => {
+      const radios = page.getByRole('radiogroup').first().getByRole('radio');
+      await sleep(1500);
+      for (const i of [0, 1, 2, 3]) {
+        await radios.nth(i).click();
+        await sleep(3500);
+      }
+    },
+  },
 };
 
 const work = mkdtempSync(path.join(tmpdir(), 'kasane-clips-'));

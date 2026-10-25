@@ -1,6 +1,7 @@
 import type { CompareBlend, CompareMode } from '@nakamura196/iiif-viewer';
 import { contentParam } from '@nakamura196/iiif-viewer/core';
 import { withBasePath } from '@/lib/basePath';
+import { BY_SOURCE } from '@/lib/browse';
 import { SITE_URL } from '@/lib/site';
 import type { ViewerTab } from '@/lib/viewerTabs';
 
@@ -15,7 +16,7 @@ export type Locale = keyof Localized;
  * 「Kasane で開く」で開く先。開くページごとに、URL に載せられる引数が違うので分けて書く。
  * 新しいページに開かせたいときは、ここに 1 種類足して hrefOf に分岐を足す。
  * georef は地図と並べて見るページ、search はキュレーション・コレクションを横断して検索するページ、
- * gallery は 3D の美術館として歩くページ。
+ * gallery は 3D の美術館として歩くページ、browse は資料の顔や画像を 3D の空間に並べて一覧するページ。
  */
 export type UseCaseOpen =
   | {
@@ -58,10 +59,19 @@ export type UseCaseOpen =
       url: string;
       // 最初から入れておく検索語
       query?: string;
+    }
+  | {
+      page: 'browse';
+      // 一覧にする Curation・Collection・マニフェストの URL（?u=）
+      url: string;
+      // 並べ方。table = 表、sphere = 球、helix = らせん、grid = 束ごとの板（既定は table）
+      layout?: 'table' | 'sphere' | 'helix' | 'grid';
+      // grid のときの束の分け方。メタデータの項目名。省略すると資料ごと
+      group?: string;
     };
 
 /** 何を見せる例か。一覧に札として出す。表示名は messages の UseCases.features */
-export const USE_CASE_FEATURES = ['image', '3d', 'annotations', 'compare', 'layers', 'georef', 'curation', 'search', 'ocr', 'auth', 'story', 'audio', 'video', 'measure', 'gallery', 'inference', 'puzzle'] as const;
+export const USE_CASE_FEATURES = ['image', '3d', 'annotations', 'compare', 'layers', 'georef', 'curation', 'search', 'ocr', 'auth', 'story', 'audio', 'video', 'measure', 'gallery', 'inference', 'puzzle', 'browse'] as const;
 export type UseCaseFeature = (typeof USE_CASE_FEATURES)[number];
 
 export interface UseCase {
@@ -87,7 +97,7 @@ export interface UseCase {
 
 /** 開く資料そのものの URL（マニフェスト、search ならキュレーション・コレクション）。compare では複数のことがある */
 export const sourcesOf = (open: UseCaseOpen): string[] =>
-  open.page === 'search' || open.page === 'gallery' ? [open.url] : typeof open.manifest === 'string' ? [open.manifest] : open.manifest;
+  open.page === 'search' || open.page === 'gallery' || open.page === 'browse' ? [open.url] : typeof open.manifest === 'string' ? [open.manifest] : open.manifest;
 
 export function hrefOf(open: UseCaseOpen): string {
   if (open.page === 'search') {
@@ -99,6 +109,12 @@ export function hrefOf(open: UseCaseOpen): string {
     const q = [`u=${encodeURIComponent(open.url)}`];
     if (open.mode) q.push(`mode=${open.mode}`);
     return `/gallery?${q.join('&')}`;
+  }
+  if (open.page === 'browse') {
+    const q = [`u=${encodeURIComponent(open.url)}`];
+    if (open.layout && open.layout !== 'table') q.push(`layout=${open.layout}`);
+    if (open.layout === 'grid' && open.group && open.group !== BY_SOURCE) q.push(`group=${encodeURIComponent(open.group)}`);
+    return `/browse?${q.join('&')}`;
   }
   const q =
     typeof open.manifest === 'string'
@@ -591,6 +607,25 @@ export const USE_CASES: UseCase[] = [
     open: { page: 'search', url: 'https://iiif.bodleian.ox.ac.uk/iiif/activity/all-changes' },
     features: ['image', 'search'],
     site: 'https://digital.bodleian.ox.ac.uk/',
+  },
+  {
+    id: 'browse-edonohanami',
+    added: '2026-10-25',
+    title: {
+      ja: '「江戸の花見」の顔 121 点を 3D の空間に並べる（3D で一覧する）',
+      en: 'The faces in the Edo hanami curation, laid out in 3D (Browse in 3D)',
+    },
+    note: {
+      ja: '江戸の花見を描いた絵を、国立国会図書館デジタルコレクションの 29 冊から集めたキュレーションです。その中の顔 121 点を、1 枚ずつのカードにして 3D の空間に並べます。テーブル・球・らせん・グループ（本ごと、またはメタデータの項目ごと）を切り替えると、カードが新しい位置へ飛んでいきます。カードを押すと大きく見られ、ダブルクリックで Keep（手元に取っておく）してビューアで開けます。',
+      en: 'A curation of Edo-period cherry-blossom viewing pictures from 29 books in the National Diet Library Digital Collections. The 121 faces in it become cards laid out in a 3D space. Switch between table, sphere, helix and groups (by book, or by a metadata field) and the cards fly to their new positions. Click a card to see it large, and double-click to Keep it and open it in the viewer.',
+    },
+    open: {
+      page: 'browse',
+      url: 'https://nakamura196.github.io/ndl-face-finder/curations/works/edonohanami.json',
+      layout: 'grid',
+    },
+    features: ['browse', 'curation'],
+    site: 'https://nakamura196.github.io/ndl-face-finder/',
   },
 ];
 
