@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  BROWSE_LAYOUTS,
   browseQuery,
   canOpenInBrowse,
   compareQuery,
-  groupsOf,
   largeImageUrl,
   readBrowseParams,
+  unwrapIiifUrl,
   sourceFromResource,
   thumbnailOfCanvas,
   viewerQuery,
@@ -156,24 +157,6 @@ describe('canOpenInBrowse', () => {
   });
 });
 
-describe('groupsOf', () => {
-  const card = (group: string): BrowseItem => ({
-    id: group + Math.random(),
-    label: '',
-    manifestUrl: '',
-    canvasIndex: null,
-    thumbnail: '',
-    group,
-    summary: '',
-  });
-  it('numbers the groups in order of appearance', () => {
-    expect(groupsOf([card('b'), card('a'), card('b')])).toEqual({
-      names: ['b', 'a'],
-      of: [0, 1, 0],
-    });
-  });
-});
-
 describe('URL', () => {
   const params = (q: string) => readBrowseParams(new URLSearchParams(q), manifestFromParams);
   it('takes the resource from manifest (the old app), iiif-content (Kasane), curation or u (gallery)', () => {
@@ -182,9 +165,29 @@ describe('URL', () => {
     expect(params('u=https://a.example/u.json').url).toBe('https://a.example/u.json');
     expect(params('').url).toBeNull();
   });
+  it('takes the resource out of a Kasane page URL', () => {
+    const json = 'https://nakamura196.github.io/ndl-face-finder/curations/works/edonohanami.json';
+    const search = `https://kasane.ldas.jp/ja/search/?u=${encodeURIComponent(json)}`;
+    expect(unwrapIiifUrl(search, manifestFromParams)).toBe(json);
+    expect(
+      unwrapIiifUrl(`https://kasane.ldas.jp/ja/viewer/?iiif-content=${encodeURIComponent(json)}&canvas=2`, manifestFromParams)
+    ).toBe(json);
+    // ページの引数に、ページの URL がそのまま入っていても取り出す
+    expect(params(`manifest=${encodeURIComponent(search)}`).url).toBe(json);
+    // ただの資料の URL・URL でないものは、そのまま
+    expect(unwrapIiifUrl(` ${json} `, manifestFromParams)).toBe(json);
+    expect(unwrapIiifUrl('https://a.example/api?id=3', manifestFromParams)).toBe('https://a.example/api?id=3');
+    expect(unwrapIiifUrl('not a url', manifestFromParams)).toBe('not a url');
+  });
   it('reads layout and limit, ignoring bad values', () => {
     expect(params('layout=helix&limit=30')).toMatchObject({ layout: 'helix', limit: 30 });
-    expect(params('layout=cube&limit=-5')).toMatchObject({ layout: null, limit: null });
+    expect(params('layout=box&limit=-5')).toMatchObject({ layout: null, limit: null });
+    expect(params('layout=helix').lockRotation).toBe(false);
+  });
+  it('keeps old ?layout=flat links working as table with rotation locked', () => {
+    expect(BROWSE_LAYOUTS).toEqual(['table', 'sphere', 'helix', 'grid']);
+    expect(params('layout=flat')).toMatchObject({ layout: 'table', lockRotation: true });
+    expect(params('layout=sphere&lock=1')).toMatchObject({ layout: 'sphere', lockRotation: true });
   });
   it('writes a link without the default layout', () => {
     expect(browseQuery('https://a.example/c.json')).toBe(
@@ -192,6 +195,9 @@ describe('URL', () => {
     );
     expect(browseQuery('https://a.example/c.json', { layout: 'sphere', limit: 30 })).toBe(
       'iiif-content=https%3A%2F%2Fa.example%2Fc.json&layout=sphere&limit=30'
+    );
+    expect(browseQuery('https://a.example/c.json', { lockRotation: true })).toBe(
+      'iiif-content=https%3A%2F%2Fa.example%2Fc.json&lock=1'
     );
   });
   it('opens a canvas card at its frame number in the viewer', () => {
@@ -205,6 +211,10 @@ describe('URL', () => {
       summary: '',
     };
     expect(viewerQuery(item)).toBe('iiif-content=https%3A%2F%2Fa.example%2Fm.json&canvas=5');
+    // Curation の member は、検索のページと同じく pos で開く
+    expect(viewerQuery({ ...item, canvasIndex: null, pos: 7 })).toBe(
+      'iiif-content=https%3A%2F%2Fa.example%2Fm.json&pos=7'
+    );
     expect(viewerQuery({ ...item, canvasIndex: null })).toBe(
       'iiif-content=https%3A%2F%2Fa.example%2Fm.json'
     );
