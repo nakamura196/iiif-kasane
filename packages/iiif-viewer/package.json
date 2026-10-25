@@ -54,10 +54,10 @@
     "three-stdlib": "^2.36.0"
   },
   "dependencies": {
-    "@iiif/parser": "4.0.3"
+    "@iiif/parser": "4.0.5"
   },
   "devDependencies": {
-    "vite": "8.3.4"
+    "vite": "8.3.5"
   },
   "publishConfig": {
     "access": "public"
