@@ -606,6 +606,7 @@ export const USE_CASES: UseCase[] = [
     },
     open: { page: 'search', url: 'https://iiif.bodleian.ox.ac.uk/iiif/activity/all-changes' },
     features: ['image', 'search'],
+    video: { ja: 'c4EcFwjzrpo', en: 'u1Yj0v0nM-k' },
     site: 'https://digital.bodleian.ox.ac.uk/',
   },
   {
@@ -625,6 +626,7 @@ export const USE_CASES: UseCase[] = [
       layout: 'grid',
     },
     features: ['browse', 'curation'],
+    video: { ja: 'rF0KxUX2dl4', en: 'aHHVXY2dF-c' },
     site: 'https://nakamura196.github.io/ndl-face-finder/',
   },
 ];
