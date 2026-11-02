@@ -1,3 +1,4 @@
+import { mkdir, writeFile } from 'node:fs/promises';
 import { test, expect, type Page } from '@playwright/test';
 
 // 手元の画像を開く（/viewer の入口のボタン）。画像はサーバに送らず、ブラウザの中で表示・読み取りする。
@@ -66,6 +67,58 @@ test('refuses a file that is not an image', async ({ page }) => {
   await page.goto('/ja/viewer/');
   await page.getByTestId('local-image-input').setInputFiles({ name: 'a.txt', mimeType: 'text/plain', buffer: Buffer.from('hello') });
   await expect(page.getByRole('alert').filter({ hasText: '画像ファイルではありません' })).toBeVisible();
+});
+
+// 1 ページずつ数字の入った画像を作る（名前順と数字順が違うように、p1・p2・p10 にする）
+async function pageImage(page: Page, n: number): Promise<Buffer> {
+  await page.setViewportSize({ width: 300 + n, height: 400 });
+  await page.setContent(`<body style="margin:0;background:#fff"><p style="font:120px sans-serif;margin:100px">${n}</p></body>`);
+  const png = await page.screenshot({ type: 'png' });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  return png;
+}
+
+test('opens several images as one book, in number order', async ({ page, baseURL }) => {
+  // 幅をページごとに変えておき、並び順を幅で確かめる
+  // 同じページで描くので 1 枚ずつ
+  const pages: { n: number; png: Buffer }[] = [];
+  for (const n of [10, 2, 1]) pages.push({ n, png: await pageImage(page, n) });
+  const seen = recordRequests(page);
+  await page.goto('/ja/viewer/');
+  await page.getByTestId('local-image-input').setInputFiles([
+    ...pages.map(({ n, png }) => ({ name: `p${n}.png`, mimeType: 'image/png', buffer: png })),
+    { name: 'memo.txt', mimeType: 'text/plain', buffer: Buffer.from('hello') },
+  ]);
+  const banner = page.getByRole('status').filter({ hasText: '3 枚' });
+  await expect(banner).toBeVisible();
+  await expect(banner).toContainText('1 件は開いていません');
+
+  // 画像の幅をページごとに変えてある（p1 = 301、p2 = 302、p10 = 310）。最初に出るのは p1
+  const first = page.locator('img[src^="blob:"]').first();
+  await expect(first).toBeVisible();
+  await expect.poll(() => first.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBe(301);
+  // 次へ送ると p2、p10 の順に出る
+  for (const width of [302, 310]) {
+    await page.getByRole('button', { name: '次へ' }).click();
+    await expect.poll(() => page.locator('img[src^="blob:"]').first().evaluate((el: HTMLImageElement) => el.naturalWidth)).toBe(width);
+  }
+  const url = new URL(page.url());
+  expect(url.search).not.toContain('blob');
+  expectNothingSent(seen, new URL(baseURL!).origin);
+});
+
+test('opens a folder, named after the folder', async ({ page }, testInfo) => {
+  const dir = testInfo.outputPath('銘尽');
+  await mkdir(dir, { recursive: true });
+  for (const n of [2, 1]) await writeFile(`${dir}/${n}.png`, await pageImage(page, n));
+  // フォルダを開くと混ざる隠しファイル
+  await writeFile(`${dir}/.DS_Store`, 'x');
+  await page.goto('/ja/viewer/');
+  await page.getByTestId('local-folder-input').setInputFiles(dir);
+  const banner = page.getByRole('status').filter({ hasText: '「銘尽」（2 枚）' });
+  await expect(banner).toBeVisible();
+  await expect(banner).not.toContainText('開いていません');
+  await expect.poll(() => page.locator('img[src^="blob:"]').first().evaluate((el: HTMLImageElement) => el.naturalWidth)).toBe(301);
 });
 
 // モデル（約 150 MB）をダウンロードするので時間がかかる

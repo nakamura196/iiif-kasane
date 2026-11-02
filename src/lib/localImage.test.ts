@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { convertToV4, parseManifestV4 } from '@nakamura196/iiif-viewer/core';
-import { isLocalManifestUrl, looksLikeImage, manifestFromLocalImage } from './localImage';
+import { isLocalManifestUrl, labelOf, looksLikeImage, manifestFromLocalImage, manifestFromLocalImages, pathOf, sortFiles } from './localImage';
 
 const image = {
   name: '銘尽.jpg',
@@ -50,5 +50,38 @@ describe('helpers', () => {
     expect(looksLikeImage({ type: 'image/png' })).toBe(true);
     expect(looksLikeImage({ type: '' })).toBe(true);
     expect(looksLikeImage({ type: 'application/pdf' })).toBe(false);
+  });
+});
+
+describe('several images as one book', () => {
+  it('puts files in name order, numbers compared as numbers', () => {
+    const files = ['p10.jpg', 'p2.jpg', 'p1.jpg', 'P3.jpg'].map((name) => ({ name }));
+    expect(sortFiles(files).map((f) => f.name)).toEqual(['p1.jpg', 'p2.jpg', 'P3.jpg', 'p10.jpg']);
+  });
+
+  it('orders by folder path when there is one', () => {
+    const files = [
+      { name: '1.jpg', webkitRelativePath: '巻2/1.jpg' },
+      { name: '2.jpg', webkitRelativePath: '巻1/2.jpg' },
+      { name: '1.jpg', webkitRelativePath: '巻1/1.jpg' },
+    ];
+    expect(sortFiles(files).map(pathOf)).toEqual(['巻1/1.jpg', '巻1/2.jpg', '巻2/1.jpg']);
+  });
+
+  it('names the book after the shared folder, else the first file', () => {
+    expect(labelOf([{ name: 'a.jpg' }])).toBe('a.jpg');
+    expect(labelOf([{ name: 'a.jpg', webkitRelativePath: '銘尽/a.jpg' }, { name: 'b.jpg', webkitRelativePath: '銘尽/b.jpg' }])).toBe('銘尽');
+    expect(labelOf([{ name: 'a.jpg' }, { name: 'b.jpg' }])).toBe('a.jpg');
+  });
+
+  it('makes one Canvas per image, each id fixed by the image itself', () => {
+    const second = { ...image, name: '2.jpg', digest: 'cd'.repeat(32), width: 100, height: 200 };
+    const m = manifestFromLocalImages([image, second], '銘尽', 'ef'.repeat(32)) as { id: string; items: { id: string; width: number }[] };
+    expect(m.id).toBe(`urn:kasane:local:sha256:${'ef'.repeat(32)}`);
+    expect(m.items.map((c) => c.width)).toEqual([4000, 100]);
+    // 1 枚で開いたときと同じ Canvas の id
+    const single = manifestFromLocalImage(second) as { items: { id: string }[] };
+    expect(m.items[1].id).toBe(single.items[0].id);
+    expect(convertToV4(m).items).toHaveLength(2);
   });
 });
