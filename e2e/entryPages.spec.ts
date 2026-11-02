@@ -62,6 +62,15 @@ for (const locale of ['ja', 'en'] as const) {
         const box = await heading.boundingBox();
         expect(box, '最初の見出しの位置').not.toBeNull();
         expect(box!.y, '最初の見出しが画面の上にはみ出している').toBeGreaterThanOrEqual(0);
+        // 見出しの上に別のもの（フッターなど）が重なっていない。/viewer/ の入口は、スマホの幅で
+        // 中身の欄が高さ 0 に押しつぶされ、見出しがフッターの下に隠れていた（toBeVisible では拾えない）
+        const covered = await heading.evaluate((h) => {
+          h.scrollIntoView({ block: 'center' });
+          const r = h.getBoundingClientRect();
+          const hit = document.elementFromPoint(r.x + Math.min(5, r.width / 2), r.y + r.height / 2);
+          return !(hit && h.contains(hit));
+        });
+        expect(covered, '最初の見出しが別のものの下に隠れている').toBe(false);
 
         const overflow = await tab.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
         expect(overflow, '横にスクロールする').toBeLessThanOrEqual(1);

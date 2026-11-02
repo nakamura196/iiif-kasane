@@ -123,9 +123,10 @@ const ViewerContent: NextPage = () => {
   };
 
   return (
-    // h-dvh: スマホではブラウザのツールバーの分だけ 100vh が見える範囲より高く、下端が隠れるため
+    // ビューアを開いたら h-dvh で画面の高さに固定する（スマホではブラウザのツールバーの分だけ 100vh が見える範囲より高く、下端が隠れるため）。
+    // 入口の画面は min-h-dvh にしてページごとスクロールさせる。高さを固定すると、スマホではフッターが場所を取り、入口の欄が押しつぶされて見えなくなる
     <div
-      className="flex flex-col h-dvh relative"
+      className={`flex flex-col relative ${manifestUrl ? 'h-dvh' : 'min-h-dvh'}`}
       // 画面のどこに画像を落としても開く。文字やリンクのドラッグ（ビューアの中の並べ替えなど）には手を出さない
       onDragOver={(e) => {
         if (!dragHasFiles(e)) return;
@@ -166,7 +167,7 @@ const ViewerContent: NextPage = () => {
           {fileError}
         </div>
       )}
-      <main className="flex-1 flex overflow-hidden relative">
+      <main className={`flex-1 flex relative ${manifestUrl ? 'overflow-hidden' : ''}`}>
         {manifestUrl ? (
           <Viewer
             iiifContent={manifestUrl}
@@ -182,8 +183,8 @@ const ViewerContent: NextPage = () => {
             )}
           />
         ) : (
-          <div className="w-full h-full overflow-y-auto flex px-4 py-8">
-            {/* 入口の画面。中身が画面より高いときは上から並べてスクロールさせ（真ん中寄せだと上が切れる）、幅はトップに近い 768px まで */}
+          <div className="w-full flex px-4 py-8">
+            {/* 入口の画面。画面に余裕があれば真ん中に置き、足りなければページごとスクロールする。幅はトップに近い 768px まで */}
             <div className="m-auto w-full max-w-3xl">
               <ManifestInput
                 onSubmit={(url: string) => setManifestUrl(url)}
