@@ -49,6 +49,10 @@
     "related": "Related resources",
     "kind_wikidata": "Wikidata item",
     "kind_wikipedia": "Wikipedia article",
-    "kind_citation": "Reference"
+    "kind_citation": "Reference",
+    "open": "Related resources",
+    "countImages": "Images: {count}",
+    "countLinks": "Links: {count}",
+    "countCitations": "References: {count}"
   }
 }

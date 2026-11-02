@@ -1,5 +1,6 @@
 'use client';
 
+import { useId, useState, type SyntheticEvent } from 'react';
 import { localizedString, type AnnotationResource } from '../../core';
 import { useLocale, useTranslations } from '../env';
 import AnnotationBody from './AnnotationBody';
@@ -44,12 +45,11 @@ function ResourceLink({ resource }: { resource: AnnotationResource }) {
 
 /**
  * The related resources of an annotation, in groups: pictures of the place, what the region depicts (Wikidata),
- * and related resources (pictures, Wikipedia, web pages, references). The same in the 2D and the 3D lists.
+ * and related resources (pictures, Wikipedia, web pages, references). Shown inside the dialog.
  */
-export default function AnnotationResources({ resources }: { resources?: AnnotationResource[] }) {
+export function AnnotationResourcesContent({ resources }: { resources: AnnotationResource[] }) {
   const t = useTranslations('AnnotationResources');
   const locale = useLocale();
-  if (!resources || resources.length === 0) return null;
   const place = resources.filter((r) => r.role === 'place' && r.kind === 'image');
   const identifying = resources.filter((r) => r.role === 'identifying');
   const related = resources.filter((r) => !place.includes(r) && !identifying.includes(r));
@@ -57,7 +57,7 @@ export default function AnnotationResources({ resources }: { resources?: Annotat
   const links = related.filter((r) => r.kind !== 'image' && r.kind !== 'citation');
   const citations = related.filter((r) => r.kind === 'citation');
   return (
-    <div className="mt-2 space-y-2" data-annotation-resources>
+    <div className="space-y-3" data-annotation-resources>
       {place.length > 0 ? (
         <div>
           <Heading>{t('place')}</Heading>
@@ -98,6 +98,68 @@ export default function AnnotationResources({ resources }: { resources?: Annotat
               ))}
             </ul>
           ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+// Clicks inside the opened part must not reach the card: a click on the card selects the annotation and moves the view.
+const stop = (e: SyntheticEvent) => e.stopPropagation();
+
+// What the button says: how many of each kind, so that the list stays short but tells what is there.
+const summarize = (resources: AnnotationResource[]) => {
+  const images = resources.filter((r) => r.kind === 'image').length;
+  const citations = resources.filter((r) => r.kind === 'citation').length;
+  return { images, citations, links: resources.length - images - citations };
+};
+
+/**
+ * The related resources of an annotation, folded into one small button in the card. Pressing it opens them in
+ * place (an accordion), so a list with many pictures stays easy to scan and the model stays visible.
+ * The same in the 2D and the 3D lists.
+ */
+export default function AnnotationResources({ resources }: { resources?: AnnotationResource[] }) {
+  const t = useTranslations('AnnotationResources');
+  const [open, setOpen] = useState(false);
+  const panelId = useId();
+
+  if (!resources || resources.length === 0) return null;
+  const { images, links, citations } = summarize(resources);
+  const parts = [
+    images > 0 ? t('countImages', { count: images }) : null,
+    links > 0 ? t('countLinks', { count: links }) : null,
+    citations > 0 ? t('countCitations', { count: citations }) : null,
+  ].filter(Boolean);
+
+  return (
+    <div className="mt-2">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
+        aria-expanded={open}
+        aria-controls={panelId}
+        data-annotation-resources-button
+        className="inline-flex items-center gap-1.5 rounded border border-gray-300 dark:border-gray-600 px-2 py-0.5 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+      >
+        <span aria-hidden className={`inline-block transition-transform ${open ? 'rotate-90' : ''}`}>
+          ▸
+        </span>
+        <span>{t('open')}</span>
+        {parts.length > 0 ? <span className="text-gray-500 dark:text-gray-400">{parts.join(' · ')}</span> : null}
+      </button>
+      {open ? (
+        <div
+          id={panelId}
+          onClick={stop}
+          onPointerDown={stop}
+          onKeyDown={stop}
+          className="mt-2 rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-2 cursor-auto"
+        >
+          <AnnotationResourcesContent resources={resources} />
         </div>
       ) : null}
     </div>

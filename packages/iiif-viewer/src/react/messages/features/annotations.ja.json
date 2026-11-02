@@ -49,6 +49,10 @@
     "related": "関連する資料",
     "kind_wikidata": "Wikidata の項目",
     "kind_wikipedia": "Wikipedia の記事",
-    "kind_citation": "文献"
+    "kind_citation": "文献",
+    "open": "関連資料",
+    "countImages": "画像 {count}",
+    "countLinks": "リンク {count}",
+    "countCitations": "文献 {count}"
   }
 }
