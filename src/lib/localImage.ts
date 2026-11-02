@@ -141,6 +141,41 @@ const readImage = async (file: File): Promise<Omit<LocalImage, 'imageUrl'> | nul
   return { name: file.name || 'image', format: file.type || 'image/jpeg', width, height, digest };
 };
 
+/** An image read in this tab, with the file it came from. */
+export interface ReadLocalImage extends Omit<LocalImage, 'imageUrl'> {
+  file: File;
+  /** Path within the picked / dropped folder, or the file name. */
+  path: string;
+}
+
+/**
+ * Decode and hash the files in this tab, ordered by file name. Files that are not images (or that this
+ * browser cannot decode) are skipped, and the same image given twice is kept once. Nothing is sent anywhere.
+ */
+export const readLocalImages = async (
+  files: File[],
+  onProgress?: (done: number, total: number) => void,
+): Promise<{ images: ReadLocalImage[]; skipped: string[] }> => {
+  // フォルダごと開くと、システムが作る隠しファイル（.DS_Store、._001.jpg など）が混ざるので黙って除く
+  const candidates = sortFiles(files.filter((f) => !f.name.startsWith('.')));
+  if (candidates.length > MAX_LOCAL_IMAGES) throw new LocalImageError('tooMany');
+  const images: ReadLocalImage[] = [];
+  const skipped: string[] = [];
+  const seen = new Set<string>();
+  // 1 枚ずつ読む（まとめて読むと、大きな画像が多いときにメモリが足りなくなる）
+  for (const [i, file] of candidates.entries()) {
+    onProgress?.(i, candidates.length);
+    const image = await readImage(file);
+    if (!image) skipped.push(pathOf(file));
+    else if (!seen.has(image.digest)) {
+      seen.add(image.digest);
+      images.push({ ...image, file, path: pathOf(file) });
+    }
+  }
+  if (!images.length) throw new LocalImageError(candidates.some(looksLikeImage) ? 'decode' : 'notImage');
+  return { images, skipped };
+};
+
 /**
  * Read the files in the browser and return the blob: URL of a manifest with one Canvas per image,
  * ordered by file name. Files that are not images (or that this browser cannot decode) are skipped,
@@ -151,25 +186,8 @@ export const openLocalImages = async (
   files: File[],
   onProgress?: (done: number, total: number) => void,
 ): Promise<OpenedLocalImages> => {
-  // フォルダごと開くと、システムが作る隠しファイル（.DS_Store、._001.jpg など）が混ざるので黙って除く
-  const candidates = sortFiles(files.filter((f) => !f.name.startsWith('.')));
-  if (candidates.length > MAX_LOCAL_IMAGES) throw new LocalImageError('tooMany');
-  const images: Omit<LocalImage, 'imageUrl'>[] = [];
-  const kept: File[] = [];
-  const skipped: string[] = [];
-  const seen = new Set<string>();
-  // 1 枚ずつ読む（まとめて読むと、大きな画像が多いときにメモリが足りなくなる）
-  for (const [i, file] of candidates.entries()) {
-    onProgress?.(i, candidates.length);
-    const image = await readImage(file);
-    if (!image) skipped.push(pathOf(file));
-    else if (!seen.has(image.digest)) {
-      seen.add(image.digest);
-      images.push(image);
-      kept.push(file);
-    }
-  }
-  if (!images.length) throw new LocalImageError(candidates.some(looksLikeImage) ? 'decode' : 'notImage');
+  const { images, skipped } = await readLocalImages(files, onProgress);
+  const kept = images.map((im) => im.file);
 
   // 束全体の id は、並べた画像の中身から決める（同じ画像を同じ順で開けば同じ id）
   const digest =
@@ -179,7 +197,7 @@ export const openLocalImages = async (
   const urls = kept.map((file) => URL.createObjectURL(file));
   const label = labelOf(kept);
   const manifest = manifestFromLocalImages(
-    images.map((im, i) => ({ ...im, imageUrl: urls[i] })),
+    images.map(({ name, format, width, height, digest: d }, i) => ({ name, format, width, height, digest: d, imageUrl: urls[i] })),
     label,
     digest,
   );
