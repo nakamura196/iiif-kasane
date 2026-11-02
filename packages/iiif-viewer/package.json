@@ -47,7 +47,7 @@
     "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.8.1",
     "gsap": "^3.15.0",
-    "jotai": "^2.12.5",
+    "jotai": "^2.12.5 || ^3.0.0",
     "react": "^19",
     "react-dom": "^19",
     "three": "^0.178.0 || ^0.186.0",
