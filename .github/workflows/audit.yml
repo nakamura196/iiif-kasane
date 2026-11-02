@@ -1,0 +1,26 @@
+# Weekly dependency audit. Fails (and e-mails the owner via the usual
+# workflow-failure notification) when a high or critical advisory appears,
+# including in dev-only packages that the deploy workflow's --omit=dev audit skips.
+# Reads the lockfile only, so no install and no PR code runs here.
+name: Weekly audit
+
+on:
+  schedule:
+    - cron: '17 0 * * 1' # Mondays 00:17 UTC (09:17 JST)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Audit dependencies (runtime and dev)
+        run: npm audit --package-lock-only --audit-level=high
