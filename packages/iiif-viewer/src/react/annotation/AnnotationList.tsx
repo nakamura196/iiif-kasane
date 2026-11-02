@@ -9,6 +9,7 @@ import { useAtom } from 'jotai';
 import { useEffect, useMemo, useRef } from 'react';
 import { useTranslations } from '../env';
 import AnnotationCard from '../annotation/AnnotationCard';
+import { RegionGroupFrame } from '../annotation/AnnotationCardFrame';
 import { groupByRegion } from '../../core';
 import {
   EMPTY_FILTER,
@@ -142,15 +143,9 @@ export default function AnnotationList() {
       <div className="space-y-4">
         {regionGroups.map((group) =>
           group.annotations.length > 1 ? (
-            <div
-              key={group.key}
-              className="rounded-lg border border-dashed border-blue-300 dark:border-blue-700 p-2 space-y-2"
-            >
-              <div className="px-2 text-xs text-blue-700 dark:text-blue-300">
-                {t('sameRegion', { count: group.annotations.length })}
-              </div>
+            <RegionGroupFrame key={group.key} count={group.annotations.length}>
               {group.annotations.map(renderCard)}
-            </div>
+            </RegionGroupFrame>
           ) : (
             renderCard(group.annotations[0])
           ),

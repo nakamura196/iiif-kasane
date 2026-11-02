@@ -56,3 +56,16 @@ describe('overlaps', () => {
     expect(overlaps({ x: 11, y: 10, w: 0, h: 0 }, { x: 0, y: 0, w: 10, h: 10 })).toBe(false);
   });
 });
+
+describe('annotationNumbers', () => {
+  it('numbers annotations from 1 in list order', async () => {
+    const { annotationNumbers } = await import('./annotationMarks');
+    const m = annotationNumbers([{ id: 'a' }, { id: 'b' }]);
+    expect(m?.get('a')).toBe(1);
+    expect(m?.get('b')).toBe(2);
+  });
+  it('gives no numbers when there are too many', async () => {
+    const { annotationNumbers, NUMBER_LIMIT } = await import('./annotationMarks');
+    expect(annotationNumbers(Array.from({ length: NUMBER_LIMIT + 1 }, (_, i) => ({ id: String(i) })))).toBeNull();
+  });
+});

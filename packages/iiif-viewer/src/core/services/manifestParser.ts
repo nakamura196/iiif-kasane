@@ -28,6 +28,7 @@ import {
   tagOfBody,
   type AnnotationBodyItem,
 } from '../features/annotationBody';
+import { readAnnotationResources } from '../features/annotationResources';
 import { labelIn, paintedModelsOf } from './paintedModels';
 
 export interface GeoFeatureName {
@@ -291,6 +292,7 @@ const buildAnnotation = (
 
   const bodies = parseBodies(anno, locale);
   const { value, tags, images, items } = bodies;
+  const resources = readAnnotationResources(items, anno.seeAlso);
   // The Annotation's own label is the heading; a body label is the older convention.
   const label =
     localizedString(anno.label, locale) || localizedString(annotationTitleOf({ body: anno.body, motivation: anno.motivation }), locale) || bodies.label;
@@ -310,6 +312,7 @@ const buildAnnotation = (
     ...(tags.length > 0 ? { tags } : {}),
     ...(images.length > 0 ? { images } : {}),
     ...(items.length > 0 ? { bodies: items } : {}),
+    ...(resources.length > 0 ? { resources } : {}),
     ...(anno.created ? { created: anno.created } : {}),
     data: {
       body: { value, label },

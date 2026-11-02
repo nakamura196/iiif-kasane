@@ -42,5 +42,13 @@
     "canvasAnnotationsTagsFewer": "Show fewer",
     "canvasAnnotationsTagsClear": "Clear tags",
     "canvasAnnotationsFocusOnSelect": "Zoom to the chosen annotation"
+  },
+  "AnnotationResources": {
+    "place": "Pictures of this place",
+    "identifying": "What this is",
+    "related": "Related resources",
+    "kind_wikidata": "Wikidata item",
+    "kind_wikipedia": "Wikipedia article",
+    "kind_citation": "Reference"
   }
 }

@@ -22,8 +22,8 @@ export interface AnnotationBodyItem {
   label?: unknown;
   /** text: the body's purpose is tagging */
   tagging?: true;
-  /** resource: the W3C purpose, when it is 'linking' (a related resource) or 'describing' */
-  purpose?: 'linking' | 'describing';
+  /** resource: the W3C purpose, when it is 'linking' (a related resource), 'describing' or 'identifying' (what the region depicts) */
+  purpose?: 'linking' | 'describing' | 'identifying';
   /** resource: the IIIF Image API service base URL (to request a thumbnail) */
   service?: string;
   /** resource: the page that describes it (the holding institution's record), and that page's label */
@@ -62,7 +62,13 @@ const resourceDetails = (body: Json, src: Json): Partial<AnnotationBodyItem> => 
   const service = asList(src.service).find(isObj);
   const homepage = asList(src.homepage).find(isObj);
   const serviceId = idOf(service);
-  const purpose = hasPurpose(body, 'linking') ? 'linking' : hasPurpose(body, 'describing') ? 'describing' : undefined;
+  const purpose = hasPurpose(body, 'linking')
+    ? 'linking'
+    : hasPurpose(body, 'describing')
+      ? 'describing'
+      : hasPurpose(body, 'identifying')
+        ? 'identifying'
+        : undefined;
   return {
     ...(purpose ? { purpose } : {}),
     ...(serviceId ? { service: serviceId.replace(/\/info\.json$/, '') } : {}),
@@ -220,5 +226,13 @@ export const imageOfBody = (b: AnnotationBodyItem, locale: string): AnnotationIm
  */
 export const otherBodies = (bodies: AnnotationBodyItem[]): AnnotationBodyItem[] => {
   const main = mainTextBody(bodies);
-  return bodies.filter((b) => b !== main && !isTagBody(b) && !isImageBody(b));
+  return bodies.filter((b) => b !== main && !isTagBody(b) && !isResourceBody(b));
 };
+
+/**
+ * A body that is a related resource of the annotation: a picture, or a link given a purpose (linking,
+ * identifying, describing). Region & Tag extension §5. These are shown together as the annotation's resources
+ * (see annotationResources.ts), not as its description or among its tags.
+ */
+export const isResourceBody = (b: AnnotationBodyItem): boolean =>
+  b.kind === 'resource' && (isImageBody(b) || b.purpose !== undefined);

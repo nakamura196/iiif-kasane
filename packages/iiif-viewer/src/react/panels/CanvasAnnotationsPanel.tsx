@@ -16,6 +16,7 @@ import {
   rawCanvasOf,
   labelIn,
   pickBodies,
+  isResourceBody,
   TEXT_GRANULARITIES,
   type CanvasAnnotation,
   type StyleDeclarations,
@@ -32,6 +33,9 @@ import { navRequestAtom, nextSeq } from '../displays/structureState';
 import { scrollRowIntoView, useVirtualRows } from '../annotation/virtualList';
 import { useCanvasAnnotations } from '../overlays/useCanvasAnnotations';
 import AnnotationBody from '../annotation/AnnotationBody';
+import AnnotationResources from '../annotation/AnnotationResources';
+import { AnnotationCardFrame, RegionGroupFrame } from '../annotation/AnnotationCardFrame';
+import { annotationNumbers } from '../overlays/annotationMarks';
 import { fmt } from '../displays/TranscriptPanel';
 import { usePlayback } from '../playback';
 import type { Panel, PanelContext } from './types';
@@ -50,16 +54,9 @@ const granularityRank = (g: string) => {
   return i < 0 ? TEXT_GRANULARITIES.length : i;
 };
 
-// The heading of an annotation (its label), above its text
-function Title({ annotation }: { annotation: CanvasAnnotation }) {
-  const locale = useLocale();
-  const title = labelIn(annotation.title, locale);
-  return title ? <p className="text-sm font-medium text-gray-900 dark:text-gray-50 break-words">{title}</p> : null;
-}
-
 function Item({
   annotation,
-  more = [],
+  number,
   selected,
   onSelect,
   canvasLabels,
@@ -68,8 +65,8 @@ function Item({
 }: {
   bodyStyle?: StyleDeclarations;
   annotation: CanvasAnnotation;
-  /** The other annotations of the same region (Shared Region extension), shown under the first. */
-  more?: CanvasAnnotation[];
+  /** The same number as the annotation's mark on the image. */
+  number?: number;
   selected: boolean;
   /** The annotation's time contains the current position of the video or audio. */
   playing?: boolean;
@@ -78,70 +75,45 @@ function Item({
 }) {
   const t = useTranslations('Info');
   const locale = useLocale();
-  const bodies = pickBodies(annotation.bodies, locale);
+  const bodies = pickBodies(annotation.bodies, locale).filter((b) => !isResourceBody(b));
   const motivation = annotation.painted ? 'painting' : annotation.motivations[0];
-  const where =
-    annotation.region.type === 'canvas'
-      ? t('canvasAnnotationsAbout')
-      : annotation.region.type === 'point'
-        ? t('canvasAnnotationsPoint')
-        : t('canvasAnnotationsRegion');
+  // 「コメント」（既定の目的）と、枠のある注釈の「領域」は書かない。番号の札が画像の上の枠と対応するため
+  const notes: string[] = [];
+  if (motivation && motivation !== 'commenting')
+    notes.push(KNOWN_MOTIVATIONS.has(motivation) ? t(`canvasAnnotationsMotivation_${motivation}`) : motivation);
+  if (annotation.region.type === 'canvas') notes.push(t('canvasAnnotationsAbout'));
+  if (annotation.granularity)
+    notes.push(
+      isKnownGranularity(annotation.granularity)
+        ? t(`canvasAnnotationsGranularity_${annotation.granularity}`)
+        : annotation.granularity,
+    );
+  if (annotation.layer)
+    notes.push(t('canvasAnnotationsLayer', { label: labelIn(annotation.layer.label, locale) || annotation.layer.id }));
+  if (annotation.time)
+    notes.push(
+      fmt(annotation.time.start) +
+        (annotation.time.end !== undefined && fmt(annotation.time.end) !== fmt(annotation.time.start)
+          ? `–${fmt(annotation.time.end)}`
+          : ''),
+    );
   return (
-    <div
-      className={`rounded border p-2 cursor-pointer ${
-        selected
-          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
-          : playing
-            ? 'border-blue-300 dark:border-blue-700 hover:bg-gray-50 dark:hover:bg-gray-800'
-            : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
-      }`}
-      onClick={onSelect}
-      aria-current={selected || undefined}
+    <AnnotationCardFrame
+      number={number}
+      title={labelIn(annotation.title, locale) || undefined}
+      meta={notes.length > 0 ? notes.map((n, i) => <span key={i} className="tabular-nums">{n}</span>) : undefined}
+      selected={selected}
+      playing={playing}
+      onSelect={onSelect}
+      annotationId={annotation.id}
+      bodyStyle={bodyStyle}
+      bodyClassName={bodyStyle?.color ? '[&_*]:!text-inherit' : ''}
     >
-      <div className="flex gap-2 text-xs text-gray-500 dark:text-gray-300 mb-1">
-        {motivation ? (
-          <span>
-            {KNOWN_MOTIVATIONS.has(motivation) ? t(`canvasAnnotationsMotivation_${motivation}`) : motivation}
-          </span>
-        ) : null}
-        <span>{where}</span>
-        {annotation.granularity ? (
-          <span>
-            {isKnownGranularity(annotation.granularity)
-              ? t(`canvasAnnotationsGranularity_${annotation.granularity}`)
-              : annotation.granularity}
-          </span>
-        ) : null}
-        {annotation.time ? (
-          <span className="ml-auto tabular-nums">
-            {fmt(annotation.time.start)}
-            {annotation.time.end !== undefined && fmt(annotation.time.end) !== fmt(annotation.time.start)
-              ? `–${fmt(annotation.time.end)}`
-              : ''}
-          </span>
-        ) : null}
-        {annotation.layer ? (
-          <span>{t('canvasAnnotationsLayer', { label: labelIn(annotation.layer.label, locale) || annotation.layer.id })}</span>
-        ) : null}
-      </div>
-      <div
-        className={`space-y-1 ${bodyStyle?.color ? '[&_*]:!text-inherit' : ''}`}
-        style={bodyStyle}
-      >
-        <Title annotation={annotation} />
-        {bodies.map((b, i) => (
-          <AnnotationBody key={i} body={b} canvasLabels={canvasLabels} />
-        ))}
-        {more.map((m) => (
-          <div key={m.id} className="space-y-1 border-t border-gray-200 dark:border-gray-700 pt-1" data-annotation-id={m.id}>
-            <Title annotation={m} />
-            {pickBodies(m.bodies, locale).map((b, i) => (
-              <AnnotationBody key={i} body={b} canvasLabels={canvasLabels} />
-            ))}
-          </div>
-        ))}
-      </div>
-    </div>
+      {bodies.map((b, i) => (
+        <AnnotationBody key={i} body={b} canvasLabels={canvasLabels} />
+      ))}
+      <AnnotationResources resources={annotation.resources} />
+    </AnnotationCardFrame>
   );
 }
 
@@ -157,6 +129,8 @@ export function CanvasAnnotationsPanelBody({ container, manifest }: PanelContext
   const t = useTranslations('Info');
   const locale = useLocale();
   const { annotations: all, loading, failed, styleOf } = useCanvasAnnotations(manifest, container);
+  // the same numbers as the marks on the image (none when there are very many)
+  const numbers = useMemo(() => annotationNumbers(all), [all]);
   const [selected, setSelected] = useAtom(selectedCanvasAnnotationAtom);
   // Text Granularity: 行と語が両方あるときなど、単位で絞り込めるようにする
   const [granularity, setGranularity] = useAtom(canvasAnnotationGranularityAtom);
@@ -395,18 +369,25 @@ export function CanvasAnnotationsPanelBody({ container, manifest }: PanelContext
                 ) : (
                   (() => {
                     const rg = r.group;
-                    const a = rg.annotations[0];
-                    const isSelected = rg.annotations.some((m) => m.id === selected);
-                    return (
-                      <Item
-                        annotation={a}
-                        more={rg.annotations.slice(1)}
-                        selected={isSelected}
-                        onSelect={() => choose(a, isSelected)}
-                        playing={timed && !!a.time && isAnnotationAt(a, currentTime)}
-                        canvasLabels={canvasLabels}
-                        bodyStyle={styleOf(a).body}
-                      />
+                    const card = (a: CanvasAnnotation) => {
+                      const isSelected = a.id === selected;
+                      return (
+                        <Item
+                          key={a.id}
+                          annotation={a}
+                          number={numbers?.get(a.id)}
+                          selected={isSelected}
+                          onSelect={() => choose(a, isSelected)}
+                          playing={timed && !!a.time && isAnnotationAt(a, currentTime)}
+                          canvasLabels={canvasLabels}
+                          bodyStyle={styleOf(a).body}
+                        />
+                      );
+                    };
+                    return rg.annotations.length > 1 ? (
+                      <RegionGroupFrame count={rg.annotations.length}>{rg.annotations.map(card)}</RegionGroupFrame>
+                    ) : (
+                      card(rg.annotations[0])
                     );
                   })()
                 )}

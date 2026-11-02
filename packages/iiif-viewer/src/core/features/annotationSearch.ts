@@ -26,8 +26,12 @@ export const cachedSearchText = (key: object, build: () => string[]): string => 
 };
 
 /** All the text of an annotation that a search looks at, normalized. */
-export const annotationSearchText = (a: Pick<CanvasAnnotation, 'bodies' | 'title'>): string =>
-  cachedSearchText(a, () => [...labelStrings(a.title), ...a.bodies.flatMap((b) => bodySearchParts(b))]);
+export const annotationSearchText = (a: Pick<CanvasAnnotation, 'bodies' | 'title' | 'resources'>): string =>
+  cachedSearchText(a, () => [
+    ...labelStrings(a.title),
+    ...a.bodies.flatMap((b) => bodySearchParts(b)),
+    ...(a.resources ?? []).flatMap((r) => [...(r.url ? [r.url] : []), ...labelStrings(r.label)]),
+  ]);
 
 /**
  * The text of one body that a search looks at. A tag reads as "key: value", as the 3D list shows and filters it.
@@ -115,7 +119,7 @@ export const presentCanvasTags = (
  * and one of the tags (when tags are chosen). The list and the marks over the image ask the same.
  */
 export const matchesCanvasAnnotation = (
-  a: Pick<CanvasAnnotation, 'bodies' | 'title'>,
+  a: Pick<CanvasAnnotation, 'bodies' | 'title' | 'resources'>,
   terms: string[],
   tags: string[],
   locale: string,

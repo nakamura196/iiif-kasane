@@ -65,3 +65,13 @@ export const boxOfRegion = (a: CanvasAnnotation): Box | null => {
 /** Whether two boxes touch (a box without size counts when it lies on the other). */
 export const overlaps = (a: Box, b: Box): boolean =>
   a.x <= b.x + b.w && b.x <= a.x + a.w && a.y <= b.y + b.h && b.y <= a.y + a.h;
+
+// Numbers are shown (in the list and on the marks) only up to this many annotations on a Canvas:
+// on a page of OCR words, a number on every word would hide the image.
+export const NUMBER_LIMIT = 200;
+
+/** The number of each annotation (its place in the Canvas's list, from 1), or null when there are too many. */
+export function annotationNumbers(annotations: readonly { id: string }[]): Map<string, number> | null {
+  if (annotations.length > NUMBER_LIMIT) return null;
+  return new Map(annotations.map((a, i) => [a.id, i + 1]));
+}
