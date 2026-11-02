@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import {
+  type ContainerInfo,
   canvasImagesOf,
   compareDetailWidthOf,
   fitSide,
@@ -23,7 +24,7 @@ import {
   type SwipeDirection,
 } from '../compare/CompareParts';
 import { ImageLayers } from './ImageTiles';
-import ImageView, { INITIAL_VIEW, stageStyleOf, zoomStageAt, type StageInfo, type ViewState } from './ImageView';
+import ImageView, { INITIAL_VIEW, OverlayLayer, stageStyleOf, zoomStageAt, type StageInfo, type ViewState } from './ImageView';
 import { useRawManifest } from './rawManifest';
 import WarpedLayer, { warpableLayer } from './WarpedLayer';
 
@@ -86,6 +87,13 @@ export interface ImageCompareViewProps {
   alignB?: AlignTransform | null;
   /** Overlay: how B is laid over A (default `normal`: faded by `opacity`). */
   blend?: CompareBlend;
+  /**
+   * Drawn over the picture in Canvas positions, on both sides (e.g. the annotation boxes of the Canvas
+   * whose Choice is compared). Not drawn over B when B is moved by `alignB` (its positions are A's).
+   */
+  extra?: ReactNode;
+  /** The container whose overlays are drawn over A (and over each side, side by side). */
+  container?: ContainerInfo;
 }
 
 export default function ImageCompareView({
@@ -99,6 +107,8 @@ export default function ImageCompareView({
   swipeDirection = 'horizontal',
   alignB,
   blend = 'normal',
+  extra,
+  container,
 }: ImageCompareViewProps) {
   const boxRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<ViewState>(INITIAL_VIEW);
@@ -180,7 +190,15 @@ export default function ImageCompareView({
       <div className="relative w-full h-full flex flex-col sm:flex-row gap-px bg-[var(--ds-border)]">
         {([0, 1] as const).map((side) => (
           <div key={side} className="relative flex-1 min-w-0 min-h-0 bg-gray-100 dark:bg-gray-900">
-            <ImageView canvasWidth={width} canvasHeight={height} detailWidth={detail} view={view} onViewChange={setView}>
+            <ImageView
+              canvasWidth={width}
+              canvasHeight={height}
+              detailWidth={detail}
+              view={view}
+              onViewChange={setView}
+              extra={side === 0 || !alignB ? extra : undefined}
+              container={container}
+            >
               {(stage) => draw(side, stage)}
             </ImageView>
             <CompareChip className="left-3">
@@ -206,7 +224,12 @@ export default function ImageCompareView({
         style={mode === 'overlay' ? overlayStyle : { clipPath: compareClipOf(mode, split, at, swipeDirection) }}
         data-iiif-compare-b
       >
-        <div style={stageStyleOf(s)}>{draw(1, s)}</div>
+        <div style={stageStyleOf(s)}>
+          {draw(1, s)}
+          {/* the annotations of the Canvas over B too (clicks go through to A's, at the same place) */}
+          {!alignB && extra}
+          {!alignB && container && <OverlayLayer container={container} canvasWidth={width} canvasHeight={height} stage={s} />}
+        </div>
       </div>
     );
   };
@@ -220,7 +243,16 @@ export default function ImageCompareView({
         if (mode === 'spyglass' && boxRef.current) setLens(pointInBox(boxRef.current, e));
       }}
     >
-      <ImageView canvasWidth={width} canvasHeight={height} detailWidth={detail} view={view} onViewChange={setView} over={over}>
+      <ImageView
+        canvasWidth={width}
+        canvasHeight={height}
+        detailWidth={detail}
+        view={view}
+        onViewChange={setView}
+        over={over}
+        extra={extra}
+        container={container}
+      >
         {(stage) => draw(0, stage)}
       </ImageView>
       <CompareChip className="left-3">

@@ -5,6 +5,17 @@
     "missingImage": "この画像はありません（取得できない、または存在しません）",
     "playMedia": "再生",
     "thumbnails": "サムネイル",
-    "annotationImage": "注釈の画像"
+    "annotationImage": "注釈の画像",
+    "choiceCompare": "比較",
+    "choiceCompareB": "B",
+    "choiceCompareA": "A",
+    "choiceCompareOpacity": "B の濃さ",
+    "choiceSwipeHandle": "境界線（ドラッグして動かす）",
+    "choiceSpyglassHint": "丸い窓の中に B を表示",
+    "choiceCompare_single": "しない",
+    "choiceCompare_swipe": "スワイプ",
+    "choiceCompare_spyglass": "スパイグラス",
+    "choiceCompare_overlay": "重ねる",
+    "choiceCompare_side": "左右に並べる"
   }
 }

@@ -27,6 +27,15 @@ export const canvasLayersAtom = atom<{ canvasId: string; items: LayerItem[] } | 
 export const layerSettingsAtom = atom<Record<string, LayerSetting>>({});
 export const layerOrderAtom = atom<Record<string, string[]>>({});
 
+// 画像の Choice をその場で見比べる（Choice のバーで選ぶ）。single は比較しない。
+// b は B 側の候補の番号（painting の id ごと）。Canvas を移っても表示のしかたは保つ（表と裏を同じ見方で見る）
+export type ChoiceCompareMode = 'single' | 'swipe' | 'spyglass' | 'overlay' | 'side';
+export const choiceCompareAtom = atom<{ mode: ChoiceCompareMode; b: Record<string, number>; opacity: number }>({
+  mode: 'single',
+  b: {},
+  opacity: 0.5,
+});
+
 // レイヤーの再生。右パネルの別のタブに移っても止まらないよう、タブの外に置く。
 // タイマーは画像の表示（ImageCanvasDisplay）が動かす。ids は再生するレイヤー（下から）、groups はその段
 export interface LayerPlayback {
