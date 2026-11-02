@@ -43,7 +43,7 @@ export default function Footer() {
             { label: t('samplesOwn'), href: '/samples/kasane' },
           ],
         },
-        // 4列目: 関連サイト（IIIF の入口・Kasane が読む仕様・ソースコード）
+        // 4列目: 関連サイト（IIIF の入口・Kasane が読む仕様・姉妹サイト・ソースコード）
         {
           heading: t('relatedHeading'),
           links: [
@@ -59,6 +59,7 @@ export default function Footer() {
               href: 'https://iiif.io/api/extension/3d/',
               external: true,
             },
+            { label: t('relatedMusubi'), href: 'https://musubi.ldas.jp/', external: true },
             {
               label: t('relatedSource'),
               href: 'https://github.com/nakamura196/iiif-kasane',
