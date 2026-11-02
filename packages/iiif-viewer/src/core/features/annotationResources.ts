@@ -5,7 +5,7 @@
 //  - bodies with a `purpose` (Region & Tag extension §5, the preferred form): an Image body (describing = a picture of
 //    the place, linking = a related picture), a Wikidata body (identifying), a Wikipedia page or reference (linking);
 //  - `seeAlso` as the 3D annotation editor writes it: Image items whose real file is in the non-standard `source`
-//    (their `id` is not resolvable), Wikidata (Dataset), Wikipedia (Text) and bibliography (text/plain, no URL).
+//    (their `id` is not resolvable; always related pictures, as only the editor's RDF tells which show the place), Wikidata (Dataset), Wikipedia (Text) and bibliography (text/plain, no URL).
 
 import { isImageBody, isResourceBody, type AnnotationBodyItem } from './annotationBody';
 import { wikidataIdOf } from './wikidataLabel';
@@ -95,9 +95,11 @@ const fromSeeAlso = (item: unknown): AnnotationResource | null => {
     const source = idOf(item.source);
     const url = source ?? (isUnresolvableEditorId(id) ? undefined : id);
     if (!isWeb(url)) return null;
+    // A seeAlso picture does not say whether it shows the place: it may be another object (a comparison, a typology).
+    // Only the editor's RDF tells, so it is a related resource (Region & Tag extension §7.4).
     return {
       kind: 'image',
-      role: source && isUnresolvableEditorId(id) ? 'place' : 'related',
+      role: 'related',
       url,
       ...(item.label !== undefined ? { label: item.label } : {}),
       ...(format ? { format } : {}),

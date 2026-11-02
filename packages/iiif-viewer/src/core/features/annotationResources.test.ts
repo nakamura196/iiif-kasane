@@ -21,15 +21,15 @@ describe('readAnnotationResources: editor seeAlso', () => {
   const r = readAnnotationResources([], seeAlso);
   it('classifies each item', () => {
     expect(r.map((x) => [x.kind, x.role])).toEqual([
-      ['image', 'place'],
       ['wikidata', 'identifying'],
+      ['image', 'related'],
       ['wikipedia', 'related'],
       ['web', 'related'],
       ['citation', 'related'],
     ]);
   });
   it('uses the real image (source), not the id that does not resolve', () => {
-    expect(r[0].url).toBe('https://img.example.org/dog.jpg');
+    expect(r.find((x) => x.kind === 'image')!.url).toBe('https://img.example.org/dog.jpg');
   });
   it('gives a bibliography as text without an address', () => {
     const c = r.find((x) => x.kind === 'citation')!;
@@ -115,6 +115,6 @@ describe('where the resources appear', () => {
     };
     const parsed = parseManifestV4(scene as never, null, 'en');
     const a = parsed.annotations?.[0];
-    expect(a?.resources?.map((x) => x.kind)).toEqual(['image', 'wikidata', 'wikipedia', 'web', 'citation']);
+    expect(a?.resources?.map((x) => x.kind)).toEqual(['wikidata', 'image', 'wikipedia', 'web', 'citation']);
   });
 });
