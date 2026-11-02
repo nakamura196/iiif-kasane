@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import {
   canvasImagesOf,
+  choiceSidesOf,
   detailWidthOf,
   imageChoiceOf,
   paintsImage,
@@ -13,6 +14,7 @@ import {
   type CanvasPainting,
   type ImageAnnotation,
   isLayerVisible,
+  labelIn,
   layerItemsOf,
   layerOpacity,
   nextPlaybackStep,
@@ -25,14 +27,16 @@ import {
 } from '../../core';
 import {
   canvasLayersAtom,
+  choiceCompareAtom,
   layerOrderAtom,
   layerPlaybackAtom,
   layerPlaybackOptionsAtom,
   layerSettingsAtom,
 } from '../atoms';
-import { useTranslations } from '../env';
+import { useLocale, useTranslations } from '../env';
 import { usePlayback } from '../playback';
-import ChoiceBar from './ChoiceBar';
+import ChoiceBar, { compareBIndex, type ChoiceCompareControls } from './ChoiceBar';
+import ImageCompareView from './ImageCompareView';
 import AuthPrompt from '../auth/AuthPrompt';
 import { useAuthPanels } from '../auth/authStore';
 import { AnnotationBoxes, MediaCover } from './ImageExtras';
@@ -77,6 +81,7 @@ function ImageBody({
   physdim?: Physdim;
 }) {
   const t = useTranslations('Viewer');
+  const locale = useLocale();
   const { container } = props;
   const [failedBase, setFailedBase] = useState(false);
   // the bottom image whose picture has come (until then the ring is shown), and its tiles still coming
@@ -158,6 +163,30 @@ function ImageBody({
   const waitingBase = !!baseLayer && !!width && !!height && !baseShown && !failedBase && !authPending;
   const compared = imageChoiceOf(images);
 
+  // その場の比較（Choice のバーで選ぶ）: A はいま表示中の候補、B はもう 1 つの候補（既定は A の次）
+  const [cmp, setCmp] = useAtom(choiceCompareAtom);
+  const comparedBar = compared ? bars.find((b) => b.painting.id === compared.id) : undefined;
+  const pickA = comparedBar ? choiceIndex(comparedBar.painting) : 0;
+  const optionCount = comparedBar?.painting.options.length ?? 0;
+  const storedB = compared ? cmp.b[compared.id] : undefined;
+  const pickB = compareBIndex(storedB, pickA, optionCount);
+  const compareControls: ChoiceCompareControls | undefined =
+    compared && optionCount > 1
+      ? {
+          mode: cmp.mode,
+          onModeChange: (mode) => setCmp((c) => ({ ...c, mode })),
+          b: pickB,
+          onBChange: (index) => setCmp((c) => ({ ...c, b: { ...c.b, [compared.id]: index } })),
+          opacity: cmp.opacity,
+          onOpacityChange: (opacity) => setCmp((c) => ({ ...c, opacity })),
+        }
+      : undefined;
+  const sides = compareControls && cmp.mode !== 'single' && compared ? choiceSidesOf(images, compared, [pickA, pickB]) : undefined;
+  const optionName = (i: number) => {
+    const o = comparedBar?.painting.options[i];
+    return o ? labelIn(o.label, locale) || decodeURIComponent(o.url.split('/').pop() ?? o.url) : '';
+  };
+
   return (
     <>
       {bars.map((b) => (
@@ -166,6 +195,7 @@ function ImageBody({
           painting={b.content}
           index={choiceIndex(b.painting)}
           onChange={(i) => choose(b.painting, i)}
+          compare={b.content.id === compared?.id ? compareControls : undefined}
         >
           {/* the Choice the comparison page compares */}
           {b.content.id === compared?.id &&
@@ -173,7 +203,18 @@ function ImageBody({
         </ChoiceBar>
       ))}
       <div className="relative flex-1 min-h-0 min-w-0">
-        {width && height ? (
+        {sides && cmp.mode !== 'single' ? (
+          <ImageCompareView
+            sides={sides}
+            mode={cmp.mode}
+            labels={[optionName(pickA), optionName(pickB)]}
+            opacity={cmp.opacity}
+            swipeHandleLabel={t('choiceSwipeHandle')}
+            spyglassHint={t('choiceSpyglassHint')}
+            extra={<AnnotationBoxes annotations={annotations} canvasWidth={width!} canvasHeight={height!} />}
+            container={container}
+          />
+        ) : width && height ? (
           <ImageView
             key={key}
             canvasWidth={width}

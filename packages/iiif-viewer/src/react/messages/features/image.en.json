@@ -5,6 +5,17 @@
     "missingImage": "This image is not available (it could not be fetched or does not exist)",
     "playMedia": "Play",
     "thumbnails": "Thumbnails",
-    "annotationImage": "Image in annotation"
+    "annotationImage": "Image in annotation",
+    "choiceCompare": "Compare",
+    "choiceCompareB": "B",
+    "choiceCompareA": "A",
+    "choiceCompareOpacity": "Opacity of B",
+    "choiceSwipeHandle": "Divider (drag to move)",
+    "choiceSpyglassHint": "B is shown in the round window",
+    "choiceCompare_single": "Off",
+    "choiceCompare_swipe": "Swipe",
+    "choiceCompare_spyglass": "Spyglass",
+    "choiceCompare_overlay": "Overlay",
+    "choiceCompare_side": "Side by side"
   }
 }
