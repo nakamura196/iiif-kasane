@@ -16,6 +16,10 @@ import { HIDDEN_VIEWER_TABS, viewerTabOf } from '@/lib/viewerTabs';
 import { canOpenInGallery } from '@/lib/gallery';
 import { canOpenInBrowse } from '@/lib/browse';
 import { otherViewsPanel, type CompareTarget } from '@/components/OtherViewsPanel';
+import { LocalImageError, isLocalManifestUrl, openLocalImage } from '@/lib/localImage';
+
+/** Whether a drag carries files (not text or a link, which the viewer handles itself). */
+const dragHasFiles = (e: React.DragEvent) => Array.from(e.dataTransfer.types).includes('Files');
 
 // ビューアが左下に置く場所（renderActions）から、比較に渡せるかを受け取るだけの部品。何も描かない。
 // 候補の無い Canvas に移ると呼ばれなくなる（外される）ので、そのとき null に戻す。
@@ -45,7 +49,29 @@ const ViewerContent: NextPage = () => {
   const [browseOk, setBrowseOk] = useState(false);
   // 表示中の模型か画像に候補が 2 つ以上あれば、比較のページに渡す Canvas / Scene の番号（ビューアが知らせる）
   const [compare, setCompare] = useState<CompareTarget>(null);
+  const tl = useTranslations('LocalImage');
+  // 手元の画像（サーバに送らず、このタブの中だけで開いたもの）
+  const isLocal = isLocalManifestUrl(manifestUrl);
+  const [localName, setLocalName] = useState('');
+  const [fileError, setFileError] = useState('');
+  const [dragging, setDragging] = useState(false);
 
+  // 手元の画像を開く。アドレス欄には書かない（blob: の URL は再読み込みすると読めず、共有もできないため）。
+  // 開いていた資料の引数は外し、文字の読み取り（推論）のタブで開く
+  const openFile = useCallback(
+    async (file: File) => {
+      try {
+        const url = await openLocalImage(file);
+        setFileError('');
+        setLocalName(file.name);
+        setManifestUrl(url);
+        router.replace('?tab=inference');
+      } catch (e) {
+        setFileError(tl(e instanceof LocalImageError ? e.reason : 'decode'));
+      }
+    },
+    [router, setManifestUrl, tl],
+  );
   // 開いたとき、また入口の事例のリンクで URL の資料が変わったときに読む
   const readUrl = useCallback(
     (manifestParam: string | null) => {
@@ -79,10 +105,11 @@ const ViewerContent: NextPage = () => {
   const otherViewsLabel = to('tab');
   const panels = useMemo(
     () =>
-      manifestUrl
+      // 手元の画像は、ほかのページ（比較・地図・3D）へ URL で渡せないので「ほかの表示」を出さない
+      manifestUrl && !isLocal
         ? [otherViewsPanel({ manifestUrl, hasGeo: hasGeoCanvas, galleryOk, browseOk, compare }, otherViewsLabel)]
         : [],
-    [manifestUrl, hasGeoCanvas, galleryOk, browseOk, compare, otherViewsLabel],
+    [manifestUrl, isLocal, hasGeoCanvas, galleryOk, browseOk, compare, otherViewsLabel],
   );
 
   const tabParam = searchParams?.get('tab');
@@ -97,11 +124,48 @@ const ViewerContent: NextPage = () => {
 
   return (
     // h-dvh: スマホではブラウザのツールバーの分だけ 100vh が見える範囲より高く、下端が隠れるため
-    <div className="flex flex-col h-dvh">
+    <div
+      className="flex flex-col h-dvh relative"
+      // 画面のどこに画像を落としても開く。文字やリンクのドラッグ（ビューアの中の並べ替えなど）には手を出さない
+      onDragOver={(e) => {
+        if (!dragHasFiles(e)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+        setDragging(true);
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget === e.target || !e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false);
+      }}
+      onDrop={(e) => {
+        if (!dragHasFiles(e)) return;
+        e.preventDefault();
+        setDragging(false);
+        const file = e.dataTransfer.files[0];
+        if (file) void openFile(file);
+      }}
+    >
       <Suspense fallback={null}>
         <ManifestParamWatcher onChange={readUrl} />
       </Suspense>
       <Header compact />
+      {manifestUrl && isLocal && (
+        <div
+          className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-1.5 text-xs border-b border-[var(--ds-border)] bg-[var(--ds-surface-2)] text-[var(--ds-fg)]"
+          role="status"
+        >
+          <span className="flex-1 min-w-0">{tl('banner', { name: localName })}</span>
+          {tab !== 'inference' && (
+            <button type="button" className="underline text-[var(--ds-primary)]" onClick={() => handleTabChange('inference')}>
+              {tl('readText')}
+            </button>
+          )}
+        </div>
+      )}
+      {manifestUrl && fileError && (
+        <div className="px-4 py-1.5 text-xs text-red-600 dark:text-red-400 border-b border-[var(--ds-border)]" role="alert">
+          {fileError}
+        </div>
+      )}
       <main className="flex-1 flex overflow-hidden relative">
         {manifestUrl ? (
           <Viewer
@@ -121,12 +185,21 @@ const ViewerContent: NextPage = () => {
           <div className="w-full h-full overflow-y-auto flex px-4 py-8">
             {/* 入口の画面。中身が画面より高いときは上から並べてスクロールさせ（真ん中寄せだと上が切れる）、幅はトップに近い 768px まで */}
             <div className="m-auto w-full max-w-3xl">
-              <ManifestInput onSubmit={(url: string) => setManifestUrl(url)} />
+              <ManifestInput
+                onSubmit={(url: string) => setManifestUrl(url)}
+                onOpenFile={(file) => void openFile(file)}
+                fileError={fileError}
+              />
             </div>
           </div>
         )}
       </main>
       {!manifestUrl && <Footer />}
+      {dragging && (
+        <div className="pointer-events-none absolute inset-2 z-50 flex items-center justify-center rounded-lg border-2 border-dashed border-[var(--ds-primary)] bg-[var(--ds-bg)]/80 text-sm font-medium text-[var(--ds-primary)]">
+          {tl('dropHere')}
+        </div>
+      )}
     </div>
   );
 };

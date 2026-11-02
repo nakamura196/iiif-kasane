@@ -2,6 +2,7 @@
 
 import { useAtom } from 'jotai';
 import { manifestUrlAtom } from '@nakamura196/iiif-viewer';
+import { isLocalManifestUrl } from '@/lib/localImage';
 import { useTranslations, useLocale } from 'next-intl';
 import { useRouter, usePathname } from 'next/navigation';
 import { Link } from '@/i18n/routing';
@@ -74,7 +75,7 @@ const Header = ({ compact = false }: { compact?: boolean }) => {
           ]}
         />
 
-        {manifestUrl && (
+        {manifestUrl && !isLocalManifestUrl(manifestUrl) && (
           // The manifest URL is a static asset / external URL already carrying
           // the basePath, not an in-app route. Use a plain <a> so next/link
           // does not prepend basePath a second time (which 404s on GH Pages).

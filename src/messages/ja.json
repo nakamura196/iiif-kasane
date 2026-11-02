@@ -48,7 +48,9 @@
     "requiredUrl": "マニフェストURLを入力してください",
     "invalidUrl": "有効なURLを入力してください",
     "sampleUseCasesAll": "ユースケース一覧（動画つき）",
-    "searchCollection": "コレクション・キュレーションを検索する"
+    "searchCollection": "コレクション・キュレーションを検索する",
+    "openLocalImage": "手元の画像を開く",
+    "openLocalImageNote": "画像はこのブラウザの中だけで扱い、サーバには送りません。画面にドラッグしても開けます。"
   },
   "Help": {
     "title": "ヘルプ"
@@ -525,5 +527,12 @@
     "bySource": "資料ごと",
     "noneValue": "（なし）",
     "otherValue": "その他"
+  },
+  "LocalImage": {
+    "banner": "手元の画像「{name}」を表示しています。画像はこのブラウザの中だけで扱い、サーバには送りません。再読み込みやタブを閉じると消えます。",
+    "readText": "文字を読み取る",
+    "dropHere": "ここに画像を落とすと開きます（サーバには送りません）",
+    "notImage": "画像ファイルではありません。JPEG・PNG・WebP などを選んでください。",
+    "decode": "この画像はブラウザで開けませんでした。TIFF などは、JPEG か PNG に変換してから開いてください。"
   }
 }
