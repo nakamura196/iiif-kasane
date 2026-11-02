@@ -41,6 +41,7 @@ export const annotationListSearchText = (a: Annotation): string =>
     a.creator,
     ...(a.tags ?? []).map(tagKey),
     ...(a.images ?? []).flatMap((i) => [i.id, ...labelStrings(i.label)]),
+    ...(a.resources ?? []).flatMap((r) => [...(r.url ? [r.url] : []), ...labelStrings(r.label)]),
     ...(a.seeAlso ?? []).flatMap((l) => [l.id, ...labelStrings(l.label)]),
   ]);
 

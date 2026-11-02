@@ -8,6 +8,7 @@
 import type { ManifestV4 } from '../types/iiif';
 
 import { annotationTitleOf, readAnnotationBodies, type AnnotationBodyItem } from './annotationBody';
+import { readAnnotationResources, type AnnotationResource } from './annotationResources';
 import { parseStyleClasses, readStylesheetField, type AnnotationStyleSource } from './annotationStyle';
 import { targetTimeOf } from './temporal';
 
@@ -43,6 +44,8 @@ export interface CanvasAnnotation extends AnnotationStyleSource {
   title?: unknown;
   region: AnnotationRegion;
   bodies: AnnotationBodyItem[];
+  /** Related resources (pictures, Wikidata, Wikipedia, references), from the resource bodies and `seeAlso`. */
+  resources?: AnnotationResource[];
   /** The AnnotationCollection the page belongs to (`partOf`), if any. */
   collection?: AnnotationCollectionRef;
   /** The motivation is painting: the text is drawn on the Canvas itself. */
@@ -411,6 +414,7 @@ export const readCanvasAnnotations = (
       // supplementing on the whole Canvas (captions, transcripts) is shown elsewhere; on a region of the
       // image it is text read from that place (OCR), and is drawn like other annotations
       if (motivations.includes('supplementing') && target.region.type === 'canvas') continue;
+      const resources = readAnnotationResources(bodies, raw.seeAlso);
       const id = str(raw.id) ?? `${canvasId}#annotation-${out.length}`;
       if (seen.has(id)) continue;
       seen.add(id);
@@ -435,6 +439,7 @@ export const readCanvasAnnotations = (
         ...(bodyClasses.length ? { bodyClasses } : {}),
         region: target.region,
         bodies,
+        ...(resources.length ? { resources } : {}),
         ...(collection ? { collection } : {}),
         ...(painting ? { painted: true } : {}),
         ...(layer ? { layer } : {}),

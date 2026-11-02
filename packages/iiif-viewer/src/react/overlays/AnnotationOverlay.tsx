@@ -26,7 +26,7 @@ import {
   selectedCanvasAnnotationAtom,
 } from './canvasAnnotationState';
 import { storyFrameAtom, storyOpenAtom } from './storyState';
-import { DOM_MARK_LIMIT, boxOfRegion, overlaps, pixelsPerUnit, visibleBoxOf, type Box } from './annotationMarks';
+import { DOM_MARK_LIMIT, annotationNumbers, boxOfRegion, overlaps, pixelsPerUnit, visibleBoxOf, type Box } from './annotationMarks';
 import type { Overlay, OverlayProps } from './types';
 import { useCanvasAnnotations } from './useCanvasAnnotations';
 
@@ -42,12 +42,35 @@ const areaOf = (a: CanvasAnnotation): number => {
 
 const STROKE = '#2563eb';
 
+// The number of a mark, at the top left of its box (the same number as its card in the list).
+// It keeps its size on screen at any zoom.
+function NumberBadge({ n, selected, left, top }: { n: number; selected: boolean; left: string; top: string }) {
+  return (
+    <span
+      aria-hidden
+      className={`absolute pointer-events-none rounded-full px-1 min-w-[1.25rem] text-center text-white font-medium leading-5 tabular-nums shadow ${
+        selected ? 'bg-orange-500' : 'bg-blue-600'
+      }`}
+      style={{
+        left,
+        top,
+        fontSize: '11px',
+        transform: 'translate(-50%, -50%) scale(calc(1 / var(--image-scale, 1)))',
+      }}
+    >
+      {n}
+    </span>
+  );
+}
+
 // 画像の上に、Canvas 上の注釈の領域を重ねる。位置は Canvas 座標の割合で置く（画像と同じ大きさの層の中）。
 // Canvas 全体への注釈は枠を描かない（右パネルにだけ出る）。
 export function AnnotationOverlayView({ container, canvasWidth, canvasHeight, stage }: OverlayProps) {
   const locale = useLocale();
   const manifest = useAtomValue(manifestAtom);
   const { annotations, styleOf } = useCanvasAnnotations(manifest, container);
+  // the same numbers as the cards of the list (none when there are very many)
+  const numbers = useMemo(() => annotationNumbers(annotations), [annotations]);
   const [selected, setSelected] = useAtom(selectedCanvasAnnotationAtom);
   // While a story is read, only the current scene may be framed (thin line, no fill), and only when asked.
   const storyOpen = useAtomValue(storyOpenAtom);
@@ -122,6 +145,7 @@ export function AnnotationOverlayView({ container, canvasWidth, canvasHeight, st
         <Mark
           key={g.key}
           group={g}
+          number={numbers?.get(g.annotations[0].id)}
           selected={isSelected(g)}
           storyOpen={storyOpen}
           canvasWidth={canvasWidth}
@@ -144,6 +168,7 @@ const titleOf = (a: CanvasAnnotation, locale: string) =>
 
 const Mark = memo(function Mark({
   group: g,
+  number,
   selected: isSel,
   storyOpen,
   canvasWidth,
@@ -153,6 +178,8 @@ const Mark = memo(function Mark({
   onToggle,
 }: {
   group: RegionGroup<CanvasAnnotation>;
+  /** The number of the region's first annotation in the list. */
+  number?: number;
   selected: boolean;
   storyOpen: boolean;
   canvasWidth: number;
@@ -178,6 +205,7 @@ const Mark = memo(function Mark({
   if (r.type === 'point') {
     const p = pointPercent(r.x, r.y, canvasWidth, canvasHeight);
     return (
+      <>
       <button
         key={g.key}
         type="button"
@@ -196,6 +224,8 @@ const Mark = memo(function Mark({
           transform: 'translate(-50%, -50%) scale(calc(1 / var(--image-scale, 1)))',
         }}
       />
+      {number !== undefined ? <NumberBadge n={number} selected={isSel} left={`${p.left}%`} top={`${p.top}%`} /> : null}
+      </>
     );
   }
   if (r.type === 'polygon') {
@@ -204,6 +234,7 @@ const Mark = memo(function Mark({
     const box = bboxOf(r.rings);
     const pad = 0;
     return (
+      <>
       <svg
         key={g.key}
         className="absolute pointer-events-none overflow-visible"
@@ -228,6 +259,8 @@ const Mark = memo(function Mark({
           />
         ))}
       </svg>
+      {number !== undefined ? <NumberBadge n={number} selected={isSel} left={`${b.left}%`} top={`${b.top}%`} /> : null}
+      </>
     );
   }
   if (r.type === 'rect') {
@@ -268,7 +301,15 @@ const Mark = memo(function Mark({
           ...(html ? { containerType: 'size' as const } : {}),
         }}
       >
-        {count > 1 ? (
+        {number !== undefined ? (
+          <span
+            aria-hidden
+            className={`absolute left-0 top-0 rounded-br px-1 text-white font-medium leading-tight tabular-nums ${isSel ? 'bg-orange-500' : 'bg-blue-600'}`}
+            style={{ fontSize: '12px', transformOrigin: 'top left', scale: 'calc(1 / var(--image-scale, 1))' }}
+          >
+            {number}
+          </span>
+        ) : count > 1 ? (
           <span
             className="absolute left-0 top-0 rounded-br bg-blue-600 px-1 text-white leading-tight"
             style={{ fontSize: '12px', transformOrigin: 'top left', scale: 'calc(1 / var(--image-scale, 1))' }}

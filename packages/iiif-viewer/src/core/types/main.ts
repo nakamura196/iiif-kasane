@@ -1,5 +1,6 @@
 import type { Vector3 } from 'three';
 import type { AnnotationBodyItem } from '../features/annotationBody';
+import type { AnnotationResource } from '../features/annotationResources';
 
 export interface AnnotationLink {
   id: string;
@@ -54,6 +55,8 @@ export interface Annotation {
   // Every body, in the reader's language (one item of each Choice). The description, the tags and the
   // images above are read from them; the card shows the others (otherBodies).
   bodies?: AnnotationBodyItem[];
+  // Related resources (pictures, Wikidata, Wikipedia, references) from the resource bodies and `seeAlso`.
+  resources?: AnnotationResource[];
   created?: string;
   data: {
     body: {

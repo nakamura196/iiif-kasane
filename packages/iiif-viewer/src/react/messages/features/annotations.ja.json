@@ -42,5 +42,13 @@
     "canvasAnnotationsTagsFewer": "少なく表示",
     "canvasAnnotationsTagsClear": "タグの選択を解除",
     "canvasAnnotationsFocusOnSelect": "選んだ注釈へ画像を寄せる"
+  },
+  "AnnotationResources": {
+    "place": "この場所の写真",
+    "identifying": "これは何か",
+    "related": "関連する資料",
+    "kind_wikidata": "Wikidata の項目",
+    "kind_wikipedia": "Wikipedia の記事",
+    "kind_citation": "文献"
   }
 }
