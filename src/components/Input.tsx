@@ -15,12 +15,16 @@ const ManifestInput = ({
   useCases = FEATURED_USE_CASES,
   onOpenFile,
   fileError,
+  fileStatus,
 }: {
   onSubmit: (url: string, tab?: string) => void;
   // 手元の画像を開くボタンを出す（ビューアの入口だけ。画像はサーバに送らない）
-  onOpenFile?: (file: File) => void;
+  // 複数選んだときやフォルダを選んだときは、名前順に並べて 1 冊として開く
+  onOpenFile?: (files: File[]) => void;
   // 手元の画像が開けなかったときの文言
   fileError?: string;
+  // 読み込みの途中経過（何枚目か）
+  fileStatus?: string;
   // トップページ用: 大きなアイコンを出さず、入力欄とボタンを 1 行に並べる
   compact?: boolean;
   // フォームとユースケース一覧のあいだに差し込む内容（トップページのデモ動画など）
@@ -36,6 +40,13 @@ const ManifestInput = ({
   const [url, setUrl] = useState('');
   const [error, setError] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
+  const folderInput = useRef<HTMLInputElement>(null);
+  const pick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    // 同じファイルを続けて選んでも change が起きるように空にする
+    e.target.value = '';
+    if (files.length) onOpenFile?.(files);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,23 +126,42 @@ const ManifestInput = ({
               ref={fileInput}
               type="file"
               accept="image/*"
+              multiple
               className="hidden"
               data-testid="local-image-input"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                // 同じファイルを続けて選んでも change が起きるように空にする
-                e.target.value = '';
-                if (file) onOpenFile(file);
-              }}
+              onChange={pick}
             />
-            <button
-              type="button"
-              onClick={() => fileInput.current?.click()}
-              className={buttonClass('secondary', 'md', 'w-full')}
-            >
-              {t('openLocalImage')}
-            </button>
+            <input
+              ref={folderInput}
+              type="file"
+              // フォルダを選ぶと、中のファイルがすべて渡る（画像でないものは開くときに除く）
+              {...{ webkitdirectory: '', directory: '' }}
+              className="hidden"
+              data-testid="local-folder-input"
+              onChange={pick}
+            />
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button
+                type="button"
+                onClick={() => fileInput.current?.click()}
+                className={buttonClass('secondary', 'md', 'w-full sm:flex-1')}
+              >
+                {t('openLocalImage')}
+              </button>
+              <button
+                type="button"
+                onClick={() => folderInput.current?.click()}
+                className={buttonClass('secondary', 'md', 'w-full sm:flex-1')}
+              >
+                {t('openLocalFolder')}
+              </button>
+            </div>
             <p className="mt-2 text-xs text-[var(--ds-fg-muted)]">{t('openLocalImageNote')}</p>
+            {fileStatus && (
+              <p className="mt-2 text-sm text-[var(--ds-fg-muted)]" role="status">
+                {fileStatus}
+              </p>
+            )}
             {fileError && <p className="mt-2 text-sm text-red-600 dark:text-red-400" role="alert">{fileError}</p>}
           </div>
         )}

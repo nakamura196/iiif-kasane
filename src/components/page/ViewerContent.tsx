@@ -16,7 +16,7 @@ import { HIDDEN_VIEWER_TABS, viewerTabOf } from '@/lib/viewerTabs';
 import { canOpenInGallery } from '@/lib/gallery';
 import { canOpenInBrowse } from '@/lib/browse';
 import { otherViewsPanel, type CompareTarget } from '@/components/OtherViewsPanel';
-import { LocalImageError, isLocalManifestUrl, openLocalImage } from '@/lib/localImage';
+import { LocalImageError, filesFromDataTransfer, isLocalManifestUrl, openLocalImages } from '@/lib/localImage';
 
 /** Whether a drag carries files (not text or a link, which the viewer handles itself). */
 const dragHasFiles = (e: React.DragEvent) => Array.from(e.dataTransfer.types).includes('Files');
@@ -52,22 +52,29 @@ const ViewerContent: NextPage = () => {
   const tl = useTranslations('LocalImage');
   // 手元の画像（サーバに送らず、このタブの中だけで開いたもの）
   const isLocal = isLocalManifestUrl(manifestUrl);
-  const [localName, setLocalName] = useState('');
+  const [local, setLocal] = useState({ name: '', count: 0, skipped: 0 });
   const [fileError, setFileError] = useState('');
+  const [fileStatus, setFileStatus] = useState('');
   const [dragging, setDragging] = useState(false);
 
   // 手元の画像を開く。アドレス欄には書かない（blob: の URL は再読み込みすると読めず、共有もできないため）。
   // 開いていた資料の引数は外し、文字の読み取り（推論）のタブで開く
-  const openFile = useCallback(
-    async (file: File) => {
+  // 複数の画像は名前順に並べ、1 冊のマニフェストにする
+  const openFiles = useCallback(
+    async (files: File[]) => {
+      setFileError('');
       try {
-        const url = await openLocalImage(file);
-        setFileError('');
-        setLocalName(file.name);
-        setManifestUrl(url);
+        const opened = await openLocalImages(files, (done, total) => {
+          // 1 枚だけのときは一瞬で終わるので出さない
+          if (total > 1) setFileStatus(tl('reading', { done, total }));
+        });
+        setLocal({ name: opened.label, count: opened.count, skipped: opened.skipped.length });
+        setManifestUrl(opened.manifestUrl);
         router.replace('?tab=inference');
       } catch (e) {
         setFileError(tl(e instanceof LocalImageError ? e.reason : 'decode'));
+      } finally {
+        setFileStatus('');
       }
     },
     [router, setManifestUrl, tl],
@@ -141,8 +148,9 @@ const ViewerContent: NextPage = () => {
         if (!dragHasFiles(e)) return;
         e.preventDefault();
         setDragging(false);
-        const file = e.dataTransfer.files[0];
-        if (file) void openFile(file);
+        void filesFromDataTransfer(e.dataTransfer).then((files) => {
+          if (files.length) void openFiles(files);
+        });
       }}
     >
       <Suspense fallback={null}>
@@ -154,7 +162,10 @@ const ViewerContent: NextPage = () => {
           className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-1.5 text-xs border-b border-[var(--ds-border)] bg-[var(--ds-surface-2)] text-[var(--ds-fg)]"
           role="status"
         >
-          <span className="flex-1 min-w-0">{tl('banner', { name: localName })}</span>
+          <span className="flex-1 min-w-0">
+            {local.count > 1 ? tl('bannerMany', { name: local.name, count: local.count }) : tl('banner', { name: local.name })}
+            {local.skipped > 0 && ` ${tl('skipped', { count: local.skipped })}`}
+          </span>
           {tab !== 'inference' && (
             <button type="button" className="underline text-[var(--ds-primary)]" onClick={() => handleTabChange('inference')}>
               {tl('readText')}
@@ -188,8 +199,9 @@ const ViewerContent: NextPage = () => {
             <div className="m-auto w-full max-w-3xl">
               <ManifestInput
                 onSubmit={(url: string) => setManifestUrl(url)}
-                onOpenFile={(file) => void openFile(file)}
+                onOpenFile={(files) => void openFiles(files)}
                 fileError={fileError}
+                fileStatus={fileStatus}
               />
             </div>
           </div>
