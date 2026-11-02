@@ -12,6 +12,7 @@ async function pageImage(page: Page, n: number): Promise<Buffer> {
   return png;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- 書き出した manifest の JSON を自由にたどるため
 type Any = Record<string, any>;
 
 test('builds a manifest that points at the place the images will be', async ({ page, baseURL }) => {
