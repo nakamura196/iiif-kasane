@@ -1,5 +1,5 @@
 // 入力フォームコンポーネント
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Link } from '@/i18n/routing';
 import { buttonClass } from '@nakamura196/react-ui';
@@ -13,8 +13,14 @@ const ManifestInput = ({
   title,
   description,
   useCases = FEATURED_USE_CASES,
+  onOpenFile,
+  fileError,
 }: {
   onSubmit: (url: string, tab?: string) => void;
+  // 手元の画像を開くボタンを出す（ビューアの入口だけ。画像はサーバに送らない）
+  onOpenFile?: (file: File) => void;
+  // 手元の画像が開けなかったときの文言
+  fileError?: string;
   // トップページ用: 大きなアイコンを出さず、入力欄とボタンを 1 行に並べる
   compact?: boolean;
   // フォームとユースケース一覧のあいだに差し込む内容（トップページのデモ動画など）
@@ -29,6 +35,7 @@ const ManifestInput = ({
   const locale = useLocale() === 'en' ? 'en' : 'ja';
   const [url, setUrl] = useState('');
   const [error, setError] = useState('');
+  const fileInput = useRef<HTMLInputElement>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,6 +108,33 @@ const ManifestInput = ({
             {t('submit')}
           </button>
         </form>
+
+        {onOpenFile && (
+          <div className="mt-6 pt-6 border-t border-[var(--ds-border)] text-center">
+            <input
+              ref={fileInput}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              data-testid="local-image-input"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                // 同じファイルを続けて選んでも change が起きるように空にする
+                e.target.value = '';
+                if (file) onOpenFile(file);
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => fileInput.current?.click()}
+              className={buttonClass('secondary', 'md', 'w-full')}
+            >
+              {t('openLocalImage')}
+            </button>
+            <p className="mt-2 text-xs text-[var(--ds-fg-muted)]">{t('openLocalImageNote')}</p>
+            {fileError && <p className="mt-2 text-sm text-red-600 dark:text-red-400" role="alert">{fileError}</p>}
+          </div>
+        )}
       </div>
 
       {children ? <div className={compact ? 'mt-10' : 'mt-12'}>{children}</div> : null}

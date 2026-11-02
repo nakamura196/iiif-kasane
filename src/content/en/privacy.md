@@ -2,7 +2,7 @@
 
 IIIF Kasane ("the Service") respects the privacy of its users and handles information obtained through the provision of the Service as described below.
 
-Last updated: October 17, 2026
+Last updated: November 2, 2026
 
 ## 1. Operator
 
@@ -32,6 +32,7 @@ Please note that if you specify a manifest URL or similar value as a query param
 The Service uses the following third-party services, and information may be obtained by each provider when you access them. Please review each service's privacy policy for details on how they handle data.
 
 - **IIIF manifest servers**: Requests are sent directly from your browser to the server hosting the manifest URL you enter or select. The operator of that server may obtain access information (such as your IP address).
+- **Local images**: When you open an image file from your computer in the viewer, the image is handled only inside your browser and is not sent to the Service's servers or to any other server. Text recognition and other inference also run in your browser (the model files and the program that runs them are downloaded from where they are published; the image is not sent with these requests). The image's address is not put in the page address, so it is not recorded by analytics either.
 - **YouTube (video embeds)**: The Service embeds videos from YouTube (youtube.com). When you play a video, Google / YouTube may obtain information and set cookies.
 - **Hosting (Vercel)**: The Service is delivered on infrastructure provided by Vercel Inc., and server access logs (IP address, user agent, etc.) may be recorded.
 

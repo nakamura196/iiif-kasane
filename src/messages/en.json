@@ -48,7 +48,9 @@
     "requiredUrl": "Enter the Manifest URL",
     "invalidUrl": "Enter a valid URL",
     "sampleUseCasesAll": "All use cases (with videos)",
-    "searchCollection": "Search a collection or curation"
+    "searchCollection": "Search a collection or curation",
+    "openLocalImage": "Open an image from your computer",
+    "openLocalImageNote": "The image stays in this browser and is never sent to a server. You can also drag it onto the page."
   },
   "Help": {
     "title": "Help"
@@ -525,5 +527,12 @@
     "bySource": "Source item",
     "noneValue": "(none)",
     "otherValue": "Other"
+  },
+  "LocalImage": {
+    "banner": "Showing your local image “{name}”. It stays in this browser and is never sent to a server. It disappears when you reload or close the tab.",
+    "readText": "Read the text",
+    "dropHere": "Drop an image here to open it (it is not sent to a server)",
+    "notImage": "This is not an image file. Please choose a JPEG, PNG, WebP or similar image.",
+    "decode": "This browser could not open the image. Convert TIFF and similar files to JPEG or PNG first."
   }
 }
