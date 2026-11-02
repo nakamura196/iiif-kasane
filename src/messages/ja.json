@@ -21,6 +21,7 @@
     "relatedIiif": "IIIF",
     "relatedPresentation": "Presentation API 3.0",
     "relatedCookbook": "IIIF Cookbook",
+    "relatedMusubi": "Musubi（LOD ブラウザ）",
     "relatedSource": "ソースコード（GitHub）",
     "developers": "中村 覚・小川 潤（東京大学）",
     "samplesAll": "Cookbook のサンプル",

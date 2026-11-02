@@ -21,6 +21,7 @@
     "relatedIiif": "IIIF",
     "relatedPresentation": "Presentation API 3.0",
     "relatedCookbook": "IIIF Cookbook",
+    "relatedMusubi": "Musubi (Linked Data browser)",
     "relatedSource": "Source code (GitHub)",
     "developers": "Satoru Nakamura & Jun Ogawa (The University of Tokyo)",
     "samplesAll": "Cookbook samples",
