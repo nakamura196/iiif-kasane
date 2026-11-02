@@ -157,6 +157,12 @@ const ManifestInput = ({
               </button>
             </div>
             <p className="mt-2 text-xs text-[var(--ds-fg-muted)]">{t('openLocalImageNote')}</p>
+            {/* ビューアで開くのとは別に、画像を置く場所を決めて、ほかでも使えるマニフェストにする */}
+            <p className="mt-2 text-xs">
+              <Link href="/manifest-editor" className="underline text-[var(--ds-fg-muted)] hover:text-[var(--ds-fg)]">
+                {t('toManifestEditor')}
+              </Link>
+            </p>
             {fileStatus && (
               <p className="mt-2 text-sm text-[var(--ds-fg-muted)]" role="status">
                 {fileStatus}
