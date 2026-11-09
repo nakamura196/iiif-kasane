@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { fetchAllV3 } from './json';
 import {
   collectionReader,
@@ -12,6 +12,7 @@ import {
   metadataRecordOf,
   sizeParam,
   type FetchJson,
+  type ReadResult,
   type SearchItem,
 } from '.';
 
@@ -126,12 +127,55 @@ describe('collectionReader', () => {
     expect(progress.at(-1)).toBe(4);
   });
 
+  it('reports what it has read so far, while a slow manifest is still pending', async () => {
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const read = fetchFrom(docs);
+    const fetchJson: FetchJson = async (url) => {
+      if (url === 'https://x/m2') await gate;
+      return read(url);
+    };
+    const partials: ReadResult[] = [];
+    const done = collectionReader.read(top, {
+      url: 'https://x/top',
+      fetchJson,
+      locale: 'en',
+      fetchOptions,
+      onPartial: (p) => partials.push(p),
+    });
+    // m2 を待っているあいだに、読めた m1 のメタデータが届く
+    await vi.waitFor(() => expect(partials.at(-1)?.items[0].metadata).toEqual({ Date: ['1850'], Place: ['Edo'] }));
+    const partial = partials.at(-1)!;
+    expect(partial.items.map((i) => i.key)).toEqual(['1', '2', '3', '4']);
+    expect(partial.items[1]).toMatchObject({ label: 'm2', metadata: {} });
+    release();
+    expect((await done).items[1].metadata).toEqual({ Date: ['1860'], Place: ['Osaka'] });
+  });
+
   it('loadSearchSource tells a collection from a curation, and refuses a single manifest', async () => {
     const fetchJson = fetchFrom({ ...docs, 'https://x/top': top });
     const src = await loadSearchSource({ url: 'https://x/top', fetchJson, locale: 'en', fetchOptions });
     expect(src.kind).toBe('collection');
     expect(src.label).toBe('top');
     await expect(loadSearchSource({ url: 'https://x/m1', fetchJson, locale: 'en' })).rejects.toThrow();
+  });
+});
+
+describe('curationReader, partial results', () => {
+  it('lists the members and their metadata before any manifest is read', async () => {
+    const curation = fixture('codh-curation.json');
+    curation.selections[1].members[0].metadata = [{ label: '性別', value: '女' }];
+    const partials: ReadResult[] = [];
+    const full = await curationReader.read(curation, {
+      url: 'https://x/c.json',
+      fetchJson: fetchFrom({ [M1]: fixture('codh-manifest-200014778.json'), [M2]: fixture('codh-manifest-200003067.json') }),
+      locale: 'ja',
+      fetchOptions,
+      onPartial: (p) => partials.push(p),
+    });
+    expect(partials[0].items).toHaveLength(8);
+    expect(partials[0].items[4].metadata).toEqual({ 性別: ['女'] });
+    expect(partials[0].items.map((i) => i.key)).toEqual(full.items.map((i) => i.key));
   });
 });
 

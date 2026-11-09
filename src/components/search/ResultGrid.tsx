@@ -43,10 +43,12 @@ function ResultCard({ item }: { item: SearchItem }) {
 /**
  * 結果のカードの並び。PAGE 件ずつ「さらに表示」で足す。
  * 絞り込みが変わったら、親が key を変えて作り直す（件数が最初に戻る）。
+ * 読み込みの途中は、まだ読めていない分に該当があるかもしれないので「該当なし」と言わない。
  */
-export default function ResultGrid({ items }: { items: SearchItem[] }) {
+export default function ResultGrid({ items, loading = false }: { items: SearchItem[]; loading?: boolean }) {
   const t = useTranslations('Search');
   const [shown, setShown] = useState(PAGE);
+  if (items.length === 0 && loading) return null;
   if (items.length === 0) return <p className="text-sm text-[var(--ds-fg-muted)]">{t('noHits')}</p>;
   return (
     <>

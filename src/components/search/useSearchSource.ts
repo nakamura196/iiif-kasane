@@ -5,11 +5,11 @@ import { fetchJson, loadSearchSource, type SearchSource } from '@nakamura196/iii
 
 export type SourceStatus =
   | { kind: 'idle' }
-  | { kind: 'loading'; progress?: [number, number] }
+  | { kind: 'loading'; progress?: [number, number]; partial?: SearchSource }
   | { kind: 'error' }
   | { kind: 'ready'; source: SearchSource };
 
-/** URL を読み込み、項目の並びにする。参照先（マニフェスト）を取りに行く進み具合も返す。 */
+/** URL を読み込み、項目の並びにする。参照先（マニフェスト）を取りに行く進み具合と、読めた分までの途中の結果も返す。 */
 export function useSearchSource(url: string | null, locale: string): SourceStatus {
   const [status, setStatus] = useState<SourceStatus>({ kind: 'idle' });
 
@@ -23,7 +23,10 @@ export function useSearchSource(url: string | null, locale: string): SourceStatu
       fetchJson,
       locale,
       onProgress: (done, total) => {
-        if (!cancelled) setStatus({ kind: 'loading', progress: [done, total] });
+        if (!cancelled) setStatus((s) => (s.kind === 'loading' ? { ...s, progress: [done, total] } : s));
+      },
+      onPartial: (partial) => {
+        if (!cancelled) setStatus((s) => (s.kind === 'loading' ? { ...s, partial } : s));
       },
     })
       .then((source) => !cancelled && setStatus({ kind: 'ready', source }))

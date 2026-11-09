@@ -31,6 +31,9 @@ export interface SearchSource {
   failed: number;
 }
 
+/** 読み手が返す結果（kind と url は loadSearchSource が足す）。 */
+export type ReadResult = Omit<SearchSource, 'kind' | 'url'>;
+
 export type FetchJson = (url: string) => Promise<unknown>;
 
 export interface ReadContext {
@@ -41,6 +44,8 @@ export interface ReadContext {
   locale: string;
   /** 参照先を取りに行くときの進み具合 */
   onProgress?: (done: number, total: number) => void;
+  /** 読めた分までの途中の結果。全部読み終えるのを待たずに一覧を出すためのもの */
+  onPartial?: (partial: ReadResult) => void;
   /** 参照先の取り方（同時に取りに行く数・取り直しの回数など）。省略すると json.ts の既定 */
   fetchOptions?: Omit<FetchAllOptions, 'onProgress'>;
 }
@@ -52,5 +57,5 @@ export interface ReadContext {
 export interface SearchReader {
   kind: string;
   accepts(json: unknown): boolean;
-  read(json: unknown, ctx: ReadContext): Promise<Omit<SearchSource, 'kind' | 'url'>>;
+  read(json: unknown, ctx: ReadContext): Promise<ReadResult>;
 }
