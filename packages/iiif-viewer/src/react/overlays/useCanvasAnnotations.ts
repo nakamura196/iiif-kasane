@@ -11,6 +11,7 @@ import {
   type AnnotationStyles,
   type StyleRules,
   nextPageOf,
+  withReferenceLabels,
   rawCanvasOf,
   canvasIdsOf,
   readCanvasAnnotations,
@@ -93,6 +94,9 @@ export function useCanvasAnnotations(
   useEffect(() => {
     if (!canvasId || sources.references.length === 0) return;
     let cancelled = false;
+    const rawAnnotations = (rawCanvasOf(manifest, canvasId)?.annotations ?? []) as unknown[];
+    const stubOf = (id: string) =>
+      rawAnnotations.find((e) => typeof e === 'object' && e !== null && (e as { id?: unknown }).id === id);
     (async () => {
       const pages: unknown[] = [];
       let failed = false;
@@ -100,7 +104,8 @@ export function useCanvasAnnotations(
         let url: string | undefined = ref;
         for (let n = 0; url && n < MAX_FOLLOWED_PAGES; n++) {
           try {
-            const page = await fetchPage(url);
+            // マニフェストの参照に付いた AnnotationCollection の名前を、取得したページ（続きのページも）に引き継ぐ
+            const page = withReferenceLabels(await fetchPage(url), stubOf(ref));
             pages.push(page);
             // follow `next` only while this page still has annotations for this Canvas
             const mine = readCanvasAnnotations(canvasId, [page], { width, height }, canvasIds);
@@ -116,7 +121,7 @@ export function useCanvasAnnotations(
     return () => {
       cancelled = true;
     };
-  }, [canvasId, key, sources, width, height, canvasIds]);
+  }, [canvasId, key, sources, width, height, canvasIds, manifest]);
 
   const current = fetched?.key === key ? fetched : null;
   const local = useAtomValue(localAnnotationPagesAtom);
