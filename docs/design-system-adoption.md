@@ -65,10 +65,10 @@ grep '"version"' node_modules/@nakamura196/react-ui/package.json
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* 書体トークンをアプリの next/font (Noto 等) で上書き */
+/* 書体トークンを端末の書体で上書き（Web フォントは読み込まない） */
 :root {
-  --ds-font-sans: var(--font-noto-sans), 'Noto Sans JP', ui-sans-serif, system-ui, sans-serif;
-  --ds-font-serif: var(--font-noto-serif), 'Noto Serif JP', ui-serif, Georgia, serif;
+  --ds-font-sans: system-ui, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic UI', 'Yu Gothic', Meiryo, 'Noto Sans CJK JP', sans-serif;
+  --ds-font-serif: 'Hiragino Mincho ProN', 'Yu Mincho', YuMincho, 'Noto Serif CJK JP', ui-serif, Georgia, serif;
 }
 ```
 

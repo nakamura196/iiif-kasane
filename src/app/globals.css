@@ -14,10 +14,11 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* DS の書体トークンをアプリの next/font (Noto) で上書きし、body に適用 */
+/* DS の書体トークンを端末の書体で上書きし、body に適用。
+   Web フォントを読み込まないので、ビルドも表示も外部のフォント配信に頼らない */
 :root {
-  --ds-font-sans: var(--font-noto-sans), 'Noto Sans JP', ui-sans-serif, system-ui, sans-serif;
-  --ds-font-serif: var(--font-noto-serif), 'Noto Serif JP', ui-serif, Georgia, serif;
+  --ds-font-sans: system-ui, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic UI', 'Yu Gothic', Meiryo, 'Noto Sans CJK JP', sans-serif;
+  --ds-font-serif: 'Hiragino Mincho ProN', 'Yu Mincho', YuMincho, 'Noto Serif CJK JP', ui-serif, Georgia, serif;
 }
 
 body {
