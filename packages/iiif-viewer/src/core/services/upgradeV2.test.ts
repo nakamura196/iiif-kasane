@@ -66,3 +66,50 @@ describe('upgradeToV3', () => {
     expect(s.rendering).toEqual([{ id: 'https://example.org/r', type: 'Text' }]);
   });
 });
+
+describe('upgradeToV3: resource の @type が oa:Annotation の画像', () => {
+  const manifest = (resource: Record<string, unknown>) => ({
+    '@context': 'http://iiif.io/api/presentation/2/context.json',
+    '@id': 'https://example.org/m',
+    '@type': 'sc:Manifest',
+    label: 'm',
+    sequences: [
+      {
+        '@type': 'sc:Sequence',
+        canvases: [
+          {
+            '@id': 'https://example.org/c1',
+            '@type': 'sc:Canvas',
+            width: 100,
+            height: 200,
+            images: [{ '@type': 'oa:Annotation', motivation: 'sc:painting', on: 'https://example.org/c1', resource }],
+          },
+        ],
+      },
+    ],
+  });
+  const body = (m: unknown) => {
+    const items = (m as { items: { items: { items: { body: { type: string; service?: unknown } }[] }[] }[] }).items;
+    return items[0].items[0].items[0].body;
+  };
+
+  it('画像サービスを持つ resource は Image になる', () => {
+    const b = body(
+      upgradeToV3(
+        manifest({
+          '@id': 'https://example.org/i/full/full/0/default.jpg',
+          '@type': 'oa:Annotation',
+          format: 'image/jpeg',
+          service: { '@context': 'http://iiif.io/api/image/2/context.json', '@id': 'https://example.org/i', profile: 'http://iiif.io/api/image/2/level2.json' },
+        }),
+      ),
+    );
+    expect(b.type).toBe('Image');
+    expect(b.service).toBeTruthy();
+  });
+
+  it('画像でない resource（テキストなど）は Image にしない', () => {
+    const b = body(upgradeToV3(manifest({ '@id': 'https://example.org/t.txt', '@type': 'oa:Annotation', format: 'text/plain' })));
+    expect(b.type).not.toBe('Image');
+  });
+});
