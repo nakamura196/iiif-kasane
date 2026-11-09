@@ -1,7 +1,7 @@
 // search の中で使う、JSON を読むための小さな道具と、参照先をまとめて取りに行く処理。
 
 import { upgradeToV3 } from '../../services/upgradeV2';
-import type { FetchJson } from './types';
+import type { FetchJson, ReadContext, ReadResult } from './types';
 
 export type Json = Record<string, unknown>;
 
@@ -21,6 +21,8 @@ export interface FetchAllOptions {
   /** 取り直す前に待つ時間（ミリ秒）。n 回目は base × 3^(n-1) */
   retryDelay?: number;
   onProgress?: (done: number, total: number) => void;
+  /** 1 件読めるたびに、それまでに読めた分を渡す（失敗は null） */
+  onFetched?: (fetched: Map<string, Json | null>) => void;
   /** 待つ処理（テストで差し替える） */
   sleep?: (ms: number) => Promise<void>;
 }
@@ -40,7 +42,7 @@ export async function fetchAllV3(
   fetchJson: FetchJson,
   options: FetchAllOptions = {},
 ): Promise<Map<string, Json | null>> {
-  const { concurrency = 4, retries = 4, retryDelay = 500, onProgress, sleep = wait } = options;
+  const { concurrency = 4, retries = 4, retryDelay = 500, onProgress, onFetched, sleep = wait } = options;
   const fetchOne = async (url: string): Promise<Json | null> => {
     for (let attempt = 0; ; attempt++) {
       try {
@@ -60,11 +62,41 @@ export async function fetchAllV3(
       const url = urls[next++];
       out.set(url, await fetchOne(url));
       onProgress?.(++done, urls.length);
+      onFetched?.(out);
     }
   };
   const n = Math.max(1, Math.min(concurrency, urls.length));
   await Promise.all(Array.from({ length: n }, worker));
   return out;
+}
+
+/** 途中の結果を画面に渡す最短の間隔（ミリ秒）。1 件ごとに一覧を作り直さないため。 */
+const PARTIAL_INTERVAL = 200;
+
+/**
+ * fetchAllV3 と同じく参照先を取りに行き、読めた分から順に ctx.onPartial へ途中の結果を渡す。
+ * build は「読めた分」から結果を作る関数で、まだ 1 件も読めていないときにも呼ぶ
+ * （キュレーションの member のメタデータは、マニフェストを読む前に分かるので、すぐ出せる）。
+ */
+export async function fetchAllReporting(
+  urls: string[],
+  { fetchJson, onProgress, onPartial, fetchOptions }: ReadContext,
+  build: (fetched: Map<string, Json | null>) => ReadResult,
+): Promise<Map<string, Json | null>> {
+  if (!onPartial) return fetchAllV3(urls, fetchJson, { ...fetchOptions, onProgress });
+  onPartial(build(new Map()));
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const onFetched = (fetched: Map<string, Json | null>) => {
+    timer ??= setTimeout(() => {
+      timer = undefined;
+      onPartial(build(fetched));
+    }, PARTIAL_INTERVAL);
+  };
+  try {
+    return await fetchAllV3(urls, fetchJson, { ...fetchOptions, onProgress, onFetched });
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export const countFailed = (fetched: Map<string, Json | null>): number =>

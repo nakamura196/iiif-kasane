@@ -9,10 +9,10 @@
 // 各マニフェストも取ってくるので、新しいほうから DISCOVERY_MAX_ITEMS 件・DISCOVERY_MAX_PAGES ページで打ち切る。
 
 import { labelIn } from '../../../services/paintedModels';
-import { asList, countFailed, fetchAllV3, idOf, isObject, str, typeOf, type Json } from '../json';
+import { asList, countFailed, fetchAllReporting, idOf, isObject, str, typeOf, type Json } from '../json';
 import { metadataRecordOf } from '../metadata';
 import { manifestThumbnail } from '../thumbnails';
-import type { FetchJson, SearchItem, SearchReader } from '../types';
+import type { FetchJson, ReadResult, SearchItem, SearchReader } from '../types';
 
 export const DISCOVERY_MAX_ITEMS = 100;
 export const DISCOVERY_MAX_PAGES = 30;
@@ -85,26 +85,28 @@ export async function recentManifests(
 export const discoveryReader: SearchReader = {
   kind: 'discovery',
   accepts: (json) => /^OrderedCollection(Page)?$/.test(typeOf(json)),
-  async read(json, { url, fetchJson, locale, onProgress, fetchOptions }) {
+  async read(json, ctx) {
+    const { url, fetchJson, locale } = ctx;
     if (!isObject(json)) return { label: '', items: [], failed: 0 };
     const refs = await recentManifests(json, fetchJson);
-    const manifests = await fetchAllV3(
-      refs.map((r) => r.id),
-      fetchJson,
-      { ...fetchOptions, onProgress },
-    );
-    const items = refs.map((ref, i): SearchItem => {
-      const m = manifests.get(ref.id) ?? null;
-      const item: SearchItem = {
-        key: String(i + 1),
-        label: labelIn(m?.label ?? ref.label, locale) || ref.id,
-        metadata: m ? metadataRecordOf(m.metadata, locale) : {},
-        target: { content: ref.id },
-      };
-      const thumb = m ? manifestThumbnail(m) : undefined;
-      if (thumb) item.thumbnail = thumb;
-      return item;
-    });
-    return { label: labelIn(json.label, locale) || str(json.summary) || url, items, failed: countFailed(manifests) };
+
+    const build = (manifests: Map<string, Json | null>): ReadResult => {
+      const items = refs.map((ref, i): SearchItem => {
+        const m = manifests.get(ref.id) ?? null;
+        const item: SearchItem = {
+          key: String(i + 1),
+          label: labelIn(m?.label ?? ref.label, locale) || ref.id,
+          metadata: m ? metadataRecordOf(m.metadata, locale) : {},
+          target: { content: ref.id },
+        };
+        const thumb = m ? manifestThumbnail(m) : undefined;
+        if (thumb) item.thumbnail = thumb;
+        return item;
+      });
+      return { label: labelIn(json.label, locale) || str(json.summary) || url, items, failed: countFailed(manifests) };
+    };
+
+    const urls = refs.map((r) => r.id);
+    return build(await fetchAllReporting(urls, ctx, build));
   },
 };

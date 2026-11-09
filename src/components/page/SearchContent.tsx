@@ -20,7 +20,9 @@ export default function SearchContent() {
   const { url, query, selection, ready, open, setQuery, setSelection } = useSearchState();
   const status = useSearchSource(url, locale);
 
-  const source = status.kind === 'ready' ? status.source : null;
+  // 読み込みの途中でも、読めた分を一覧とファセットに出す
+  const loading = status.kind === 'loading';
+  const source = status.kind === 'ready' ? status.source : status.kind === 'loading' ? (status.partial ?? null) : null;
   const items = useMemo(() => source?.items ?? [], [source]);
   const hits = useMemo(() => filterItems(items, query, selection), [items, query, selection]);
   const facets = useMemo(() => facetsOf(items, query, selection), [items, query, selection]);
@@ -61,7 +63,7 @@ export default function SearchContent() {
 
           {status.kind === 'error' && <p className="text-sm text-red-600 dark:text-red-400">{t('error')}</p>}
           {status.kind === 'loading' && (
-            <p className="text-sm text-[var(--ds-fg-muted)]" role="status">
+            <p className="mb-3 text-sm text-[var(--ds-fg-muted)]" role="status">
               {status.progress
                 ? t('loadingManifests', { done: status.progress[0], total: status.progress[1] })
                 : t('loading')}
@@ -74,7 +76,7 @@ export default function SearchContent() {
           <ActiveFilters selection={selection} onToggle={toggle} onClear={() => setSelection(() => ({}))} />
 
           {/* 絞り込みが変わったら作り直して、並べる件数を最初に戻す */}
-          {source && <ResultGrid key={writeSearchParams({ url: null, query, selection }).toString()} items={hits} />}
+          {source && <ResultGrid key={writeSearchParams({ url: null, query, selection }).toString()} items={hits} loading={loading} />}
         </div>
       </main>
     </div>
