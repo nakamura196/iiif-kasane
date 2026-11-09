@@ -24,6 +24,7 @@ import { flatDisplay } from './FlatDisplay';
 import { MediaCover } from './ImageExtras';
 import { FIRST_FRAME } from './MediaView';
 import { useRawManifest } from './rawManifest';
+import { useSeekOnFocus } from './structureState';
 import { fmt } from './TranscriptPanel';
 import type { Display, DisplayProps } from './types';
 
@@ -108,6 +109,7 @@ function CompositeStage({ container, timeline, cover }: { container: ContainerIn
   const t = useTranslations('Viewer');
   const choices = useAtomValue(modelChoicesAtom);
   const { mediaRef, setCurrentTime } = usePlayback();
+  useSeekOnFocus(container);
   const { duration, width, height } = timeline;
 
   const [time, setTime] = useState(0);
