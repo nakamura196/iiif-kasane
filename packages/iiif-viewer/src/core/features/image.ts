@@ -737,6 +737,19 @@ export const singleImageUrl = (service: ImageServiceRef, info: ImageInfo, needed
   return imageRequestUrl(service, 'full', pick.width, pick.height);
 };
 
+/**
+ * Narrower widths to ask for when the base image fails: the region at the service's own reductions, the
+ * largest first. Some servers answer 500 to the sharper levels of a damaged file and still serve the coarse
+ * ones (Kansai University's Cantaloupe, for example), and a blurred page is better than none. Floored so
+ * that a request never needs a level sharper than the one it stands for. Not for level 0 (no regions).
+ */
+export const smallerBaseWidths = (info: ImageInfo, regionWidth: number, baseWidth: number, limit = 3): number[] => {
+  const scheme = tileSchemeOf(info);
+  if (!scheme || info.level < 1) return [];
+  const widths = new Set(scheme.scaleFactors.map((f) => Math.floor(regionWidth / f)));
+  return [...widths].filter((w) => w < baseWidth && w >= 64).sort((a, b) => b - a).slice(0, limit);
+};
+
 // ---------------------------------------------------------------- placement
 
 /** Size of the bounding box of a w x h rectangle turned by `degrees`. */

@@ -14,6 +14,7 @@ import {
   rotationFromCss,
   serviceFromImageUrl,
   singleImageUrl,
+  smallerBaseWidths,
   thumbnailUrlOf,
   tileSchemeOf,
   tilesCovering,
@@ -295,5 +296,25 @@ describe('placement', () => {
     const corner = canvasRectToLayer(p, { x: 0, y: 0, w: 10, h: 10 });
     expect(corner.x).toBeCloseTo(0);
     expect(corner.y + corner.h).toBeCloseTo(2105);
+  });
+});
+
+describe('smallerBaseWidths', () => {
+  const info = (over: object) => ({ version: 2, width: 2000, height: 1409, level: 2, sizes: [], tiles: [{ width: 512, height: 512, scaleFactors: [1, 2, 4, 8, 16] }], ...over }) as Parameters<typeof smallerBaseWidths>[0];
+
+  it('goes down the levels of the service, the largest first', () => {
+    expect(smallerBaseWidths(info({}), 2000, 1024)).toEqual([1000, 500, 250]);
+  });
+
+  it('skips the widths that are not narrower than what already failed', () => {
+    expect(smallerBaseWidths(info({}), 2000, 500)).toEqual([250, 125]);
+  });
+
+  it('does not round a level up to a sharper one', () => {
+    expect(smallerBaseWidths(info({ tiles: [{ width: 512, height: 512, scaleFactors: [1, 4] }] }), 2003, 1024)).toEqual([500]);
+  });
+
+  it('has nothing to offer on a level 0 service', () => {
+    expect(smallerBaseWidths(info({ level: 0, tiles: [] }), 2000, 1024)).toEqual([]);
   });
 });
