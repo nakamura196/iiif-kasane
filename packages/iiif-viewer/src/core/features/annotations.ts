@@ -362,6 +362,28 @@ export const annotationSourcesOf = (canvas: Json | undefined): CanvasAnnotationS
   return { pages, references };
 };
 
+/**
+ * A page given by reference in the manifest often names its AnnotationCollection with a label
+ * (`partOf: [{ id, type, label }]`), while the page file itself repeats only the id (Cookbook 0309).
+ * Gives the fetched page the labels (and totals) of the reference, for collections it names without one.
+ */
+export const withReferenceLabels = (page: unknown, reference: unknown): unknown => {
+  if (!isObj(page) || !isObj(reference)) return page;
+  const known = asList(reference.partOf).filter(isObj);
+  if (known.length === 0) return page;
+  const own = asList(page.partOf);
+  const merged = own.map((p) => {
+    if (typeof p === 'string') {
+      const k = known.find((e) => idOf(e) === p);
+      return k ? { id: p, ...(k.type !== undefined ? { type: k.type } : {}), label: k.label, total: k.total } : p;
+    }
+    if (!isObj(p) || p.label !== undefined) return p;
+    const k = known.find((e) => idOf(e) === idOf(p));
+    return k ? { ...p, ...(k.label !== undefined ? { label: k.label } : {}), ...(p.total === undefined && k.total !== undefined ? { total: k.total } : {}) } : p;
+  });
+  return { ...page, partOf: merged };
+};
+
 /** The page that follows (`next`), as an address. */
 export const nextPageOf = (page: unknown): string | undefined => (isObj(page) ? idOf(page.next) : undefined);
 

@@ -77,6 +77,28 @@ function fixUnknownTypes(v: unknown): void {
   Object.values(o).forEach(fixUnknownTypes);
 }
 
+// 画像の本体（images[].resource）の @type が dctypes:Image でなく oa:Annotation と書かれた manifest がある
+// （青森県立図書館、musetheque.jp 系）。仕様は dctypes:Image を推奨（should）にとどめるので誤りとは言えないが、
+// upgrader は型で画像かどうかを決めるため、このままだと本体が画像として扱われず「この画像はありません」になる。
+// 画像サービスを持つか、format が image/* のときだけ dctypes:Image に直す。他の種類の resource には触れない。
+function fixImageBodies(v: unknown): void {
+  if (Array.isArray(v)) {
+    v.forEach(fixImageBodies);
+    return;
+  }
+  if (typeof v !== 'object' || v === null) return;
+  const o = v as Json;
+  if (Array.isArray(o.images)) {
+    for (const img of o.images) {
+      const r = (img as Json | null)?.resource as Json | undefined;
+      if (typeof r !== 'object' || r === null || r['@type'] !== 'oa:Annotation') continue;
+      const isImage = r.service != null || (typeof r.format === 'string' && r.format.startsWith('image/'));
+      if (isImage) r['@type'] = 'dctypes:Image';
+    }
+  }
+  Object.values(o).forEach(fixImageBodies);
+}
+
 const V2_CONTEXTS = ['http://iiif.io/api/presentation/2/context.json', 'http://www.shared-canvas.org/ns/context.json'];
 
 /** Presentation 2 の manifest / collection か（upgrader 自身の判定と同じ基準）。 */
@@ -93,6 +115,7 @@ export const isPresentation2 = (json: unknown): boolean => {
 export const upgradeToV3 = (json: unknown): unknown => {
   if (!isPresentation2(json)) return json;
   fixChoices(json);
+  fixImageBodies(json);
   fixLinkStrings(json);
   const o = json as Json;
   const homepage = homepageOf(o.related);

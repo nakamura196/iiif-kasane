@@ -7,6 +7,7 @@ import {
   embeddedCanvasAnnotations,
   isAnnotationAt,
   nextPageOf,
+  withReferenceLabels,
   parseXywh,
   pathPoints,
   pickBodies,
@@ -284,5 +285,19 @@ describe('Text Granularity', () => {
       ['w1', 'word'],
       ['n1', undefined],
     ]);
+  });
+});
+
+describe('withReferenceLabels（0309: 参照の partOf にだけ名前がある）', () => {
+  const ref = { id: 'p1.json', type: 'AnnotationPage', partOf: [{ id: 'coll.json', type: 'AnnotationCollection', label: { en: ['Layout'] }, total: 8 }] };
+  it('取得したページの partOf に名前を足す', () => {
+    const page = { id: 'p1.json', partOf: [{ id: 'coll.json', type: 'AnnotationCollection' }], items: [] };
+    const out = withReferenceLabels(page, ref) as { partOf: { label: unknown; total: number }[] };
+    expect(out.partOf[0].label).toEqual({ en: ['Layout'] });
+    expect(out.partOf[0].total).toBe(8);
+  });
+  it('ページ自身の名前は上書きしない', () => {
+    const page = { id: 'p1.json', partOf: [{ id: 'coll.json', label: { en: ['Own'] } }] };
+    expect((withReferenceLabels(page, ref) as { partOf: { label: unknown }[] }).partOf[0].label).toEqual({ en: ['Own'] });
   });
 });

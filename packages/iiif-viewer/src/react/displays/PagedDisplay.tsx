@@ -5,12 +5,11 @@ import { useAtom, useAtomValue } from 'jotai';
 import type { ContainerInfo } from '../../core';
 import { labelIn } from '../../core';
 import { useLocale, useTranslations } from '../env';
-import { usePlayback } from '../playback';
 import { flatDisplay } from './FlatDisplay';
 import { imageCanvasDisplay } from './ImageCanvasDisplay';
 import { OverlayLayer } from './ImageView';
 import { storyOpenAtom } from '../overlays/storyState';
-import { compareAtom, compareMultiAtom, focusAtom, usePageOrder } from './structureState';
+import { compareAtom, compareMultiAtom, focusAtom, usePageOrder, useSeekOnFocus } from './structureState';
 import { containedBox, regionBox, type PageBox } from './pageBox';
 import type { Display, DisplayProps } from './types';
 
@@ -259,29 +258,6 @@ function RegionHighlight({ host, container }: { host: React.RefObject<HTMLDivEle
       </button>
     </div>
   );
-}
-
-// Seeks to the time that a content state / table of contents entry points to, once the
-// media element of the Canvas exists.
-function useSeekOnFocus(container: ContainerInfo) {
-  const focus = useAtomValue(focusAtom);
-  const { seek, mediaRef } = usePlayback();
-  const done = useRef(0);
-  const time = focus && focus.target.canvasId === container.id ? focus.target.t?.[0] : undefined;
-  const seq = focus?.seq ?? 0;
-  useEffect(() => {
-    if (time === undefined || done.current === seq) return;
-    let tries = 0;
-    const timer = window.setInterval(() => {
-      tries += 1;
-      if (mediaRef.current || tries > 30) {
-        window.clearInterval(timer);
-        done.current = seq;
-        seek(time);
-      }
-    }, 100);
-    return () => window.clearInterval(timer);
-  }, [time, seq, seek, mediaRef]);
 }
 
 // Canvas / Timeline: a single page, facing pages (behavior: paged) or a continuous strip

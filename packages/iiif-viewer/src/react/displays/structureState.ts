@@ -3,7 +3,8 @@
 // structure 機能の状態。Viewer ごとの jotai store に載る（グローバルな変数は作らない）。
 // 右パネルの目次・ページ送り・表示が、これを通してつながる。
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { usePlayback } from '../playback';
 import { useLocale } from '../env';
 import { atom, useAtomValue, useSetAtom } from 'jotai';
 import {
@@ -154,4 +155,27 @@ export function useManifestSwitch() {
   }, [items, manifestUrl, setTrail, apply]);
 
   return { open, back, canGoBack: items.length > 0 };
+}
+
+// Seeks to the time that a content state / table of contents entry points to, once the
+// media element of the Canvas exists.
+export function useSeekOnFocus(container: ContainerInfo) {
+  const focus = useAtomValue(focusAtom);
+  const { seek, mediaRef } = usePlayback();
+  const done = useRef(0);
+  const time = focus && focus.target.canvasId === container.id ? focus.target.t?.[0] : undefined;
+  const seq = focus?.seq ?? 0;
+  useEffect(() => {
+    if (time === undefined || done.current === seq) return;
+    let tries = 0;
+    const timer = window.setInterval(() => {
+      tries += 1;
+      if (mediaRef.current || tries > 30) {
+        window.clearInterval(timer);
+        done.current = seq;
+        seek(time);
+      }
+    }, 100);
+    return () => window.clearInterval(timer);
+  }, [time, seq, seek, mediaRef]);
 }
