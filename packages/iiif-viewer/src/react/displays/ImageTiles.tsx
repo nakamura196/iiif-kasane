@@ -15,6 +15,7 @@ import {
   singleImageUrl,
   tileSchemeOf,
   tilesForView,
+  smallerBaseWidths,
   type ImageInfo,
   type ImageLayer,
   type ImageServiceRef,
@@ -131,6 +132,8 @@ export default function ImageLayerView({
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   // the base image whose `full` request failed and is asked again as pixels (see below)
   const [retriedBase, setRetriedBase] = useState<string | null>(null);
+  // how many narrower widths have been tried for this base image (see `smallerBaseWidths`)
+  const [narrowed, setNarrowed] = useState<{ of: string; step: number } | null>(null);
   // The tiles wait until the base image has come (or failed). Servers on HTTP/1.1 take 6 requests at a
   // time, so a hundred tiles asked together hold the base image back and the picture shows late.
   const [baseSettled, setBaseSettled] = useState(false);
@@ -210,11 +213,16 @@ export default function ImageLayerView({
   // Some servers (e.g. the National Archives of Japan) answer 403 to the keyword `full` but serve the
   // same area given as pixels. When the `full` base image fails, ask once more with the explicit region.
   const retrying = fullBase !== null && retriedBase === fullBase;
-  const base = fullBase === null
-    ? imageRequestUrl(service, region, baseWidth)
-    : retrying
-      ? imageRequestUrl(service, { x: 0, y: 0, w: info.width, h: info.height }, baseWidth)
-      : fullBase;
+  const firstBase = fullBase ?? imageRequestUrl(service, region, baseWidth);
+  const narrower = smallerBaseWidths(info, region.w, baseWidth);
+  const step = narrowed?.of === firstBase ? narrowed.step : 0;
+  const base = step > 0
+    ? imageRequestUrl(service, region, narrower[step - 1])
+    : fullBase === null
+      ? firstBase
+      : retrying
+        ? imageRequestUrl(service, { x: 0, y: 0, w: info.width, h: info.height }, baseWidth)
+        : fullBase;
 
   // tiles for what is visible now
   let tiles: ReturnType<typeof tilesForView> = [];
@@ -280,6 +288,10 @@ export default function ImageLayerView({
         onError={() => {
           if (fullBase !== null && !retrying) {
             setRetriedBase(fullBase);
+            return;
+          }
+          if (step < narrower.length) {
+            setNarrowed({ of: firstBase, step: step + 1 });
             return;
           }
           setBaseSettled(true);
