@@ -5,7 +5,6 @@ import { useAtom, useAtomValue } from 'jotai';
 import type { ContainerInfo } from '../../core';
 import { labelIn } from '../../core';
 import { useLocale, useTranslations } from '../env';
-import { usePlayback } from '../playback';
 import { flatDisplay } from './FlatDisplay';
 import { imageCanvasDisplay } from './ImageCanvasDisplay';
 import { OverlayLayer } from './ImageView';
