@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useTheme } from 'next-themes';
-import { Viewer } from '@nakamura196/iiif-viewer';
+import { Viewer } from 'iiif-kasane';
 import { buttonClass } from '@nakamura196/react-ui';
 import CommonLayout from '@/components/layout/Common';
 import { HIDDEN_VIEWER_TABS } from '@/lib/viewerTabs';

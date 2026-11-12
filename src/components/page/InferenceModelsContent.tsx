@@ -1,7 +1,7 @@
 'use client';
 
 import { useLocale, useTranslations } from 'next-intl';
-import { INFERENCE_MODELS, type InferenceModel } from '@nakamura196/iiif-viewer';
+import { INFERENCE_MODELS, type InferenceModel } from 'iiif-kasane';
 import CommonLayout from '@/components/layout/Common';
 import PageContainer from '@/components/layout/PageContainer';
 

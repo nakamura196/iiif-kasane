@@ -19,7 +19,7 @@ import {
   type CompareBlend,
   type CompareMode,
   type SwipeDirection,
-} from '@nakamura196/iiif-viewer';
+} from 'iiif-kasane';
 import Header from '@/components/Header';
 import { Link } from '@/i18n/routing';
 import ManifestInput from '@/components/Input';
@@ -36,8 +36,8 @@ import {
   parseAlignment,
   probeServiceOf,
   type Alignment,
-} from '@nakamura196/iiif-viewer/core';
-import { manifestFromParams } from '@nakamura196/iiif-viewer/core';
+} from 'iiif-kasane/core';
+import { manifestFromParams } from 'iiif-kasane/core';
 
 const MODES: CompareMode[] = ['side', 'swipe', 'spyglass', 'overlay'];
 // overlay fades one picture into the other: images only

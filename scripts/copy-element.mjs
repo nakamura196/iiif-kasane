@@ -15,9 +15,12 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const PREVIOUS = ['0.1.0', '0.1.1', '0.1.2', '0.1.3', '0.1.4', '0.1.5'];
+const PREVIOUS = ['0.1.0', '0.1.1', '0.1.2', '0.1.3', '0.1.4', '0.1.5', '0.1.6'];
+// 0.1.x は @nakamura196/iiif-viewer の名前で GitHub Release にだけ置いた。0.2.0 からは npm の iiif-kasane
 const releaseTgz = (v) =>
-  `https://github.com/nakamura196/iiif-kasane/releases/download/iiif-viewer-v${v}/nakamura196-iiif-viewer-${v}.tgz`;
+  v.startsWith('0.1.')
+    ? `https://github.com/nakamura196/iiif-kasane/releases/download/iiif-viewer-v${v}/nakamura196-iiif-viewer-${v}.tgz`
+    : `https://registry.npmjs.org/iiif-kasane/-/iiif-kasane-${v}.tgz`;
 
 const MAX_ATTEMPTS = 5;
 const TIMEOUT_MS = 60_000;
@@ -66,7 +69,7 @@ if (!existsSync(out)) {
 const dest = join(out, 'element', `v${pkg.version}`);
 rmSync(dest, { recursive: true, force: true });
 mkdirSync(dest, { recursive: true });
-// dist/lib と dist/types は npm 向け（npm run build -w @nakamura196/iiif-viewer）。配信には要らない
+// dist/lib と dist/types は npm 向け（npm run build -w iiif-kasane）。配信には要らない
 const npmOnly = new Set([join(dist, 'lib'), join(dist, 'types')]);
 cpSync(dist, dest, { recursive: true, filter: (p) => !npmOnly.has(p) });
 console.log(`out/element/v${pkg.version}/: ${readdirSync(dest).join(', ')}`);

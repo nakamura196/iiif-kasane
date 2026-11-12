@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { manifestFromParams } from '@nakamura196/iiif-viewer/core';
-import { SidePanel } from '@nakamura196/iiif-viewer';
+import { manifestFromParams } from 'iiif-kasane/core';
+import { SidePanel } from 'iiif-kasane';
 import { buttonClass } from '@nakamura196/react-ui';
 import Header from '@/components/Header';
 import { Link } from '@/i18n/routing';

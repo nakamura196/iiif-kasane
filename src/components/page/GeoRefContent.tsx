@@ -2,12 +2,12 @@
 
 import type { NextPage } from 'next';
 import { Suspense } from 'react';
-import { annotationsAtom, manifestUrlAtom, selectedAnnotationIdAtom } from '@nakamura196/iiif-viewer';
+import { annotationsAtom, manifestUrlAtom, selectedAnnotationIdAtom } from 'iiif-kasane';
 import { useAtom } from 'jotai';
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
-import { fetchManifest } from '@nakamura196/iiif-viewer/core';
-import { manifestAtom } from '@nakamura196/iiif-viewer';
-import { AuthPrompt, CanvasComponent, GeoImageView, useAuthStates, useCanvasImages } from '@nakamura196/iiif-viewer';
+import { fetchManifest } from 'iiif-kasane/core';
+import { manifestAtom } from 'iiif-kasane';
+import { AuthPrompt, CanvasComponent, GeoImageView, useAuthStates, useCanvasImages } from 'iiif-kasane';
 import ManifestInput from '@/components/Input';
 import ManifestParamWatcher from '@/components/ManifestParamWatcher';
 import RotationControl from '@/components/map/RotationControl';
@@ -16,7 +16,7 @@ import { Link } from '@/i18n/routing';
 import { SITE_URL } from '@/lib/site';
 import { USE_CASES, hrefOf } from '@/lib/usecases';
 import MapView, { type MapImageOverlay } from '@/components/map/MapView';
-import { authorizedUrl, convertToV4, probeServiceOf } from '@nakamura196/iiif-viewer/core';
+import { authorizedUrl, convertToV4, probeServiceOf } from 'iiif-kasane/core';
 import {
   parseManifestV4,
   geoAnnotations,
@@ -31,9 +31,9 @@ import {
   type GeoCanvas,
   type GeoFeature,
   type ImageLayer,
-} from '@nakamura196/iiif-viewer/core';
-import { AnnotationCard } from '@nakamura196/iiif-viewer';
-import { SidePanel, rightsPanel } from '@nakamura196/iiif-viewer';
+} from 'iiif-kasane/core';
+import { AnnotationCard } from 'iiif-kasane';
+import { SidePanel, rightsPanel } from 'iiif-kasane';
 import { useTranslations, useLocale } from 'next-intl';
 import {
   annotationsParams,
@@ -55,7 +55,7 @@ import {
   type GeorefParamPatch,
   type GeorefSideTab,
   type GeorefUrlState,
-} from '@nakamura196/iiif-viewer/core';
+} from 'iiif-kasane/core';
 
 // マニフェストからattributionを取得するヘルパー関数
 const getAttribution = (manifest: Record<string, unknown>, locale: string): string | undefined => {

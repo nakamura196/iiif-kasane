@@ -10,7 +10,7 @@ import { OwnLayoutDemo, TagDemo, ViewerDemo } from '@/components/developers/demo
 import { SITE_URL } from '@/lib/site';
 import viewerPkg from '../../../packages/iiif-viewer/package.json';
 
-// 開発者向けのページ。Kasane のビューア（@nakamura196/iiif-viewer）を自分のサイトに置く 3 つの方法を、
+// 開発者向けのページ。Kasane のビューア（iiif-kasane）を自分のサイトに置く 3 つの方法を、
 // 動くビューアとコードのタブで見せる。Clover IIIF の docs（https://samvera-labs.github.io/clover-iiif/docs）を参考にした。
 
 type L = { ja: string; en: string };
@@ -27,8 +27,8 @@ const ANNOTATED_MANIFEST = `${SITE_URL}/manifests/sample-manifest-with-annotatio
 const T = {
   title: { ja: '開発者向け', en: 'For developers' },
   lead: {
-    ja: 'Kasane のビューアは、パッケージ @nakamura196/iiif-viewer として、ほかのサイトにも置けます（MIT ライセンス）。React の部品として使う方法、HTML のタグ <iiif-viewer> として使う方法、Astro で使う方法を、動く例とコードで示します。',
-    en: 'The viewer of Kasane is available as the package @nakamura196/iiif-viewer, to put on your own site (MIT license). This page shows three ways to use it, each with a live viewer and its code: as React components, as the HTML tag <iiif-viewer>, and in Astro.',
+    ja: 'Kasane のビューアは、パッケージ iiif-kasane として、ほかのサイトにも置けます（MIT ライセンス）。React の部品として使う方法、HTML のタグ <iiif-viewer> として使う方法、Astro で使う方法を、動く例とコードで示します。',
+    en: 'The viewer of Kasane is available as the package iiif-kasane, to put on your own site (MIT license). This page shows three ways to use it, each with a live viewer and its code: as React components, as the HTML tag <iiif-viewer>, and in Astro.',
   },
   tabsHint: {
     ja: '各例の上のタブで「プレビュー」（動くビューア）とコードを切り替えます。',
@@ -39,10 +39,10 @@ const T = {
   copied: { ja: 'コピーしました', en: 'Copied' },
   installHeading: { ja: 'インストール', en: 'Install' },
   installBody: {
-    ja: 'npm のレジストリにはまだ載せていません。版ごとの tarball を GitHub Releases に置いています。3D 用の three.js などは、画像だけを見せる場合も入れてください（ブラウザが読むのは 3D を表示したときだけです）。タグだけを使う場合は、インストールは要りません。',
-    en: 'The package is not on the npm registry yet; each version is attached to a GitHub Release. Install three.js and the other 3D packages even if you show only images: your bundler resolves them, but the browser fetches them only when a 3D Scene is shown. The tag needs no install.',
+    ja: 'npm で iiif-kasane として公開しています。3D 用の three.js などは、画像だけを見せる場合も入れてください（ブラウザが読むのは 3D を表示したときだけです）。タグだけを使う場合は、インストールは要りません。',
+    en: 'The package is published on npm as iiif-kasane. Install three.js and the other 3D packages even if you show only images: your bundler resolves them, but the browser fetches them only when a 3D Scene is shown. The tag needs no install.',
   },
-  releases: { ja: 'GitHub Releases の一覧', en: 'All GitHub Releases' },
+  releases: { ja: 'npm のページ', en: 'Package on npm' },
   reactHeading: { ja: 'React: Viewer', en: 'React: Viewer' },
   reactBody: {
     ja: 'いちばん簡単な使い方です。Viewer は親の要素いっぱいに広がるので、親に高さを付けて className="h-full" を渡します。iiifContent にはマニフェストの URL か IIIF Content State を渡します。',
@@ -123,12 +123,12 @@ export default function DevelopersContent({ files }: { files: DeveloperFiles }) 
   const common = { previewLabel: t('preview'), copyLabel: t('copy'), copiedLabel: t('copied') };
 
   const install = [
-    `npm install ${REPO}/releases/download/iiif-viewer-v${VERSION}/nakamura196-iiif-viewer-${VERSION}.tgz`,
+    'npm install iiif-kasane',
     'npm install react react-dom jotai three three-stdlib @react-three/fiber @react-three/drei gsap',
   ].join('\n');
 
-  const reactCode = `import { Viewer } from '@nakamura196/iiif-viewer';
-import '@nakamura196/iiif-viewer/style.css';
+  const reactCode = `import { Viewer } from 'iiif-kasane';
+import 'iiif-kasane/style.css';
 
 export default function Page() {
   return (
@@ -180,7 +180,7 @@ export default function Page() {
             <CodeBlock code={install} copyLabel={t('copy')} copiedLabel={t('copied')} />
           </div>
           <P>
-            <ExtLink href={`${REPO}/releases`}>{t('releases')}</ExtLink>
+            <ExtLink href="https://www.npmjs.com/package/iiif-kasane">{t('releases')}</ExtLink>
           </P>
         </Section>
 

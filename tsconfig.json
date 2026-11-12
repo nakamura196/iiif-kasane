@@ -26,10 +26,10 @@
       "@/*": [
         "./src/*"
       ],
-      "@nakamura196/iiif-viewer": [
+      "iiif-kasane": [
         "./packages/iiif-viewer/src/react/index.ts"
       ],
-      "@nakamura196/iiif-viewer/core": [
+      "iiif-kasane/core": [
         "./packages/iiif-viewer/src/core/index.ts"
       ]
     }

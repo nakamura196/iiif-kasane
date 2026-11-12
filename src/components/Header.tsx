@@ -1,7 +1,7 @@
 'use client';
 
 import { useAtom } from 'jotai';
-import { manifestUrlAtom } from '@nakamura196/iiif-viewer';
+import { manifestUrlAtom } from 'iiif-kasane';
 import { isLocalManifestUrl } from '@/lib/localImage';
 import { useTranslations, useLocale } from 'next-intl';
 import { useRouter, usePathname } from 'next/navigation';

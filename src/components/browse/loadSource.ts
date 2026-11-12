@@ -1,6 +1,6 @@
 // /browse/ が資料を取ってくる部分（ネットワークを使う）。並べるカードへの直し方は lib/browse.ts。
 
-import { curationReader, fetchJson, fetchManifest, isCuration } from '@nakamura196/iiif-viewer/core';
+import { curationReader, fetchJson, fetchManifest, isCuration } from 'iiif-kasane/core';
 import { sourceFromResource, thumbnailOfManifest, type BrowseItem, type BrowseSource } from '@/lib/browse';
 
 /**

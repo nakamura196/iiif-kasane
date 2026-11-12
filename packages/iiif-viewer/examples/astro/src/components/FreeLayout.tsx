@@ -8,9 +8,9 @@ import {
   ViewerProvider,
   useViewer,
   type ViewerSelection,
-} from '@nakamura196/iiif-viewer';
-import { labelIn } from '@nakamura196/iiif-viewer/core';
-import '@nakamura196/iiif-viewer/style.css';
+} from 'iiif-kasane';
+import { labelIn } from 'iiif-kasane/core';
+import 'iiif-kasane/style.css';
 import { useState } from 'react';
 
 // A part of your own: reads the provider's state with useViewer(). IIIF labels are language maps

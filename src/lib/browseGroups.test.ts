@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { manifestFromParams } from '@nakamura196/iiif-viewer/core';
+import { manifestFromParams } from 'iiif-kasane/core';
 import {
   BY_SOURCE,
   NONE_KEY,

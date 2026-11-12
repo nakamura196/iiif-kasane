@@ -2,7 +2,7 @@
 // IIIF の Collection / Manifest / Curation を、ページが並べる「カード」の配列にする。
 // 元は nakamura196/iiif-3d-gallery の src/lib/data.ts（Presentation 2 の変換は Kasane のものを使う）。
 
-import { upgradeToV3, labelIn, contentParam, metadataRecordOf } from '@nakamura196/iiif-viewer/core';
+import { upgradeToV3, labelIn, contentParam, metadataRecordOf } from 'iiif-kasane/core';
 
 type Json = Record<string, unknown>;
 

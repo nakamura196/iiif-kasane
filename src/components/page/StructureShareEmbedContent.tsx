@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Link } from '@/i18n/routing';
-import { contentParam } from '@nakamura196/iiif-viewer/core';
+import { contentParam } from 'iiif-kasane/core';
 import CommonLayout from '@/components/layout/Common';
 import PageContainer from '@/components/layout/PageContainer';
 import { SITE_URL } from '@/lib/site';

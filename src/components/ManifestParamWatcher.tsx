@@ -5,7 +5,7 @@
 // useSearchParams を使うと静的書き出しでその部分が描かれなくなるので、ページ全体ではなく、何も描かないこの部品だけを Suspense で包んで使う
 import { useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { manifestFromParams } from '@nakamura196/iiif-viewer/core';
+import { manifestFromParams } from 'iiif-kasane/core';
 
 export default function ManifestParamWatcher({ onChange }: { onChange: (manifest: string | null) => void }) {
   const searchParams = useSearchParams();

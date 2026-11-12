@@ -1,4 +1,4 @@
-import { PANEL_IDS } from '@nakamura196/iiif-viewer';
+import { PANEL_IDS } from 'iiif-kasane';
 
 // /viewer の ?tab= に指定できるタブ。ViewerContent が URL を読むときと、
 // ユースケース・サンプルが「開いたあとに選ぶタブ」を書くときの両方で使う。

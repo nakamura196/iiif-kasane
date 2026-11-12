@@ -13,7 +13,7 @@
     "pretest": "node scripts/build-news.mjs",
     "prelint": "node scripts/build-news.mjs",
     "dev": "node scripts/copy-maplibre-worker.mjs && next dev -p 3838",
-    "build:element": "npm run build:element -w @nakamura196/iiif-viewer",
+    "build:element": "npm run build:element -w iiif-kasane",
     "build": "node scripts/copy-maplibre-worker.mjs && npm run build:element && next build && node scripts/copy-element.mjs",
     "start": "next start -p 3838",
     "lint": "eslint .",
@@ -26,7 +26,7 @@
   },
   "dependencies": {
     "@iiif/presentation-3": "^2.2.4",
-    "@nakamura196/iiif-viewer": "*",
+    "iiif-kasane": "*",
     "@nakamura196/react-ui": "github:nakamura196/react-ui#v0.5.0",
     "@next/third-parties": "^16.4.2",
     "@react-three/drei": "^10.7.9",

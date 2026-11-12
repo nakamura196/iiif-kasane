@@ -15,7 +15,7 @@ import {
   type GeoFeature,
   type GeorefMapView,
   type LngLat,
-} from '@nakamura196/iiif-viewer/core';
+} from 'iiif-kasane/core';
 import { BASEMAPS, basemapOf, type BasemapId } from './basemaps';
 import { searchPlaces, type PlaceResult } from './placeSearch';
 

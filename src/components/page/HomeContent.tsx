@@ -8,7 +8,7 @@ import Footer from '@/components/Footer';
 import ManifestInput from '@/components/Input';
 import PageContainer from '@/components/layout/PageContainer';
 import { SectionHeading, News, VideoEmbed } from '@nakamura196/react-ui';
-import { contentParam } from '@nakamura196/iiif-viewer/core';
+import { contentParam } from 'iiif-kasane/core';
 import { NEWS, NEWS_ON_HOME } from '@/lib/news';
 
 export default function HomeContent() {

@@ -2,9 +2,9 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Puzzle, canPlayPuzzle, type Panel, type PanelContext } from '@nakamura196/iiif-viewer';
+import { Puzzle, canPlayPuzzle, type Panel, type PanelContext } from 'iiif-kasane';
 import { Link } from '@/i18n/routing';
-import { contentParam } from '@nakamura196/iiif-viewer/core';
+import { contentParam } from 'iiif-kasane/core';
 import { OTHER_VIEWS_TAB } from '@/lib/viewerTabs';
 import {
   GALLERY_LIMITS,
