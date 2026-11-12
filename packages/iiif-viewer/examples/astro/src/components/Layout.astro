@@ -1,0 +1,29 @@
+---
+interface Props {
+  title: string;
+}
+const { title } = Astro.props;
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <style is:global>
+      body { margin: 0; padding: 1rem; font-family: system-ui, sans-serif; line-height: 1.5; }
+      nav { display: flex; gap: 1rem; margin-bottom: 1rem; }
+      main { max-width: 72rem; margin: 0 auto; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <nav>
+        <a href="/">Examples</a>
+        <a href="/tag">The tag</a>
+        <a href="/parts">React parts</a>
+      </nav>
+      <slot />
+    </main>
+  </body>
+</html>

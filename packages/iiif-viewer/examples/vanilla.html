@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>iiif-viewer with plain JavaScript</title>
+    <style>
+      body { margin: 0; padding: 1rem; font-family: system-ui, sans-serif; line-height: 1.5; }
+      main { max-width: 72rem; margin: 0 auto; }
+      .layout { display: grid; grid-template-columns: 14rem 1fr; gap: 1rem; }
+      .items { list-style: none; margin: 0; padding: 0; }
+      .items button { width: 100%; text-align: left; padding: 0.5rem; margin-bottom: 0.25rem; cursor: pointer; }
+      .items button[aria-current='true'] { font-weight: bold; }
+      /* The tag fills the height you give it (36rem by default). */
+      iiif-viewer { height: 30rem; border: 1px solid #ccc; }
+      /* Colors can be changed from outside with the --iiif-viewer-* variables
+         (--iiif-viewer-dark-* for the dark theme). */
+      iiif-viewer.accent { --iiif-viewer-primary: #b00020; --iiif-viewer-dark-primary: #ff6b81; }
+      #more iiif-viewer { height: 22rem; margin-top: 1rem; }
+      @media (max-width: 48rem) { .layout { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>&lt;iiif-viewer&gt; with plain JavaScript</h1>
+      <p>
+        No framework and no build step: one script tag, then the viewer is an HTML element.
+        Change its attributes from JavaScript to change what it shows. Serve the package folder
+        (so that <code>../dist/iiif-viewer.js</code> exists after <code>npm run build</code>) and open this file.
+      </p>
+
+      <div class="layout">
+        <div>
+          <ul class="items" id="items"></ul>
+          <label><input type="checkbox" id="dark" /> Dark theme</label><br />
+          <label><input type="checkbox" id="accent" /> Red accent color</label><br />
+          <button type="button" id="add">Add another viewer</button>
+        </div>
+        <iiif-viewer id="viewer" locale="en" theme="light" options='{"panelOpen":true}'></iiif-viewer>
+      </div>
+      <div id="more"></div>
+    </main>
+
+    <!-- On a real site: src="https://kasane.ldas.jp/element/v<version>/iiif-viewer.js".
+         The script registers the tag and loads style.css from its own directory. -->
+    <script type="module" src="../dist/iiif-viewer.js"></script>
+    <script type="module">
+      const items = [
+        { label: 'Globe (3D, with annotations)', url: 'https://kasane.ldas.jp/manifests/sample-manifest-with-annotations.json' },
+        { label: 'Image (Cookbook 0001)', url: 'https://iiif.io/api/cookbook/recipe/0001-mvm-image/v4/manifest.json' },
+        { label: 'Book, several pages (Cookbook 0009)', url: 'https://iiif.io/api/cookbook/recipe/0009-book-1/manifest.json' },
+      ];
+      const viewer = document.getElementById('viewer');
+      const list = document.getElementById('items');
+
+      const show = (url) => {
+        // Setting the attribute is all it takes; the viewer reads the new manifest.
+        viewer.setAttribute('iiif-content', url);
+        for (const b of list.querySelectorAll('button')) b.setAttribute('aria-current', String(b.dataset.url === url));
+      };
+      for (const item of items) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = item.label;
+        button.dataset.url = item.url;
+        button.addEventListener('click', () => show(item.url));
+        const li = document.createElement('li');
+        li.append(button);
+        list.append(li);
+      }
+      show(items[0].url);
+
+      document.getElementById('dark').addEventListener('change', (e) => {
+        viewer.setAttribute('theme', e.target.checked ? 'dark' : 'light');
+      });
+      document.getElementById('accent').addEventListener('change', (e) => {
+        viewer.classList.toggle('accent', e.target.checked);
+      });
+      // A viewer made from JavaScript. Each tag keeps its own state.
+      document.getElementById('add').addEventListener('click', () => {
+        const another = document.createElement('iiif-viewer');
+        another.setAttribute('iiif-content', items[1].url);
+        another.setAttribute('locale', 'en');
+        another.setAttribute('options', JSON.stringify({ panelOpen: false }));
+        document.getElementById('more').append(another);
+      });
+    </script>
+  </body>
+</html>

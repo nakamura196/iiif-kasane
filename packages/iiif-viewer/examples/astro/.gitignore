@@ -1,0 +1,5 @@
+node_modules/
+dist/
+.astro/
+# copied from ../../dist by scripts/copy-element.mjs
+public/iiif-viewer/

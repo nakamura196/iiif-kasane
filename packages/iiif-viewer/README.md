@@ -108,6 +108,39 @@ Pass `hidePanels` with tab ids (e.g. `hidePanels={['puzzle']}`) to leave out som
 own tabs. A host page can then put the same controls in a tab of its own: `Puzzle` is the puzzle's
 start controls, and `canPlayPuzzle` says whether the shown Canvas has an image for it.
 
+### Your own layout: `ViewerProvider` and the parts
+
+`Viewer` is `ViewerProvider` with a default layout. To lay the parts out yourself, use the provider
+and put the parts inside it. They share one state: the loaded manifest, the shown Canvas, the
+selected annotation.
+
+```tsx
+import { ViewerProvider, CanvasView, AnnotationList, Metadata, useViewer } from '@nakamura196/iiif-viewer';
+import '@nakamura196/iiif-viewer/style.css';
+
+<ViewerProvider iiifContent={manifestUrl} locale="en" className="my-layout" onSelect={(s) => console.log(s)}>
+  <CanvasView className="my-view" />   {/* the page buttons and the image / 3D / A/V display */}
+  <AnnotationList />
+  <Metadata />                          {/* follows the shown Canvas */}
+</ViewerProvider>
+```
+
+- The provider draws one `<div class="iiif-viewer">` around its children; `className` makes it the
+  container of your layout. Write the layout with your own CSS: `style.css` holds only the classes
+  the viewer's parts use.
+- It takes the same `iiifContent`, `locale`, `theme`, `target`, `onSelect` and `environment` as `Viewer`.
+- `useViewer()` gives your own components the state (`manifest`, `containers`, `container`,
+  `selectedIndex`, `select(index)`). It throws outside a provider; `useOptionalViewer()` returns null there.
+- Each provider has its own state, so several on one page do not interfere.
+
+### Examples
+
+- [`examples/astro/`](./examples/astro/): an Astro site with the tag, and with the React parts in a
+  layout of its own (a React island).
+- [`examples/vanilla.html`](./examples/vanilla.html): the tag with plain JavaScript (switching
+  manifests, theme and colors, adding viewers).
+- [`examples/element.html`](./examples/element.html): two tags on a plain page.
+
 ## The `<iiif-viewer>` tag
 
 ```html

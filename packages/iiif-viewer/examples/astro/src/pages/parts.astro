@@ -1,0 +1,42 @@
+---
+import Layout from '../components/Layout.astro';
+import FreeLayout from '../components/FreeLayout';
+---
+<Layout title="React parts in your own layout">
+  <h1>React parts in your own layout</h1>
+  <p>
+    <code>ViewerProvider</code> with <code>CanvasView</code>, <code>AnnotationList</code> and
+    <code>Metadata</code> in a grid of this page. The viewer reads the browser (WebGL, the window
+    size), so the island is rendered on the client only.
+  </p>
+
+  <FreeLayout client:only="react" manifest="https://kasane.ldas.jp/manifests/sample-manifest-with-annotations.json" />
+
+  <style is:global>
+    /*
+     * The layout is this page's own CSS. The package's style.css has only the classes its own parts
+     * use, and they apply only inside the provider, so write your layout with your own classes.
+     */
+    .free-layout {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      grid-template-rows: 22rem 14rem;
+      grid-template-areas: 'view annotations' 'view metadata';
+      gap: 0.75rem;
+    }
+    .free-layout section { display: flex; flex-direction: column; min-height: 0; border: 1px solid #ccc; }
+    .free-layout h2 { margin: 0; padding: 0.25rem 0.75rem; font-size: 1rem; background: #f3f4f6; }
+    .area-view { grid-area: view; }
+    .area-view .view { flex: 1; }
+    .area-annotations { grid-area: annotations; overflow-y: auto; }
+    .area-metadata { grid-area: metadata; overflow-y: auto; }
+    .page-label { margin: 0; padding: 0.25rem 0.75rem; font-size: 0.875rem; }
+    @media (max-width: 48rem) {
+      .free-layout {
+        grid-template-columns: 1fr;
+        grid-template-rows: 24rem auto auto;
+        grid-template-areas: 'view' 'annotations' 'metadata';
+      }
+    }
+  </style>
+</Layout>
