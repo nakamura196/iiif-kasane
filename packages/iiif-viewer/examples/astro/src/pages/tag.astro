@@ -1,0 +1,51 @@
+---
+import Layout from '../components/Layout.astro';
+
+const manifests = [
+  { label: 'Globe (3D, with annotations)', url: 'https://kasane.ldas.jp/manifests/sample-manifest-with-annotations.json' },
+  { label: 'Image (IIIF Cookbook 0001)', url: 'https://iiif.io/api/cookbook/recipe/0001-mvm-image/v4/manifest.json' },
+];
+---
+<Layout title="The <iiif-viewer> tag">
+  <h1>The &lt;iiif-viewer&gt; tag</h1>
+  <p>
+    The tag needs no framework: Astro sends it as plain HTML, and the script below turns it into a
+    viewer in the browser. The controls change its attributes.
+  </p>
+
+  <form class="controls">
+    <label>Manifest
+      <select id="manifest">
+        {manifests.map((m) => <option value={m.url}>{m.label}</option>)}
+      </select>
+    </label>
+    <label>Theme
+      <select id="theme">
+        <option>auto</option>
+        <option>light</option>
+        <option>dark</option>
+      </select>
+    </label>
+  </form>
+
+  <iiif-viewer id="viewer" iiif-content={manifests[0].url} locale="en" theme="auto"></iiif-viewer>
+
+  <!-- On a real site: src="https://kasane.ldas.jp/element/v<version>/iiif-viewer.js".
+       The script loads style.css from its own directory. -->
+  <script is:inline type="module" src="/iiif-viewer/iiif-viewer.js"></script>
+  <script>
+    const viewer = document.getElementById('viewer')!;
+    const bind = (id: string, attribute: string) =>
+      document.getElementById(id)!.addEventListener('change', (e) =>
+        viewer.setAttribute(attribute, (e.target as HTMLSelectElement).value),
+      );
+    bind('manifest', 'iiif-content');
+    bind('theme', 'theme');
+  </script>
+
+  <style>
+    .controls { display: flex; gap: 1rem; margin-bottom: 0.75rem; }
+    /* The tag fills the height you give it (36rem by default). */
+    iiif-viewer { height: 32rem; border: 1px solid #ccc; }
+  </style>
+</Layout>

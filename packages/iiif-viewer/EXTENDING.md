@@ -32,7 +32,9 @@
 
 ## 守ること
 
-- `core/containers.ts`・`Viewer.tsx`・`Info.tsx`・`messages/ja.json`・`messages/en.json` は書き換えない。足りないときは、担当に頼む（または別 PR で先に直す）
+- `core/containers.ts`・`Viewer.tsx`・`ViewerProvider.tsx`・`CanvasView.tsx`・`Info.tsx`・`messages/ja.json`・`messages/en.json` は書き換えない。足りないときは、担当に頼む（または別 PR で先に直す）
 - `core` は React・Next.js・DOM に依存しない。テストを同じ場所に置く
 - 再生位置は `usePlayback()`、画面の状態は Viewer ごとの jotai store（`atoms.ts`）。グローバルな変数を作らない
+- 資料の読み込み・表示中の Canvas・store は `ViewerProvider` が持つ。`Viewer` は「`ViewerProvider`＋既定のレイアウト」。
+  部品から表示中の Canvas を読むときは `useViewer()`（Provider の外でも動かしたい部品は `useOptionalViewer()`）
 - 表示とパネルは、`ContainerInfo`（`core/services/containers.ts`）を入力にする
