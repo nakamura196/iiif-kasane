@@ -29,7 +29,8 @@
     "useCasesAll": "ユースケース",
     "gallery": "IIIF バーチャル美術館",
     "browse": "3D で一覧する",
-    "manifestEditor": "マニフェストを作る"
+    "manifestEditor": "マニフェストを作る",
+    "forDevelopers": "開発者向け"
   },
   "News": {
     "heading": "お知らせ",
