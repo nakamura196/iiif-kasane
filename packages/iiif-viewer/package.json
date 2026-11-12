@@ -1,6 +1,6 @@
 {
   "name": "iiif-kasane",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "IIIF viewer building blocks: React components, framework-free core, and the <iiif-kasane> tag.",
   "license": "MIT",
   "author": "Satoru Nakamura",
@@ -35,6 +35,10 @@
       "types": "./dist/types/core/index.d.ts",
       "default": "./dist/lib/core.js"
     },
+    "./scene": {
+      "types": "./dist/types/react/scene.d.ts",
+      "default": "./dist/lib/scene.js"
+    },
     "./element": "./dist/iiif-kasane.js",
     "./style.css": "./dist/style.css",
     "./package.json": "./package.json"
@@ -42,6 +46,8 @@
   "sideEffects": [
     "./dist/iiif-kasane.js",
     "./dist/iiif-viewer.js",
+    "./dist/lib/scene.js",
+    "./src/react/scene.ts",
     "*.css"
   ],
   "peerDependencies": {
@@ -53,6 +59,23 @@
     "react-dom": "^19",
     "three": "^0.178.0 || ^0.186.0",
     "three-stdlib": "^2.36.0"
+  },
+  "peerDependenciesMeta": {
+    "@react-three/drei": {
+      "optional": true
+    },
+    "@react-three/fiber": {
+      "optional": true
+    },
+    "gsap": {
+      "optional": true
+    },
+    "three": {
+      "optional": true
+    },
+    "three-stdlib": {
+      "optional": true
+    }
   },
   "dependencies": {
     "@iiif/parser": "4.0.3"

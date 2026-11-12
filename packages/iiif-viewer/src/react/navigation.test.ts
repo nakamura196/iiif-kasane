@@ -26,6 +26,13 @@ describe('targetKey', () => {
     expect(targetKey({ canvasId: 'https://e/c1', xywh: [1, 2, 3, 4] })).not.toBe(base);
     expect(targetKey({ canvasId: 'https://e/c1', highlight: false })).not.toBe(base);
   });
+  it('changes with the time and the play flag, and works without a Canvas', () => {
+    const base = targetKey({ canvasId: 'https://e/c1' });
+    expect(targetKey({ canvasId: 'https://e/c1', t: 30 })).not.toBe(base);
+    expect(targetKey({ canvasId: 'https://e/c1', t: 30, play: true })).not.toBe(targetKey({ canvasId: 'https://e/c1', t: 30 }));
+    expect(targetKey({ t: 30 })).toBe(targetKey({ t: 30 }));
+    expect(targetKey({ t: 30 })).not.toBe(targetKey({ t: 31 }));
+  });
 });
 
 describe('annotation link body', () => {

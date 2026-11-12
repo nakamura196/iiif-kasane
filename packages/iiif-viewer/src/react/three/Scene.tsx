@@ -3,14 +3,14 @@
 import { startTransition, Suspense, useEffect, useImperativeHandle, useMemo, useRef, type Ref } from 'react';
 import { Clone, useAnimations, useGLTF, Bounds } from '@react-three/drei';
 import { useThree, type ThreeEvent } from '@react-three/fiber';
-import { Box3, Group, PerspectiveCamera, Points, PointsMaterial, Sphere, Vector3, type Object3D } from 'three';
+import { Box3, Group, Matrix4, PerspectiveCamera, Points, PointsMaterial, Sphere, Vector3, type Object3D } from 'three';
 import gsap from 'gsap';
 import Annotations from '../three/Annotations';
 import ModelErrorBoundary from './ModelErrorBoundary';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { manifestAtom, measuringAtom, modelAnimationAtom, modelChoicesAtom, modelRadiusAtom, paintedModelsAtom, sceneIdAtom, showAnnotationsAtom } from '../atoms';
 import MeasureMarks, { useMeasure } from './MeasureTool';
-import { sceneSpatialScaleOf, upgradeUrl } from '../../core';
+import { chosenOption, sceneSpatialScaleOf, upgradeUrl } from '../../core';
 import { defaultCameraOf, type DefaultCamera } from '../../core';
 import { runFocusFlight, type Vec3 } from '../../core';
 import { fitView, topView } from '../../core';
@@ -121,16 +121,29 @@ function Upgrade({ url, onReady }: { url: string; onReady: () => void }) {
 export interface PlacedModel {
   url: string;
   position: [number, number, number];
+  // the painting body's transform (column-major 4x4), applied before the position
+  matrix?: number[];
 }
+
+// A matrix from the manifest as a three.js Matrix4 (null when the model is painted as it is).
+const useMatrix4 = (elements: number[] | undefined): Matrix4 | null =>
+  useMemo(() => (elements ? new Matrix4().fromArray(elements) : null), [elements]);
 
 // A model painted into the Scene besides the main one (e.g. the ground). Each loads
 // in its own Suspense so that switching it does not hide the rest of the scene.
-function PlacedGLTF({ url, position, onClick }: PlacedModel & { onClick?: (e: ThreeEvent<MouseEvent>) => void }) {
+function PlacedGLTF({ url, position, matrix, onClick }: PlacedModel & { onClick?: (e: ThreeEvent<MouseEvent>) => void }) {
   const model = useGLTF(url);
   useSizedPoints(model.scene);
+  const m = useMatrix4(matrix);
   return (
     <group position={position} onClick={onClick}>
-      <Clone object={model.scene} />
+      {m ? (
+        <group matrix={m} matrixAutoUpdate={false}>
+          <Clone object={model.scene} />
+        </group>
+      ) : (
+        <Clone object={model.scene} />
+      )}
     </group>
   );
 }
@@ -188,7 +201,12 @@ export default function Scene({
     [paintedModels, choices],
   );
   const cam = useMemo(() => defaultCameraOf(manifest, sceneId), [manifest, sceneId]);
-  const sphere = useMemo(() => new Box3().setFromObject(model.scene).getBoundingSphere(new Sphere()), [model]);
+  // The main model's transform (e.g. a RotateTransform that stands a scan upright).
+  const mainMatrix = useMatrix4(paintedModels[0] ? chosenOption(paintedModels[0], choices).matrix : undefined);
+  const sphere = useMemo(() => {
+    const s = new Box3().setFromObject(model.scene).getBoundingSphere(new Sphere());
+    return mainMatrix ? s.applyMatrix4(mainMatrix) : s;
+  }, [model, mainMatrix]);
   const setModelRadius = useSetAtom(modelRadiusAtom);
   useEffect(() => {
     setModelRadius(sphere.radius);
@@ -201,9 +219,16 @@ export default function Scene({
   const measure = useMeasure(measuring);
   // A model with animations is drawn as it is loaded, not as a copy: the copy rebuilds each light
   // with a new target, so a spot light that the animation moves would keep pointing at the origin.
+  const drawn = model.animations.length > 0 ? <primitive object={model.scene} /> : <Clone object={model.scene} />;
   const body = (
     <group ref={animationRoot} onClick={measure.onClick}>
-      {model.animations.length > 0 ? <primitive object={model.scene} /> : <Clone object={model.scene} />}
+      {mainMatrix ? (
+        <group matrix={mainMatrix} matrixAutoUpdate={false}>
+          {drawn}
+        </group>
+      ) : (
+        drawn
+      )}
     </group>
   );
 
@@ -229,7 +254,7 @@ export default function Scene({
         // a model beside the main one that fails to load is left out; the rest stays
         <ModelErrorBoundary key={`${i}:${m.url}`}>
           <Suspense fallback={null}>
-            <PlacedGLTF url={m.url} position={m.position} onClick={measure.onClick} />
+            <PlacedGLTF url={m.url} position={m.position} matrix={m.matrix} onClick={measure.onClick} />
           </Suspense>
         </ModelErrorBoundary>
       ))}

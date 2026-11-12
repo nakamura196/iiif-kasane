@@ -21,12 +21,16 @@ export const indexOfCanvas = (containers: ReadonlyArray<{ id: string }>, canvasI
 
 /** The Canvas (and region) that the host page asks the viewer to show. */
 export interface ViewerTarget {
-  /** Canvas id, without a fragment. */
-  canvasId: string;
+  /** Canvas id, without a fragment. Without it: the Canvas being shown (useful with `t` alone). */
+  canvasId?: string;
   /** Region in Canvas pixels: x, y, width, height. */
   xywh?: Xywh;
   /** false: zoom to the region without drawing a box around it. */
   highlight?: boolean;
+  /** Time in seconds on an audio / video Canvas: the player moves there once it is ready. */
+  t?: number;
+  /** With `t`: start playing from there. The browser may refuse until the reader has used the page. */
+  play?: boolean;
 }
 
 /** The shown Canvas, as reported to the host page. */
@@ -38,4 +42,6 @@ export interface ViewerSelection {
 
 /** A key that changes only when the target points somewhere else. */
 export const targetKey = (target: ViewerTarget | undefined): string =>
-  target ? `${target.canvasId}#${target.xywh?.join(',') ?? ''}#${target.highlight === false ? 0 : 1}` : '';
+  target
+    ? `${target.canvasId ?? ''}#${target.xywh?.join(',') ?? ''}#${target.highlight === false ? 0 : 1}#${target.t ?? ''}#${target.play ? 1 : 0}`
+    : '';

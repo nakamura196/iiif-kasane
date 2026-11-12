@@ -4,6 +4,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -140,8 +141,47 @@ function ViewerStateRoot({
   const container: ContainerInfo | undefined = containers[selected];
 
   // 動画・音声の再生位置。文字起こし（右パネル）と動画・音声の表示がこれで連動する。
-  const mediaRef = useRef<HTMLMediaElement | null>(null);
+  // 外から指定された時刻（target.t）。その Canvas の再生の部品が付いたときに、そこへ動かす。
+  const pendingSeek = useRef<{ canvasId: string; t: number; play: boolean } | null>(null);
+  const shownCanvas = useRef<string | undefined>(undefined);
   const [currentTime, setCurrentTime] = useState(0);
+  const applySeek = (el: HTMLMediaElement | null) => {
+    const p = pendingSeek.current;
+    if (!el || !p || shownCanvas.current !== p.canvasId) return;
+    pendingSeek.current = null;
+    const go = () => {
+      try {
+        el.currentTime = p.t;
+        setCurrentTime(p.t);
+        if (p.play) void el.play()?.catch(() => {});
+      } catch {
+        /* the reader can still move the position by hand */
+      }
+    };
+    // <video> / <audio> は長さが分かるまで動かせない。YouTube や合成の舞台の受け口は readyState を持たないので、すぐ動かす
+    if (typeof el.readyState === 'number' && el.readyState < 1 && typeof el.addEventListener === 'function') {
+      el.addEventListener('loadedmetadata', go, { once: true });
+    } else go();
+  };
+  const applySeekRef = useRef(applySeek);
+  useLayoutEffect(() => {
+    shownCanvas.current = container?.id;
+    applySeekRef.current = applySeek;
+  });
+  // 再生の部品（MediaView・YouTubeView・合成の舞台）は mediaRef.current に自分を入れる。入った時点で、待っている時刻へ動かす
+  const mediaRef = useMemo(() => {
+    let el: HTMLMediaElement | null = null;
+    return {
+      get current() {
+        return el;
+      },
+      set current(v: HTMLMediaElement | null) {
+        el = v;
+        // 新しい Canvas の部品は、この部品の useLayoutEffect（shownCanvas の更新）より先に入るので、描画が終わってから見る
+        if (v) queueMicrotask(() => applySeekRef.current(v));
+      },
+    };
+  }, []);
   const playback = useMemo<Playback>(
     () => ({
       mediaRef,
@@ -152,7 +192,7 @@ function ViewerStateRoot({
         setCurrentTime(seconds);
       },
     }),
-    [currentTime],
+    [currentTime, mediaRef],
   );
 
   const select = (index: number) => {
@@ -199,17 +239,28 @@ function ViewerStateRoot({
     const applied = `${manifest.id}|${key}`;
     if (appliedTarget.current === applied) return;
     appliedTarget.current = applied;
-    if (indexOfCanvas(containers, next.canvasId) < 0) {
+    const canvasId = next.canvasId ?? shownId.current ?? containers[0].id;
+    if (indexOfCanvas(containers, canvasId) < 0) {
       waitingFor.current = null;
       return;
     }
-    waitingFor.current = shownId.current === next.canvasId ? null : next.canvasId;
+    if (next.t != null && Number.isFinite(next.t) && next.t >= 0) {
+      pendingSeek.current = { canvasId, t: next.t, play: !!next.play };
+    }
+    if (next.canvasId == null && !next.xywh) {
+      // 時刻だけの指定: 頁は動かさない。再生の部品がもう付いていれば、ここで動かす
+      waitingFor.current = null;
+      applySeekRef.current(mediaRef.current);
+      return;
+    }
+    waitingFor.current = shownId.current === canvasId ? null : canvasId;
     setNavRequest({
       seq: nextSeq(),
-      target: { canvasId: next.canvasId, ...(next.xywh ? { xywh: next.xywh } : {}) },
+      target: { canvasId, ...(next.xywh ? { xywh: next.xywh } : {}) },
       highlight: next.highlight,
     });
-  }, [key, manifest, containers, setNavRequest]);
+    if (shownId.current === canvasId) applySeekRef.current(mediaRef.current);
+  }, [key, manifest, containers, setNavRequest, mediaRef]);
 
   const reported = useRef<string | null>(null);
   useEffect(() => {

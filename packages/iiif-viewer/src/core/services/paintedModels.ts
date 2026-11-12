@@ -9,12 +9,16 @@
 // the behavior just shows the first, light one.
 
 import type { SceneV4 } from '../types/iiif';
+import { transformMatrixOf } from './modelTransform';
 
 export interface ModelOption {
   url: string;
   label: unknown; // IIIF language map or string, as in the manifest
   // the Model resource as written in the manifest (its services, e.g. an AuthProbeService2)
   body: unknown;
+  // the body's `transform` list (a SpecificResource around the Model) as one 4x4 matrix,
+  // column-major (three.js Matrix4.elements order); absent when the Model is painted as it is
+  matrix?: number[];
 }
 
 export interface PaintedModel {
@@ -36,8 +40,16 @@ const asList = (v: unknown): unknown[] => (Array.isArray(v) ? v : v == null ? []
 
 const isPainting = (anno: Json) => asList(anno.motivation).includes('painting');
 
+// A Model, or a SpecificResource whose source is a Model and whose `transform` list
+// scales, rotates or moves it before it is placed (Presentation 4.0).
 const modelOption = (body: unknown): ModelOption | null => {
   const b = body as Json | undefined;
+  if (b?.type === 'SpecificResource') {
+    const inner = modelOption(asList(b.source)[0]);
+    if (!inner) return null;
+    const matrix = transformMatrixOf(b.transform);
+    return { ...inner, label: b.label ?? inner.label, ...(matrix ? { matrix } : {}) };
+  }
   if (b?.type !== 'Model' || typeof b.id !== 'string') return null;
   return { url: b.id, label: b.label, body };
 };

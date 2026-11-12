@@ -16,5 +16,5 @@
     "rootDir": "src",
     "outDir": "dist/types"
   },
-  "files": ["src/react/index.ts", "src/core/index.ts"]
+  "files": ["src/react/index.ts", "src/react/scene.ts", "src/core/index.ts"]
 }

@@ -5,6 +5,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import '../style.css';
 import { decodeContentState } from '../core';
 import { Viewer, type ViewerProps } from '../react/Viewer';
+// The tag shows every kind of item, 3D Scenes included.
+import '../react/scene';
 import type { InfoTab } from '../react/layout/panels/Info';
 
 const TABS: readonly InfoTab[] = ['metadata', 'annotations'];
