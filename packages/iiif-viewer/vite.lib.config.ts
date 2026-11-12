@@ -32,6 +32,8 @@ export default defineConfig({
       entry: {
         index: src('react/index.ts'),
         core: src('core/index.ts'),
+        // the 3D display: three.js and the other 3D packages are needed only by this entry
+        scene: src('react/scene.ts'),
       },
       formats: ['es'],
     },

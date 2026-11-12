@@ -9,21 +9,38 @@ paging and tables of contents, audio/video with time ranges, annotations, IIIF A
 
 ```sh
 npm install iiif-kasane
-npm install react react-dom jotai three three-stdlib @react-three/fiber @react-three/drei gsap
+npm install react react-dom jotai
+# only for 3D Scenes (see below)
+npm install three three-stdlib @react-three/fiber @react-three/drei gsap
 ```
 
 Versions up to 0.1.6 were named `@nakamura196/iiif-viewer` and were attached to GitHub Releases
 (tags `iiif-viewer-v<version>`) instead of the npm registry. From 0.2.0 the package is `iiif-kasane` on npm;
 change your imports from `@nakamura196/iiif-viewer` to `iiif-kasane`. Nothing else changed.
 
-three.js and react-three-fiber are for 3D Scenes. They have to be installed even if you only show images,
-because your bundler resolves them, but the browser fetches them only when a Scene is shown.
+### 3D Scenes
+
+The 3D display is a separate entry, so that a site that shows only images or audio/video does not
+install three.js and the other 3D packages. To show IIIF Scenes, install them and add one line:
+
+```tsx
+import 'iiif-kasane/scene';
+```
+
+The import registers the 3D display for `Viewer` and `CanvasView`. The browser still fetches
+three.js only when a Scene is shown. Without the import, a Scene shows a short notice instead.
+The `<iiif-kasane>` tag includes the 3D display.
+
+Up to 0.3.0, the main entry needed the 3D packages, and `CanvasComponent`, `Scene` and
+`SceneEnvironment` were exported from `iiif-kasane`. From 0.4.0 they are exported from
+`iiif-kasane/scene`.
 
 ## Entries
 
 | Import | What it is |
 | --- | --- |
-| `iiif-kasane` | React components (`Viewer`, `ImageCompareView`, `GeoImageView`, the 3D `Scene`, …) and their state (jotai atoms) |
+| `iiif-kasane` | React components (`Viewer`, `ImageCompareView`, `GeoImageView`, …) and their state (jotai atoms) |
+| `iiif-kasane/scene` | The 3D display (`Scene`, `CanvasComponent`, `SceneEnvironment`). Importing it lets `Viewer` show 3D Scenes. Needs three.js and the other 3D packages |
 | `iiif-kasane/core` | Manifest reading without React or the DOM (`fetchManifest`, `containersOf`, Content State, …). Works on the server |
 | `iiif-kasane/style.css` | Styles of the components (Tailwind utilities, without a global reset) |
 | `iiif-kasane/element` | The `<iiif-kasane>` tag, with React inside |
@@ -73,6 +90,14 @@ The viewer moves to `target` when the manifest is loaded and whenever `target` p
 `onSelect` is called for the first Canvas, for each page turn, and after moving to `target`;
 while the viewer is on its way to `target`, the Canvas it opens first is not reported.
 An unknown `canvasId` is ignored.
+
+For audio and video, `t` (seconds) moves the player to that time, and `play: true` starts it.
+Without `canvasId`, the time applies to the Canvas that is shown, without turning the page:
+
+```tsx
+// e.g. a search hit that links to a time in the recording
+<Viewer iiifContent={manifestUrl} target={{ t: 60, play: true }} className="h-full" />
+```
 
 ### Starting with the side panel closed
 

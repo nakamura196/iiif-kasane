@@ -7,6 +7,8 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useTheme } from 'next-themes';
 import { Viewer, manifestUrlAtom, type InfoTab } from 'iiif-kasane';
+// 3D の Scene も表示する（three.js などは 3D を開いたときだけ読み込まれる）
+import 'iiif-kasane/scene';
 import ManifestInput from '@/components/Input';
 import ManifestParamWatcher from '@/components/ManifestParamWatcher';
 import Header from '@/components/Header';

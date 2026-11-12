@@ -29,6 +29,9 @@
       "iiif-kasane": [
         "./packages/iiif-viewer/src/react/index.ts"
       ],
+      "iiif-kasane/scene": [
+        "./packages/iiif-viewer/src/react/scene.ts"
+      ],
       "iiif-kasane/core": [
         "./packages/iiif-viewer/src/core/index.ts"
       ]

@@ -15,3 +15,25 @@ describe('表示の振り分け', () => {
     expect(displayAfter('collection', emptyScene)?.id).toBe('image-canvas');
   });
 });
+
+// 3D の表示は既定では案内だけ。iiif-kasane/scene の registerDisplay で同じ id の本物に差し替わる。
+describe('表示の登録', () => {
+  it('同じ id の表示は、元の位置で差し替わる', async () => {
+    const { registerDisplay } = await import('./registry');
+    const before = DISPLAYS.map((d) => d.id);
+    const real = { id: 'scene', match: (c: ContainerInfo) => c.kind === 'Scene', Component: () => null };
+    const placeholder = DISPLAYS.find((d) => d.id === 'scene');
+    registerDisplay(real);
+    expect(DISPLAYS.map((d) => d.id)).toEqual(before);
+    expect(DISPLAYS.find((d) => d.id === 'scene')).toBe(real);
+    if (placeholder) registerDisplay(placeholder);
+  });
+
+  it('新しい id の表示は、最後の受け皿（flat）の前に入る', async () => {
+    const { registerDisplay } = await import('./registry');
+    registerDisplay({ id: 'extra', match: () => false, Component: () => null });
+    const ids = DISPLAYS.map((d) => d.id);
+    expect(ids.indexOf('extra')).toBe(ids.length - 2);
+    DISPLAYS.splice(ids.indexOf('extra'), 1);
+  });
+});

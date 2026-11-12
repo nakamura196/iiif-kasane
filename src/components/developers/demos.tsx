@@ -10,6 +10,8 @@ import {
   useViewer,
   type ViewerSelection,
 } from 'iiif-kasane';
+// 3D の Scene も表示する（three.js などは 3D を開いたときだけ読み込まれる）
+import 'iiif-kasane/scene';
 import { labelIn } from 'iiif-kasane/core';
 
 // /developers のプレビュー。見せるコードと同じ形で書く。

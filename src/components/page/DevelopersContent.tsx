@@ -39,8 +39,8 @@ const T = {
   copied: { ja: 'コピーしました', en: 'Copied' },
   installHeading: { ja: 'インストール', en: 'Install' },
   installBody: {
-    ja: 'npm で iiif-kasane として公開しています。3D 用の three.js などは、画像だけを見せる場合も入れてください（ブラウザが読むのは 3D を表示したときだけです）。タグだけを使う場合は、インストールは要りません。',
-    en: 'The package is published on npm as iiif-kasane. Install three.js and the other 3D packages even if you show only images: your bundler resolves them, but the browser fetches them only when a 3D Scene is shown. The tag needs no install.',
+    ja: 'npm で iiif-kasane として公開しています。3D の資料も見せる場合は、three.js などの 3D 用の部品を入れ、import \'iiif-kasane/scene\' を 1 行足してください（ブラウザが読むのは 3D を表示したときだけです）。画像や音声・動画だけなら、3D 用の部品は要りません。タグだけを使う場合は、インストールは要りません。',
+    en: 'The package is published on npm as iiif-kasane. To show 3D Scenes too, install three.js and the other 3D packages and add import \'iiif-kasane/scene\' (the browser fetches them only when a Scene is shown). For images and audio/video only, the 3D packages are not needed. The tag needs no install.',
   },
   releases: { ja: 'npm のページ', en: 'Package on npm' },
   reactHeading: { ja: 'React: Viewer', en: 'React: Viewer' },
@@ -124,7 +124,9 @@ export default function DevelopersContent({ files }: { files: DeveloperFiles }) 
 
   const install = [
     'npm install iiif-kasane',
-    'npm install react react-dom jotai three three-stdlib @react-three/fiber @react-three/drei gsap',
+    'npm install react react-dom jotai',
+    '# 3D の資料も見せるとき / only for 3D Scenes',
+    'npm install three three-stdlib @react-three/fiber @react-three/drei gsap',
   ].join('\n');
 
   const reactCode = `import { Viewer } from 'iiif-kasane';

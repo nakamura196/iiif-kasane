@@ -11,17 +11,14 @@ import {
   CompareChip,
   CompareHint,
   LensRing,
-  Scene,
-  SceneEnvironment,
   SwipeHandle,
   compareClipOf,
   lensRingPositionOf,
   pointInBox,
   type CompareMode,
-  type PlacedModel,
   type SwipeDirection,
-  type ViewHandle,
 } from 'iiif-kasane';
+import { Scene, SceneEnvironment, type PlacedModel, type ViewHandle } from 'iiif-kasane/scene';
 
 // Two models of one Scene, seen through one camera. Each side has its own canvas;
 // whichever the user is moving leads, and the other copies its camera every frame.

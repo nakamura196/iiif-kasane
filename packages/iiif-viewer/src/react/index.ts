@@ -22,14 +22,10 @@ export {
   type Translator,
 } from './env';
 export { messages as viewerMessages, type ViewerMessages } from './messages';
-export { default as CanvasComponent } from './three/Canvas';
-export { default as Scene, type PlacedModel, type ViewHandle } from './three/Scene';
+// The 3D parts (CanvasComponent, Scene, SceneEnvironment) are in 'iiif-kasane/scene'.
 export { default as ModelChoice } from './three/ModelChoice';
-export {
-  default as SceneEnvironment,
-  resolveSceneEnvironment,
-  type SceneEnvironmentOption,
-} from './three/SceneEnvironment';
+export { registerDisplay } from './displays/registry';
+export type { Display, DisplayProps } from './displays/types';
 export { default as SidePanel } from './layout/SidePanel';
 export { default as Info, type InfoTab } from './layout/panels/Info';
 export { PANEL_IDS } from './panels/registry';
