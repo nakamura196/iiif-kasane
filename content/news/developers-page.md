@@ -3,7 +3,7 @@ date: 2026-11-12
 title.ja: 自分のサイトにビューアを置く方法をまとめた「開発者向け」ページを足しました
 title.en: For developers: put the viewer on your own site
 action.href: /developers
-note: ViewerProvider（PR #316）を含む版のリリース後に公開する
+note: マージしたらすぐ 0.1.6 の GitHub Release を出す（ページの install の URL が 0.1.6 を指すため）
 ---
 
 ## ja
