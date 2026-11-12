@@ -3,6 +3,7 @@ export * from './services/containers';
 export * from './services/manifestConverter';
 export * from './services/manifestParser';
 export * from './services/paintedModels';
+export * from './services/modelTransform';
 export * from './services/utils';
 export * from './services/upgradeV2';
 export * from './services/sharedServices';

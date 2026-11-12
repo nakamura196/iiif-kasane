@@ -15,6 +15,7 @@ import AuthPrompt from '../auth/AuthPrompt';
 import { useAuthStates } from '../auth/authStore';
 import ModelChoice from '../three/ModelChoice';
 import type { Display, DisplayProps } from './types';
+import type { PlacedModel } from '../three/Scene';
 
 // three.js and react-three-fiber are only fetched when a Scene is shown.
 const CanvasComponent = lazy(() => import('../three/Canvas'));
@@ -53,8 +54,10 @@ function SceneDisplay({ container, manifest, iiifContent, renderActions, selecte
     () =>
       paintedModels
         .slice(1)
-        .map((m, i) => ({ url: urls[i + 1], position: m.position }))
-        .filter((m): m is { url: string; position: [number, number, number] } => !!m.url),
+        .flatMap((m, i): PlacedModel[] => {
+          const url = urls[i + 1];
+          return url ? [{ url, position: m.position, matrix: chosen[i + 1]?.matrix }] : [];
+        }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- urls is rebuilt each render; extraKey holds its content
     [paintedModels, extraKey],
   );
