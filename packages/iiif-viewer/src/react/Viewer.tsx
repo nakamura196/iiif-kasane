@@ -63,6 +63,12 @@ export interface ViewerProps {
    * itself (through `target`). The arrow keys still turn the pages, and `onSelect` still reports them.
    */
   pager?: boolean;
+  /**
+   * Lighting of the 3D view. "built-in" (default) draws a small studio-like environment inside the
+   * viewer, with no network request. "none" uses plain lights only. A drei preset name ("city", ...)
+   * is fetched from drei's CDN (raw.githack.com). Any other value is the URL of an .hdr / .exr file.
+   */
+  environment?: string;
   className?: string;
 }
 
@@ -277,6 +283,7 @@ export function Viewer({
   onSelect,
   panelOpen,
   pager,
+  environment,
   className,
 }: ViewerProps) {
   const [store] = useState(() => createStore());
@@ -285,7 +292,7 @@ export function Viewer({
 
   return (
     <Provider store={store}>
-      <ViewerEnv locale={locale} resolvedTheme={resolvedTheme}>
+      <ViewerEnv locale={locale} resolvedTheme={resolvedTheme} environment={environment}>
         <ViewerBody
           iiifContent={iiifContent}
           tab={tab}

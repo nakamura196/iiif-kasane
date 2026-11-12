@@ -1,5 +1,6 @@
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
-import { OrbitControls, Html, Environment } from '@react-three/drei';
+import { OrbitControls, Html } from '@react-three/drei';
+import SceneEnvironment from './SceneEnvironment';
 import { Suspense, useEffect, useState, useRef, useImperativeHandle, forwardRef, useCallback, useMemo } from 'react';
 import Scene, { type PlacedModel, type ViewHandle } from '../three/Scene';
 import ModelErrorBoundary from './ModelErrorBoundary';
@@ -230,7 +231,7 @@ const CanvasComponent = ({ glbUrl, extraModels, attribution }: CanvasComponentPr
           <gridHelper args={[10, 10, isDark ? 0x374151 : 0x9ca3af, isDark ? 0x1f2937 : 0xe5e7eb]} />
           {/* IBL(環境マップ)で PBR マテリアルに反射・陰影を与える＝Voyagerに近い質感の主因。
               背景は差し替えず(テーマ色を維持)、ライティングのみ利用。 */}
-          <Environment preset="city" background={false} environmentIntensity={isDark ? 0.6 : 1} />
+          <SceneEnvironment isDark={isDark} />
           {/* フラットな環境光は最小限に(IBLと二重に効くと白飛びするため)、
               directional は陰影の方向づけ用のキーライトとして残す。 */}
           <ambientLight intensity={isDark ? 0.15 : 0.25} />
