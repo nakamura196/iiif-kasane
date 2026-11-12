@@ -29,7 +29,8 @@
     "useCasesAll": "Use cases",
     "gallery": "IIIF VR Gallery",
     "browse": "Browse in 3D",
-    "manifestEditor": "Create a manifest"
+    "manifestEditor": "Create a manifest",
+    "forDevelopers": "For developers"
   },
   "News": {
     "heading": "News",
