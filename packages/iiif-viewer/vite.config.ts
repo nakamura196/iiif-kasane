@@ -8,9 +8,9 @@ generateRegistries();
 
 // The viewer's utilities have Tailwind's plain names (.flex, .hidden, .border, ...). A host page may
 // use the same names for its own elements, so limit every utility to the inside of the viewer
-// (the <iiif-viewer> tag, or the element with class "iiif-viewer" that ViewerProvider draws).
+// (the <iiif-kasane> or <iiif-viewer> tag, or the element with class "iiif-viewer" that ViewerProvider draws).
 // :where() adds no specificity, so the utilities keep their weight.
-const SCOPE = ':where(.iiif-viewer, .iiif-viewer *, iiif-viewer *)';
+const SCOPE = ':where(.iiif-viewer, .iiif-viewer *, iiif-kasane *, iiif-viewer *)';
 const inUtilities = (rule: Rule): boolean => {
   for (let node = rule.parent as Node | undefined; node; node = node.parent as Node | undefined) {
     if (node.type !== 'atrule') continue;
@@ -30,10 +30,18 @@ const scopeUtilities = (): Plugin => ({
   },
 });
 
-// Build of the <iiif-viewer> tag: one ES module (iiif-viewer.js) with React and the
+// Build of the <iiif-kasane> tag: one ES module (iiif-kasane.js) with React and the
 // viewer inside, plus style.css. The 3D part (three.js, react-three-fiber) is a lazy
-// import in Viewer.tsx, so it ends up in separate chunks next to iiif-viewer.js and is
+// import in Viewer.tsx, so it ends up in separate chunks next to iiif-kasane.js and is
 // only fetched when a Scene is shown.
+// iiif-viewer.js is the file name before 0.3.0. It is kept as a one-line module that loads
+// iiif-kasane.js, so that pages that load it by that name keep working.
+const legacyEntry = (): import('vite').Plugin => ({
+  name: 'iiif-viewer-legacy-entry',
+  generateBundle() {
+    this.emitFile({ type: 'asset', fileName: 'iiif-viewer.js', source: "import './iiif-kasane.js';\n" });
+  },
+});
 export default defineConfig({
   root: fileURLToPath(new URL('.', import.meta.url)),
   define: {
@@ -43,6 +51,7 @@ export default defineConfig({
   css: {
     postcss: { plugins: [tailwindcss(), scopeUtilities()] },
   },
+  plugins: [legacyEntry()],
   build: {
     outDir: 'dist',
     emptyOutDir: true,
@@ -51,7 +60,7 @@ export default defineConfig({
     lib: {
       entry: fileURLToPath(new URL('./src/element/index.ts', import.meta.url)),
       formats: ['es'],
-      fileName: () => 'iiif-viewer.js',
+      fileName: () => 'iiif-kasane.js',
       cssFileName: 'style',
     },
     rollupOptions: {

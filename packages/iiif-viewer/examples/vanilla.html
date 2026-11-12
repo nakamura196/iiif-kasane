@@ -12,11 +12,11 @@
       .items button { width: 100%; text-align: left; padding: 0.5rem; margin-bottom: 0.25rem; cursor: pointer; }
       .items button[aria-current='true'] { font-weight: bold; }
       /* The tag fills the height you give it (36rem by default). */
-      iiif-viewer { height: 30rem; border: 1px solid #ccc; }
+      iiif-kasane { height: 30rem; border: 1px solid #ccc; }
       /* Colors can be changed from outside with the --iiif-viewer-* variables
          (--iiif-viewer-dark-* for the dark theme). */
       iiif-viewer.accent { --iiif-viewer-primary: #b00020; --iiif-viewer-dark-primary: #ff6b81; }
-      #more iiif-viewer { height: 22rem; margin-top: 1rem; }
+      #more iiif-kasane { height: 22rem; margin-top: 1rem; }
       @media (max-width: 48rem) { .layout { grid-template-columns: 1fr; } }
     </style>
   </head>
@@ -26,7 +26,7 @@
       <p>
         No framework and no build step: one script tag, then the viewer is an HTML element.
         Change its attributes from JavaScript to change what it shows. Serve the package folder
-        (so that <code>../dist/iiif-viewer.js</code> exists after <code>npm run build</code>) and open this file.
+        (so that <code>../dist/iiif-kasane.js</code> exists after <code>npm run build</code>) and open this file.
       </p>
 
       <div class="layout">
@@ -36,14 +36,14 @@
           <label><input type="checkbox" id="accent" /> Red accent color</label><br />
           <button type="button" id="add">Add another viewer</button>
         </div>
-        <iiif-viewer id="viewer" locale="en" theme="light" options='{"panelOpen":true}'></iiif-viewer>
+        <iiif-kasane id="viewer" locale="en" theme="light" options='{"panelOpen":true}'></iiif-kasane>
       </div>
       <div id="more"></div>
     </main>
 
-    <!-- On a real site: src="https://kasane.ldas.jp/element/v<version>/iiif-viewer.js".
+    <!-- On a real site: src="https://kasane.ldas.jp/element/v<version>/iiif-kasane.js".
          The script registers the tag and loads style.css from its own directory. -->
-    <script type="module" src="../dist/iiif-viewer.js"></script>
+    <script type="module" src="../dist/iiif-kasane.js"></script>
     <script type="module">
       const items = [
         { label: 'Globe (3D, with annotations)', url: 'https://kasane.ldas.jp/manifests/sample-manifest-with-annotations.json' },

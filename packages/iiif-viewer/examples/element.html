@@ -8,7 +8,7 @@
       body { margin: 0; padding: 1rem; font-family: sans-serif; }
       h2 { margin: 1.5rem 0 0.5rem; font-size: 1rem; }
       /* The tag fills the height you give it. The default is 36rem. */
-      iiif-viewer { height: 28rem; border: 1px solid #ccc; }
+      iiif-kasane { height: 28rem; border: 1px solid #ccc; }
       /* Colors can be changed from outside with --iiif-viewer-* variables. */
       #second { --iiif-viewer-primary: #b00020; }
     </style>
@@ -22,19 +22,19 @@
     </p>
 
     <h2>1. 3D scene (sample manifest of this site)</h2>
-    <iiif-viewer id="first" locale="en" theme="light"></iiif-viewer>
+    <iiif-kasane id="first" locale="en" theme="light"></iiif-kasane>
 
     <h2>2. Image (IIIF Cookbook recipe 0001, Presentation v4)</h2>
-    <iiif-viewer
+    <iiif-kasane
       id="second"
       iiif-content="https://iiif.io/api/cookbook/recipe/0001-mvm-image/v4/manifest.json"
       locale="en"
       theme="auto"
       options='{"tab":"metadata"}'
-    ></iiif-viewer>
+    ></iiif-kasane>
 
     <!-- The module registers the tag and loads style.css from its own directory. -->
-    <script type="module" src="../dist/iiif-viewer.js"></script>
+    <script type="module" src="../dist/iiif-kasane.js"></script>
     <script>
       // The first tag points at this site's sample manifest (absolute URL needed).
       document

@@ -1,7 +1,7 @@
 # iiif-kasane
 
 The IIIF viewer of [Kasane](https://github.com/nakamura196/iiif-kasane) as a package:
-React components, framework-free manifest reading, and the `<iiif-viewer>` tag.
+React components, framework-free manifest reading, and the `<iiif-kasane>` tag.
 It reads IIIF Presentation 3 (and 2, upgraded on load): images with deep zoom, layers and Choice,
 paging and tables of contents, audio/video with time ranges, annotations, IIIF Auth 2.0, and 3D Scenes.
 
@@ -26,7 +26,7 @@ because your bundler resolves them, but the browser fetches them only when a Sce
 | `iiif-kasane` | React components (`Viewer`, `ImageCompareView`, `GeoImageView`, the 3D `Scene`, …) and their state (jotai atoms) |
 | `iiif-kasane/core` | Manifest reading without React or the DOM (`fetchManifest`, `containersOf`, Content State, …). Works on the server |
 | `iiif-kasane/style.css` | Styles of the components (Tailwind utilities, without a global reset) |
-| `iiif-kasane/element` | The `<iiif-viewer>` tag, with React inside |
+| `iiif-kasane/element` | The `<iiif-kasane>` tag, with React inside |
 
 ## React
 
@@ -141,7 +141,7 @@ The viewer sits in the page's own DOM (no shadow root), so that the page can set
 
 - No global reset (Tailwind's preflight is left out).
 - The viewer's classes (`.flex`, `.hidden`, `.border`, …) apply only inside the viewer: inside
-  `<iiif-viewer>` or the provider's `.iiif-viewer` element. A page's own `.hidden` is not touched.
+  `<iiif-kasane>` or the provider's `.iiif-viewer` element. A page's own `.hidden` is not touched.
 - The dark theme follows the viewer's `theme`, not a `.dark` class the page has on `<html>`.
 - Everything is in CSS layers, so the page's own rules win when both set the same thing.
 
@@ -156,21 +156,26 @@ What remains: the page's rules for plain elements (for example Bootstrap's `h3 {
   manifests, theme and colors, adding viewers).
 - [`examples/element.html`](./examples/element.html): two tags on a plain page.
 
-## The `<iiif-viewer>` tag
+## The `<iiif-kasane>` tag
 
 ```html
-<script type="module" src="https://kasane.ldas.jp/element/v0.1.6/iiif-viewer.js"></script>
-<iiif-viewer iiif-content="https://iiif.io/api/cookbook/recipe/0001-mvm-image/manifest.json" locale="en"></iiif-viewer>
+<script type="module" src="https://cdn.jsdelivr.net/npm/iiif-kasane@0.3.0/dist/iiif-kasane.js"></script>
+<iiif-kasane iiif-content="https://iiif.io/api/cookbook/recipe/0001-mvm-image/manifest.json" locale="en"></iiif-kasane>
 ```
 
 It loads `style.css` from the same directory. Give the tag a height with CSS or `--iiif-viewer-height`,
 and change colors with the `--iiif-viewer-*` variables (see `dist/style.css`).
-Each version stays at `https://kasane.ldas.jp/element/v<version>/`.
+The same files are also on the Kasane site, one folder per version:
+`https://kasane.ldas.jp/element/v<version>/iiif-kasane.js`. Each version stays there.
+
+Before 0.3.0 the tag was `<iiif-viewer>` and the file was `iiif-viewer.js`. Both still work, so pages
+that already embed the viewer need no change. New pages should use `<iiif-kasane>`: a tag name can be
+defined only once on a page, and a generic name such as `iiif-viewer` may also be used by another library.
 
 ## Development
 
 The sources are in `src/`; the Kasane site uses them directly. `npm run build` (in this folder)
-writes `dist/`: the tag (`dist/iiif-viewer.js`), the npm entries (`dist/lib`) and their types (`dist/types`).
+writes `dist/`: the tag (`dist/iiif-kasane.js`, and `dist/iiif-viewer.js` under its old name), the npm entries (`dist/lib`) and their types (`dist/types`).
 How to add a feature: [EXTENDING.md](./EXTENDING.md) (Japanese).
 
 ## License

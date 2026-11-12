@@ -3,7 +3,7 @@
  * Preflight is left out on purpose: the viewer sits in the host page's DOM,
  * so a global reset would change the host page.
  *
- * Colors: set --iiif-viewer-* on <iiif-viewer> (or any ancestor) to change them.
+ * Colors: set --iiif-viewer-* on <iiif-kasane> (or any ancestor) to change them.
  * Dark mode values are --iiif-viewer-dark-*.
  */
 @layer theme, base, components, utilities;
@@ -18,6 +18,7 @@
  */
 @custom-variant dark (&:where(.iiif-viewer.dark, .iiif-viewer.dark *));
 
+iiif-kasane,
 iiif-viewer {
   display: block;
   /* The viewer fills the tag. Give the tag a height with CSS, or use --iiif-viewer-height. */
@@ -25,11 +26,12 @@ iiif-viewer {
   min-width: 0;
 }
 
+iiif-kasane .iiif-viewer-host,
 iiif-viewer .iiif-viewer-host {
   height: 100%;
 }
 
-:is(iiif-viewer, .iiif-viewer) {
+:is(iiif-kasane, iiif-viewer, .iiif-viewer) {
   --ds-bg: var(--iiif-viewer-bg, #ffffff);
   --ds-surface: var(--iiif-viewer-surface, #f7f9fb);
   --ds-surface-2: var(--iiif-viewer-surface-2, #eef2f7);
@@ -57,14 +59,14 @@ iiif-viewer .iiif-viewer-host {
   line-height: 1.5;
 }
 
-:is(iiif-viewer, .iiif-viewer) *,
-:is(iiif-viewer, .iiif-viewer) *::before,
-:is(iiif-viewer, .iiif-viewer) *::after {
+:is(iiif-kasane, iiif-viewer, .iiif-viewer) *,
+:is(iiif-kasane, iiif-viewer, .iiif-viewer) *::before,
+:is(iiif-kasane, iiif-viewer, .iiif-viewer) *::after {
   box-sizing: border-box;
 }
 
-:is(iiif-viewer, .iiif-viewer) .dark,
-:is(iiif-viewer, .iiif-viewer).dark {
+:is(iiif-kasane, iiif-viewer, .iiif-viewer) .dark,
+:is(iiif-kasane, iiif-viewer, .iiif-viewer).dark {
   --ds-bg: var(--iiif-viewer-dark-bg, #010e18);
   --ds-surface: var(--iiif-viewer-dark-surface, #021c30);
   --ds-surface-2: var(--iiif-viewer-dark-surface-2, #032a47);
@@ -83,36 +85,36 @@ iiif-viewer .iiif-viewer-host {
  * that the viewer's own utilities (border, p-4, ...) still win, as they do over Tailwind's preflight.
  */
 @layer base {
-  :is(iiif-viewer, .iiif-viewer) button {
+  :is(iiif-kasane, iiif-viewer, .iiif-viewer) button {
     font: inherit;
     color: inherit;
     cursor: pointer;
     background: transparent;
     border: 0 solid;
   }
-  :is(iiif-viewer, .iiif-viewer) img,
-  :is(iiif-viewer, .iiif-viewer) video,
-  :is(iiif-viewer, .iiif-viewer) canvas,
-  :is(iiif-viewer, .iiif-viewer) svg {
+  :is(iiif-kasane, iiif-viewer, .iiif-viewer) img,
+  :is(iiif-kasane, iiif-viewer, .iiif-viewer) video,
+  :is(iiif-kasane, iiif-viewer, .iiif-viewer) canvas,
+  :is(iiif-kasane, iiif-viewer, .iiif-viewer) svg {
     display: block;
     max-width: 100%;
   }
-  :is(iiif-viewer, .iiif-viewer) h1,
-  :is(iiif-viewer, .iiif-viewer) h2,
-  :is(iiif-viewer, .iiif-viewer) h3,
-  :is(iiif-viewer, .iiif-viewer) p,
-  :is(iiif-viewer, .iiif-viewer) ul,
-  :is(iiif-viewer, .iiif-viewer) dl,
-  :is(iiif-viewer, .iiif-viewer) dd {
+  :is(iiif-kasane, iiif-viewer, .iiif-viewer) h1,
+  :is(iiif-kasane, iiif-viewer, .iiif-viewer) h2,
+  :is(iiif-kasane, iiif-viewer, .iiif-viewer) h3,
+  :is(iiif-kasane, iiif-viewer, .iiif-viewer) p,
+  :is(iiif-kasane, iiif-viewer, .iiif-viewer) ul,
+  :is(iiif-kasane, iiif-viewer, .iiif-viewer) dl,
+  :is(iiif-kasane, iiif-viewer, .iiif-viewer) dd {
     margin: 0;
   }
-  :is(iiif-viewer, .iiif-viewer) ul {
+  :is(iiif-kasane, iiif-viewer, .iiif-viewer) ul {
     list-style: none;
     padding: 0;
   }
-  :is(iiif-viewer, .iiif-viewer) *,
-  :is(iiif-viewer, .iiif-viewer) *::before,
-  :is(iiif-viewer, .iiif-viewer) *::after {
+  :is(iiif-kasane, iiif-viewer, .iiif-viewer) *,
+  :is(iiif-kasane, iiif-viewer, .iiif-viewer) *::before,
+  :is(iiif-kasane, iiif-viewer, .iiif-viewer) *::after {
     border-style: solid;
     border-width: 0;
   }

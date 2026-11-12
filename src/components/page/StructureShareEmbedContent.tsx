@@ -14,8 +14,8 @@ import viewerPkg from '../../../packages/iiif-viewer/package.json';
 
 type L = { ja: string; en: string };
 
-/** <iiif-viewer> の配布先。npm run build の copy-element.mjs が out/element/v<版>/ に置く */
-const ELEMENT_URL = `${SITE_URL}/element/v${viewerPkg.version}/iiif-viewer.js`;
+/** <iiif-kasane> の配布先。npm run build の copy-element.mjs が out/element/v<版>/ に置く */
+const ELEMENT_URL = `${SITE_URL}/element/v${viewerPkg.version}/iiif-kasane.js`;
 
 const WELLCOME_BOOK = 'https://iiif.wellcomecollection.org/presentation/v3/b18035723';
 const WELLCOME_MULTIPART = 'https://iiif.wellcomecollection.org/presentation/v3/b2178081x';
@@ -151,12 +151,12 @@ export default function StructureShareEmbedContent() {
 
   const embedCode = `<script type="module" src="${ELEMENT_URL}"></script>
 
-<iiif-viewer
+<iiif-kasane
   iiif-content="${SAMPLE_3D}"
   locale="${locale}"
   theme="auto"
   style="display: block; height: 32rem"
-></iiif-viewer>`;
+></iiif-kasane>`;
   const srcDoc = `<!doctype html><html lang="${locale}"><head><meta charset="utf-8"><style>body{margin:0}</style></head><body>${embedCode}</body></html>`;
 
   const attrs: { name: string; body: L }[] = [

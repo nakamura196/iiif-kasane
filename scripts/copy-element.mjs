@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * <iiif-viewer> のビルド成果物 (packages/iiif-viewer/dist) を、静的書き出しの
+ * <iiif-kasane> のビルド成果物 (packages/iiif-viewer/dist) を、静的書き出しの
  * out/element/v<版>/ に置く。版は packages/iiif-viewer/package.json の version。
  *
  * 使い方: npm run build の中で next build のあとに呼ばれる (単独実行も可)。
@@ -15,7 +15,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const PREVIOUS = ['0.1.0', '0.1.1', '0.1.2', '0.1.3', '0.1.4', '0.1.5', '0.1.6'];
+const PREVIOUS = ['0.1.0', '0.1.1', '0.1.2', '0.1.3', '0.1.4', '0.1.5', '0.1.6', '0.2.0'];
 // 0.1.x は @nakamura196/iiif-viewer の名前で GitHub Release にだけ置いた。0.2.0 からは npm の iiif-kasane
 const releaseTgz = (v) =>
   v.startsWith('0.1.')
@@ -57,8 +57,8 @@ const pkg = JSON.parse(readFileSync(join(root, 'packages/iiif-viewer/package.jso
 const dist = join(root, 'packages/iiif-viewer/dist');
 const out = join(root, 'out');
 
-if (!existsSync(join(dist, 'iiif-viewer.js'))) {
-  console.error('packages/iiif-viewer/dist/iiif-viewer.js がありません。先に npm run build:element を実行してください。');
+if (!existsSync(join(dist, 'iiif-kasane.js'))) {
+  console.error('packages/iiif-viewer/dist/iiif-kasane.js がありません。先に npm run build:element を実行してください。');
   process.exit(1);
 }
 if (!existsSync(out)) {

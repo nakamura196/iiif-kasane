@@ -1,7 +1,7 @@
 {
   "name": "iiif-kasane",
-  "version": "0.2.0",
-  "description": "IIIF viewer building blocks: React components, framework-free core, and the <iiif-viewer> tag.",
+  "version": "0.3.0",
+  "description": "IIIF viewer building blocks: React components, framework-free core, and the <iiif-kasane> tag.",
   "license": "MIT",
   "author": "Satoru Nakamura",
   "repository": {
@@ -35,11 +35,12 @@
       "types": "./dist/types/core/index.d.ts",
       "default": "./dist/lib/core.js"
     },
-    "./element": "./dist/iiif-viewer.js",
+    "./element": "./dist/iiif-kasane.js",
     "./style.css": "./dist/style.css",
     "./package.json": "./package.json"
   },
   "sideEffects": [
+    "./dist/iiif-kasane.js",
     "./dist/iiif-viewer.js",
     "*.css"
   ],
