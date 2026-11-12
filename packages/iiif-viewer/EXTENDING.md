@@ -37,4 +37,6 @@
 - 再生位置は `usePlayback()`、画面の状態は Viewer ごとの jotai store（`atoms.ts`）。グローバルな変数を作らない
 - 資料の読み込み・表示中の Canvas・store は `ViewerProvider` が持つ。`Viewer` は「`ViewerProvider`＋既定のレイアウト」。
   部品から表示中の Canvas を読むときは `useViewer()`（Provider の外でも動かしたい部品は `useOptionalViewer()`）
+- 画面の外（`document.body` など）に出す部品は、`class="iiif-viewer"` の要素で包む。配布用の `style.css` は、
+  ビューアの見た目をその中だけに効かせているため（使う側のページの `.hidden` などとぶつからないように）
 - 表示とパネルは、`ContainerInfo`（`core/services/containers.ts`）を入力にする
