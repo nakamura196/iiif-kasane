@@ -1,4 +1,4 @@
-// <iiif-viewer iiif-content="..." locale="ja" theme="auto" options='{"tab":"metadata","panelOpen":false,"pager":false,"environment":"none"}'></iiif-viewer>
+// <iiif-kasane iiif-content="..." locale="ja" theme="auto" options='{"tab":"metadata","panelOpen":false,"pager":false,"environment":"none"}'></iiif-kasane>
 // Light DOM (no shadow root) so that the host page can set --iiif-viewer-* variables.
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -118,6 +118,10 @@ function ensureStyle() {
 
 ensureStyle();
 
-if (typeof customElements !== 'undefined' && !customElements.get('iiif-viewer')) {
-  customElements.define('iiif-viewer', IiifViewerElement);
+// The tag is <iiif-kasane>. <iiif-viewer> is the name before 0.3.0; it stays so that pages that already
+// embed it keep working. A tag name can be defined only once per page, and the same class cannot be
+// defined under two names, so the old name gets a subclass.
+if (typeof customElements !== 'undefined') {
+  if (!customElements.get('iiif-kasane')) customElements.define('iiif-kasane', IiifViewerElement);
+  if (!customElements.get('iiif-viewer')) customElements.define('iiif-viewer', class extends IiifViewerElement {});
 }

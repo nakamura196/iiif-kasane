@@ -91,3 +91,11 @@
 - `copy-element.mjs` は、0.1.x を GitHub Release の tgz から、0.2.0 以降を npm の tgz から取る
 - 確かめたこと: tsc、vitest 971 件、Astro の例のビルド、サイト全体のビルド（`out/element/` に v0.1.0〜v0.2.0）、`npm pack --dry-run`（名前 iiif-kasane、478 ファイル）
 - 落とし穴: Astro の例で `npm ci` すると、`node_modules/iiif-kasane` が `../..`（パッケージ自身）を指す。そのまま `next build` すると、Turbopack がファイルを探してこの輪を回り、止まる。例のフォルダの `node_modules` を消せば通る
+
+## 2026-11-12 v0.3.0: タグを <iiif-kasane> に、配布ファイルを iiif-kasane.js に
+
+- 0.2.0 の節で「タグ `<iiif-viewer>` は変えない」としたのを改めた。理由: タグの名前は 1 つのページで 1 回しか登録できない。`iiif-viewer` はありふれた名前なので、別の IIIF のライブラリが同じ名前を使うと、同じページで片方が動かなくなる。パッケージ名・表示名とも揃う
+- 古い名前は残す: `<iiif-viewer>` も登録する（同じクラスは 2 つの名前で登録できないので、中身の無いサブクラスで）。`dist/iiif-viewer.js` は `iiif-kasane.js` を読み込むだけの 1 行のファイルとして出す。Mahnke 氏のサイト（0.1.4、`<iiif-viewer>`）などの既存の埋め込みは、そのまま動く
+- CSS は `iiif-kasane` と `iiif-viewer` の両方に効くようにした。`--iiif-viewer-*` の変数、`.iiif-viewer` の class、`data-iiif-viewer-style` は変えていない（変えると、色を指定しているよそのページが崩れる）
+- `/element/v<版>/` のパスは変えない。`element` は決まった慣習ではないが、変えると既存の埋め込みが壊れる。案内の先頭は npm 経由の jsDelivr（`https://cdn.jsdelivr.net/npm/iiif-kasane@<版>/dist/iiif-kasane.js`）にした。0.2.0 の jsDelivr の URL で、ブラウザで表示できることを確かめた（後から読む部品も含めて）
+- 確かめたこと: 組み立て（`dist/` に iiif-kasane.js・iiif-viewer.js・style.css）、Playwright で 4 通り（新しいタグ／古いファイルと古いタグ／両方を同じページに／jsDelivr の 0.2.0）とも表示され、エラー 0。tsc、vitest 971 件

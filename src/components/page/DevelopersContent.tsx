@@ -18,8 +18,8 @@ type L = { ja: string; en: string };
 const REPO = 'https://github.com/nakamura196/iiif-kasane';
 const PKG_TREE = `${REPO}/tree/main/packages/iiif-viewer`;
 const VERSION = viewerPkg.version;
-/** <iiif-viewer> の配布先。npm run build の copy-element.mjs が out/element/v<版>/ に置く */
-const ELEMENT_URL = `${SITE_URL}/element/v${VERSION}/iiif-viewer.js`;
+/** <iiif-kasane> の配布先。npm run build の copy-element.mjs が out/element/v<版>/ に置く */
+const ELEMENT_URL = `${SITE_URL}/element/v${VERSION}/iiif-kasane.js`;
 
 const IMAGE_MANIFEST = 'https://iiif.io/api/cookbook/recipe/0001-mvm-image/manifest.json';
 const ANNOTATED_MANIFEST = `${SITE_URL}/manifests/sample-manifest-with-annotations.json`;
@@ -27,8 +27,8 @@ const ANNOTATED_MANIFEST = `${SITE_URL}/manifests/sample-manifest-with-annotatio
 const T = {
   title: { ja: '開発者向け', en: 'For developers' },
   lead: {
-    ja: 'Kasane のビューアは、パッケージ iiif-kasane として、ほかのサイトにも置けます（MIT ライセンス）。React の部品として使う方法、HTML のタグ <iiif-viewer> として使う方法、Astro で使う方法を、動く例とコードで示します。',
-    en: 'The viewer of Kasane is available as the package iiif-kasane, to put on your own site (MIT license). This page shows three ways to use it, each with a live viewer and its code: as React components, as the HTML tag <iiif-viewer>, and in Astro.',
+    ja: 'Kasane のビューアは、パッケージ iiif-kasane として、ほかのサイトにも置けます（MIT ライセンス）。React の部品として使う方法、HTML のタグ <iiif-kasane> として使う方法、Astro で使う方法を、動く例とコードで示します。',
+    en: 'The viewer of Kasane is available as the package iiif-kasane, to put on your own site (MIT license). This page shows three ways to use it, each with a live viewer and its code: as React components, as the HTML tag <iiif-kasane>, and in Astro.',
   },
   tabsHint: {
     ja: '各例の上のタブで「プレビュー」（動くビューア）とコードを切り替えます。',
@@ -61,7 +61,7 @@ const T = {
     ja: 'レイアウトはページ側の CSS で書きます。パッケージの style.css には部品が使うクラスしか無く、それもビューアの中だけに効きます。',
     en: 'Write the layout with your own CSS. The package’s style.css holds only the classes the parts use, and they apply only inside the viewer.',
   },
-  tagHeading: { ja: 'タグ: <iiif-viewer>', en: 'The tag: <iiif-viewer>' },
+  tagHeading: { ja: 'タグ: <iiif-kasane>', en: 'The tag: <iiif-kasane>' },
   tagBody: {
     ja: 'フレームワークの無いページでも、スクリプトを 1 行読み込めばタグとして使えます。React はスクリプトの中に入っています。高さは CSS か --iiif-viewer-height で、色は --iiif-viewer-* の変数で変えられます。版ごとの URL は残し続けるので、版を固定して読み込めます。',
     en: 'A page without any framework can use the viewer as a tag by loading one script; React is inside it. Set the height with CSS or --iiif-viewer-height, and the colors with the --iiif-viewer-* variables. Each version stays at its own URL, so you can pin one.',
@@ -144,11 +144,11 @@ export default function Page() {
 
   const tagHtml = `<script type="module" src="${ELEMENT_URL}"></script>
 
-<iiif-viewer
+<iiif-kasane
   iiif-content="${IMAGE_MANIFEST}"
   locale="${locale}"
   style="height: 32rem"
-></iiif-viewer>`;
+></iiif-kasane>`;
 
   return (
     <CommonLayout>

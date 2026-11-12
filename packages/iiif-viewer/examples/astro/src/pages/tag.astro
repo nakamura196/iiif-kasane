@@ -6,7 +6,7 @@ const manifests = [
   { label: 'Image (IIIF Cookbook 0001)', url: 'https://iiif.io/api/cookbook/recipe/0001-mvm-image/v4/manifest.json' },
 ];
 ---
-<Layout title="The <iiif-viewer> tag">
+<Layout title="The <iiif-kasane> tag">
   <h1>The &lt;iiif-viewer&gt; tag</h1>
   <p>
     The tag needs no framework: Astro sends it as plain HTML, and the script below turns it into a
@@ -28,11 +28,11 @@ const manifests = [
     </label>
   </form>
 
-  <iiif-viewer id="viewer" iiif-content={manifests[0].url} locale="en" theme="auto"></iiif-viewer>
+  <iiif-kasane id="viewer" iiif-content={manifests[0].url} locale="en" theme="auto"></iiif-kasane>
 
-  <!-- On a real site: src="https://kasane.ldas.jp/element/v<version>/iiif-viewer.js".
+  <!-- On a real site: src="https://kasane.ldas.jp/element/v<version>/iiif-kasane.js".
        The script loads style.css from its own directory. -->
-  <script is:inline type="module" src="/iiif-viewer/iiif-viewer.js"></script>
+  <script is:inline type="module" src="/iiif-viewer/iiif-kasane.js"></script>
   <script>
     const viewer = document.getElementById('viewer')!;
     const bind = (id: string, attribute: string) =>
@@ -46,6 +46,6 @@ const manifests = [
   <style>
     .controls { display: flex; gap: 1rem; margin-bottom: 0.75rem; }
     /* The tag fills the height you give it (36rem by default). */
-    iiif-viewer { height: 32rem; border: 1px solid #ccc; }
+    iiif-kasane { height: 32rem; border: 1px solid #ccc; }
   </style>
 </Layout>

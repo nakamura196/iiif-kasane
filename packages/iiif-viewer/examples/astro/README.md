@@ -2,7 +2,7 @@
 
 Two pages:
 
-- `/tag`: the `<iiif-viewer>` tag. No framework: a plain script and an HTML element, changed from a few
+- `/tag`: the `<iiif-kasane>` tag. No framework: a plain script and an HTML element, changed from a few
   lines of JavaScript.
 - `/parts`: `ViewerProvider` with `CanvasView`, `AnnotationList` and `Metadata` in a CSS grid of the
   page, as a React island (`client:only="react"`). See `src/components/FreeLayout.tsx`.
@@ -24,5 +24,5 @@ In your own site:
 - Install `iiif-kasane` and its peer dependencies (`react`, `react-dom`, `jotai`, `three`,
   `@react-three/fiber`, `@react-three/drei`, `three-stdlib`, `gsap`) for the React parts, with `@astrojs/react`.
 - For the tag alone, nothing needs installing: load
-  `https://kasane.ldas.jp/element/v<version>/iiif-viewer.js` with `<script is:inline type="module">`.
+  `https://kasane.ldas.jp/element/v<version>/iiif-kasane.js` with `<script is:inline type="module">`.
   Do not bundle the tag's module: it loads `style.css` from its own directory.
