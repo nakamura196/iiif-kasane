@@ -12,7 +12,11 @@
 
 @source './';
 
-@custom-variant dark (&:where(.dark, .dark *));
+/*
+ * dark: follows only the viewer's own theme (the .dark class the viewer puts on its root),
+ * not a .dark class the host page has on <html>.
+ */
+@custom-variant dark (&:where(.iiif-viewer.dark, .iiif-viewer.dark *));
 
 iiif-viewer {
   display: block;
@@ -74,37 +78,42 @@ iiif-viewer .iiif-viewer-host {
   --ds-ring: var(--iiif-viewer-dark-ring, #6db9f5);
 }
 
-/* Elements Tailwind's preflight would normally reset, limited to the viewer. */
-:is(iiif-viewer, .iiif-viewer) button {
-  font: inherit;
-  color: inherit;
-  cursor: pointer;
-  background: transparent;
-  border: 0 solid;
-}
-:is(iiif-viewer, .iiif-viewer) img,
-:is(iiif-viewer, .iiif-viewer) video,
-:is(iiif-viewer, .iiif-viewer) canvas,
-:is(iiif-viewer, .iiif-viewer) svg {
-  display: block;
-  max-width: 100%;
-}
-:is(iiif-viewer, .iiif-viewer) h1,
-:is(iiif-viewer, .iiif-viewer) h2,
-:is(iiif-viewer, .iiif-viewer) h3,
-:is(iiif-viewer, .iiif-viewer) p,
-:is(iiif-viewer, .iiif-viewer) ul,
-:is(iiif-viewer, .iiif-viewer) dl,
-:is(iiif-viewer, .iiif-viewer) dd {
-  margin: 0;
-}
-:is(iiif-viewer, .iiif-viewer) ul {
-  list-style: none;
-  padding: 0;
-}
-:is(iiif-viewer, .iiif-viewer) *,
-:is(iiif-viewer, .iiif-viewer) *::before,
-:is(iiif-viewer, .iiif-viewer) *::after {
-  border-style: solid;
-  border-width: 0;
+/*
+ * Elements Tailwind's preflight would normally reset, limited to the viewer. In the base layer, so
+ * that the viewer's own utilities (border, p-4, ...) still win, as they do over Tailwind's preflight.
+ */
+@layer base {
+  :is(iiif-viewer, .iiif-viewer) button {
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+    background: transparent;
+    border: 0 solid;
+  }
+  :is(iiif-viewer, .iiif-viewer) img,
+  :is(iiif-viewer, .iiif-viewer) video,
+  :is(iiif-viewer, .iiif-viewer) canvas,
+  :is(iiif-viewer, .iiif-viewer) svg {
+    display: block;
+    max-width: 100%;
+  }
+  :is(iiif-viewer, .iiif-viewer) h1,
+  :is(iiif-viewer, .iiif-viewer) h2,
+  :is(iiif-viewer, .iiif-viewer) h3,
+  :is(iiif-viewer, .iiif-viewer) p,
+  :is(iiif-viewer, .iiif-viewer) ul,
+  :is(iiif-viewer, .iiif-viewer) dl,
+  :is(iiif-viewer, .iiif-viewer) dd {
+    margin: 0;
+  }
+  :is(iiif-viewer, .iiif-viewer) ul {
+    list-style: none;
+    padding: 0;
+  }
+  :is(iiif-viewer, .iiif-viewer) *,
+  :is(iiif-viewer, .iiif-viewer) *::before,
+  :is(iiif-viewer, .iiif-viewer) *::after {
+    border-style: solid;
+    border-width: 0;
+  }
 }

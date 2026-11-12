@@ -28,6 +28,7 @@ export default function Footer() {
             { label: t('help'), href: '/help' },
             { label: t('inferenceModels'), href: '/inference-models' },
             { label: t('manifestEditor'), href: '/manifest-editor' },
+            { label: t('forDevelopers'), href: '/developers' },
             { label: t('privacy'), href: '/privacy' },
             { label: t('terms'), href: '/terms' },
           ],

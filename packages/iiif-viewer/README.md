@@ -8,7 +8,7 @@ paging and tables of contents, audio/video with time ranges, annotations, IIIF A
 ## Install
 
 ```sh
-npm install https://github.com/nakamura196/iiif-kasane/releases/download/iiif-viewer-v0.1.3/nakamura196-iiif-viewer-0.1.3.tgz
+npm install https://github.com/nakamura196/iiif-kasane/releases/download/iiif-viewer-v0.1.6/nakamura196-iiif-viewer-0.1.6.tgz
 npm install react react-dom jotai three three-stdlib @react-three/fiber @react-three/drei gsap
 ```
 
@@ -133,6 +133,20 @@ import '@nakamura196/iiif-viewer/style.css';
   `selectedIndex`, `select(index)`). It throws outside a provider; `useOptionalViewer()` returns null there.
 - Each provider has its own state, so several on one page do not interfere.
 
+### Styles and the host page
+
+The viewer sits in the page's own DOM (no shadow root), so that the page can set the
+`--iiif-viewer-*` variables. `style.css` is built so that the two sides interfere as little as possible:
+
+- No global reset (Tailwind's preflight is left out).
+- The viewer's classes (`.flex`, `.hidden`, `.border`, …) apply only inside the viewer: inside
+  `<iiif-viewer>` or the provider's `.iiif-viewer` element. A page's own `.hidden` is not touched.
+- The dark theme follows the viewer's `theme`, not a `.dark` class the page has on `<html>`.
+- Everything is in CSS layers, so the page's own rules win when both set the same thing.
+
+What remains: the page's rules for plain elements (for example Bootstrap's `h3 { font-size }` or
+`button` styles) also reach the elements inside the viewer, as they would for any light-DOM component.
+
 ### Examples
 
 - [`examples/astro/`](./examples/astro/): an Astro site with the tag, and with the React parts in a
@@ -144,7 +158,7 @@ import '@nakamura196/iiif-viewer/style.css';
 ## The `<iiif-viewer>` tag
 
 ```html
-<script type="module" src="https://kasane.ldas.jp/element/v0.1.3/iiif-viewer.js"></script>
+<script type="module" src="https://kasane.ldas.jp/element/v0.1.6/iiif-viewer.js"></script>
 <iiif-viewer iiif-content="https://iiif.io/api/cookbook/recipe/0001-mvm-image/manifest.json" locale="en"></iiif-viewer>
 ```
 
