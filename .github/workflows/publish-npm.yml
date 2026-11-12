@@ -1,0 +1,50 @@
+# Publishes the viewer package (packages/iiif-viewer, npm name iiif-kasane) to npm
+# when a GitHub Release tagged iiif-kasane-v<version> is published.
+# Uses npm Trusted Publishing (OIDC): no npm token is stored in this repository,
+# and npm attaches a provenance statement linking the tarball to this workflow run.
+# The trusted publisher on npmjs.com must name this file: publish-npm.yml.
+name: Publish to npm
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: startsWith(github.event.release.tag_name, 'iiif-kasane-v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write # npm Trusted Publishing
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Check that the tag matches the package version
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          v=$(node -p "require('./packages/iiif-viewer/package.json').version")
+          if [ "$TAG" != "iiif-kasane-v$v" ]; then echo "Tag $TAG does not match version $v"; exit 1; fi
+          npm -v
+
+      - name: Install
+        run: npm ci
+
+      - name: Test the package
+        run: npx vitest run packages/iiif-viewer
+
+      - name: Publish
+        run: npm publish -w iiif-kasane

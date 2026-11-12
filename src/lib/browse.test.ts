@@ -12,7 +12,7 @@ import {
   viewerQuery,
   type BrowseItem,
 } from './browse';
-import { manifestFromParams } from '@nakamura196/iiif-viewer/core';
+import { manifestFromParams } from 'iiif-kasane/core';
 
 const v3Collection = {
   '@context': 'http://iiif.io/api/presentation/3/context.json',

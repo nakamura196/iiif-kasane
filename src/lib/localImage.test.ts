@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { convertToV4, parseManifestV4 } from '@nakamura196/iiif-viewer/core';
+import { convertToV4, parseManifestV4 } from 'iiif-kasane/core';
 import { isLocalManifestUrl, labelOf, looksLikeImage, manifestFromLocalImage, manifestFromLocalImages, pathOf, sortFiles } from './localImage';
 
 const image = {

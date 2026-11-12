@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import type { FacetSelection } from '@nakamura196/iiif-viewer/core';
+import type { FacetSelection } from 'iiif-kasane/core';
 
 // 検索画面の状態と URL の引数の対応。状態は URL に残すので、そのまま共有できる。
 //   u: 読み込む URL（curation / collection / iiif-content でも受ける）

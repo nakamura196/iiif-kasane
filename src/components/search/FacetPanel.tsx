@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import type { FacetSelection, SearchFacet } from '@nakamura196/iiif-viewer/core';
+import type { FacetSelection, SearchFacet } from 'iiif-kasane/core';
 
 const SHOWN = 8; // 値を最初に見せる数
 

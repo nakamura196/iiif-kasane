@@ -1,4 +1,4 @@
-# @nakamura196/iiif-viewer in Astro
+# iiif-kasane in Astro
 
 Two pages:
 
@@ -21,7 +21,7 @@ needs two settings in `astro.config.mjs` that a site installing the package from
 
 In your own site:
 
-- Install `@nakamura196/iiif-viewer` and its peer dependencies (`react`, `react-dom`, `jotai`, `three`,
+- Install `iiif-kasane` and its peer dependencies (`react`, `react-dom`, `jotai`, `three`,
   `@react-three/fiber`, `@react-three/drei`, `three-stdlib`, `gsap`) for the React parts, with `@astrojs/react`.
 - For the tag alone, nothing needs installing: load
   `https://kasane.ldas.jp/element/v<version>/iiif-viewer.js` with `<script is:inline type="module">`.

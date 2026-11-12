@@ -1,5 +1,5 @@
 /*
- * Styles of @nakamura196/iiif-viewer (built to dist/style.css).
+ * Styles of iiif-kasane (built to dist/style.css).
  * Preflight is left out on purpose: the viewer sits in the host page's DOM,
  * so a global reset would change the host page.
  *

@@ -2,7 +2,7 @@
   "name": "iiif-viewer-astro-example",
   "private": true,
   "type": "module",
-  "description": "Using @nakamura196/iiif-viewer in an Astro site: the <iiif-viewer> tag, and React parts laid out freely.",
+  "description": "Using iiif-kasane in an Astro site: the <iiif-viewer> tag, and React parts laid out freely.",
   "scripts": {
     "predev": "node scripts/copy-element.mjs",
     "prebuild": "node scripts/copy-element.mjs",
@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@astrojs/react": "7.1.2",
-    "@nakamura196/iiif-viewer": "file:../..",
+    "iiif-kasane": "file:../..",
     "@react-three/drei": "10.7.9",
     "@react-three/fiber": "9.8.2",
     "astro": "7.4.5",

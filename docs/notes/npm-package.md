@@ -76,3 +76,18 @@
   `<iiif-viewer>` タグでは `options='{"pager":false}'`
 - 確かめたこと: vitest 693 件。tgz を awase に入れ、頁送りが 1 組になること、PageDown でめくると本文が付いてくることを e2e で
 - 確かめていないこと: タグの options 経由の動き
+
+## 2026-11-12 v0.2.0: 名前を iiif-kasane に改め、npm に出す
+
+- 名前: `@nakamura196/iiif-viewer` → `iiif-kasane`（頭に何も付けない）。表示名「IIIF Kasane」・リポジトリ名と揃えるため
+- 却下した案:
+  - `kasane` … npm で別のパッケージ（2022 年から更新なし）が使っている
+  - `@nakamura196/kasane`・`@nakamura196/iiif-kasane` … 個人のアカウントに結び付き、研究室・団体に移すと名前ごと変わる。頭なしなら管理者を足すだけで済む（Mirador は `mirador`、Universal Viewer は `universalviewer`）
+  - リポジトリ名を `kasane` に変える … `nakamura196.github.io/iiif-kasane/` の転送が止まる（前回 iiif-3d-viewer から変えたときに起きた）。表示名とも合っているので据え置き
+- 版は 0.2.0。import の名前が変わるので、0.x の中の数字を上げた。0.1.6 のままにすると、同じ番号で中身（名前）の違うものが 2 つになる
+- 置き場所 `packages/iiif-viewer/` とタグ `<iiif-viewer>`・`/element/v<版>/` は変えない（よそのページの埋め込みを壊さないため）
+- 発行は npm の Trusted Publishing（GitHub Actions の OIDC。トークンを持たない、provenance が自動で付く）。`.github/workflows/publish-npm.yml` が、タグ `iiif-kasane-v<版>` の Release で動く
+- 自明でなかった事実（docs.npmjs.com/trusted-publishers、2026-10-06 版）: trusted publisher は、npm にある既存のパッケージにしか設定できない。最初の 1 回は手元から `npm publish` する。設定してから 2 日以内に、workflow から 1 回出す必要がある。npm 11.5.1 以上・Node 22.14.0 以上。package.json の `repository.url` が GitHub のリポジトリと一致していること
+- `copy-element.mjs` は、0.1.x を GitHub Release の tgz から、0.2.0 以降を npm の tgz から取る
+- 確かめたこと: tsc、vitest 971 件、Astro の例のビルド、サイト全体のビルド（`out/element/` に v0.1.0〜v0.2.0）、`npm pack --dry-run`（名前 iiif-kasane、478 ファイル）
+- 落とし穴: Astro の例で `npm ci` すると、`node_modules/iiif-kasane` が `../..`（パッケージ自身）を指す。そのまま `next build` すると、Turbopack がファイルを探してこの輪を回り、止まる。例のフォルダの `node_modules` を消せば通る

@@ -1,4 +1,4 @@
-// Public API of @nakamura196/iiif-viewer: React components on top of ./core.
+// Public API of iiif-kasane: React components on top of ./core.
 export { Viewer, type ViewerProps, type ViewerActionsState } from './Viewer';
 export {
   ViewerProvider,

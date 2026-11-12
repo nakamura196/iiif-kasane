@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import type { FacetSelection } from '@nakamura196/iiif-viewer/core';
+import type { FacetSelection } from 'iiif-kasane/core';
 
 /** 選んでいる値の一覧（押すと外れる）。 */
 export default function ActiveFilters({

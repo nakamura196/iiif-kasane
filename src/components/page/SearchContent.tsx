@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { facetsOf, filterItems } from '@nakamura196/iiif-viewer/core';
+import { facetsOf, filterItems } from 'iiif-kasane/core';
 import Header from '@/components/Header';
 import ActiveFilters from '@/components/search/ActiveFilters';
 import FacetPanel from '@/components/search/FacetPanel';

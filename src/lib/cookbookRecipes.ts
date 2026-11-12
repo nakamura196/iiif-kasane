@@ -1,4 +1,4 @@
-import { contentParam } from '@nakamura196/iiif-viewer/core';
+import { contentParam } from 'iiif-kasane/core';
 import type { ViewerTab } from '@/lib/viewerTabs';
 
 // IIIF Cookbook の全レシピ。/samples の一覧に、レシピ番号の順で並べる。

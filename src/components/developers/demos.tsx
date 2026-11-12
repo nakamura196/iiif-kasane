@@ -9,8 +9,8 @@ import {
   ViewerProvider,
   useViewer,
   type ViewerSelection,
-} from '@nakamura196/iiif-viewer';
-import { labelIn } from '@nakamura196/iiif-viewer/core';
+} from 'iiif-kasane';
+import { labelIn } from 'iiif-kasane/core';
 
 // /developers のプレビュー。見せるコードと同じ形で書く。
 // - OwnLayoutDemo は packages/iiif-viewer/examples/astro/src/components/FreeLayout.tsx と同じ中身

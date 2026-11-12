@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { buttonClass } from '@nakamura196/react-ui';
-import type { SearchItem } from '@nakamura196/iiif-viewer/core';
+import type { SearchItem } from 'iiif-kasane/core';
 import { Link } from '@/i18n/routing';
 import { viewerHref } from './links';
 

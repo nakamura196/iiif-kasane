@@ -21,7 +21,7 @@ import {
   type PlacedModel,
   type SwipeDirection,
   type ViewHandle,
-} from '@nakamura196/iiif-viewer';
+} from 'iiif-kasane';
 
 // Two models of one Scene, seen through one camera. Each side has its own canvas;
 // whichever the user is moving leads, and the other copies its camera every frame.

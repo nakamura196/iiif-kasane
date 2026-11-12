@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { fetchJson, loadSearchSource, type SearchSource } from '@nakamura196/iiif-viewer/core';
+import { fetchJson, loadSearchSource, type SearchSource } from 'iiif-kasane/core';
 
 export type SourceStatus =
   | { kind: 'idle' }

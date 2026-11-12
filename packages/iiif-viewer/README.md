@@ -1,4 +1,4 @@
-# @nakamura196/iiif-viewer
+# iiif-kasane
 
 The IIIF viewer of [Kasane](https://github.com/nakamura196/iiif-kasane) as a package:
 React components, framework-free manifest reading, and the `<iiif-viewer>` tag.
@@ -8,12 +8,13 @@ paging and tables of contents, audio/video with time ranges, annotations, IIIF A
 ## Install
 
 ```sh
-npm install https://github.com/nakamura196/iiif-kasane/releases/download/iiif-viewer-v0.1.6/nakamura196-iiif-viewer-0.1.6.tgz
+npm install iiif-kasane
 npm install react react-dom jotai three three-stdlib @react-three/fiber @react-three/drei gsap
 ```
 
-The package is not on the npm registry yet; each version is attached to a GitHub Release
-(tags `iiif-viewer-v<version>`). The lockfile keeps the tarball's integrity hash.
+Versions up to 0.1.6 were named `@nakamura196/iiif-viewer` and were attached to GitHub Releases
+(tags `iiif-viewer-v<version>`) instead of the npm registry. From 0.2.0 the package is `iiif-kasane` on npm;
+change your imports from `@nakamura196/iiif-viewer` to `iiif-kasane`. Nothing else changed.
 
 three.js and react-three-fiber are for 3D Scenes. They have to be installed even if you only show images,
 because your bundler resolves them, but the browser fetches them only when a Scene is shown.
@@ -22,16 +23,16 @@ because your bundler resolves them, but the browser fetches them only when a Sce
 
 | Import | What it is |
 | --- | --- |
-| `@nakamura196/iiif-viewer` | React components (`Viewer`, `ImageCompareView`, `GeoImageView`, the 3D `Scene`, …) and their state (jotai atoms) |
-| `@nakamura196/iiif-viewer/core` | Manifest reading without React or the DOM (`fetchManifest`, `containersOf`, Content State, …). Works on the server |
-| `@nakamura196/iiif-viewer/style.css` | Styles of the components (Tailwind utilities, without a global reset) |
-| `@nakamura196/iiif-viewer/element` | The `<iiif-viewer>` tag, with React inside |
+| `iiif-kasane` | React components (`Viewer`, `ImageCompareView`, `GeoImageView`, the 3D `Scene`, …) and their state (jotai atoms) |
+| `iiif-kasane/core` | Manifest reading without React or the DOM (`fetchManifest`, `containersOf`, Content State, …). Works on the server |
+| `iiif-kasane/style.css` | Styles of the components (Tailwind utilities, without a global reset) |
+| `iiif-kasane/element` | The `<iiif-viewer>` tag, with React inside |
 
 ## React
 
 ```tsx
-import { Viewer } from '@nakamura196/iiif-viewer';
-import '@nakamura196/iiif-viewer/style.css';
+import { Viewer } from 'iiif-kasane';
+import 'iiif-kasane/style.css';
 
 export default function Page() {
   return (
@@ -54,7 +55,7 @@ Use them to keep the viewer in step with something else on the page, such as a t
 whose page breaks point to Canvases.
 
 ```tsx
-import { Viewer, type ViewerTarget } from '@nakamura196/iiif-viewer';
+import { Viewer, type ViewerTarget } from 'iiif-kasane';
 
 const [target, setTarget] = useState<ViewerTarget>({ canvasId: 'https://example.org/canvas/p2' });
 
@@ -115,8 +116,8 @@ and put the parts inside it. They share one state: the loaded manifest, the show
 selected annotation.
 
 ```tsx
-import { ViewerProvider, CanvasView, AnnotationList, Metadata, useViewer } from '@nakamura196/iiif-viewer';
-import '@nakamura196/iiif-viewer/style.css';
+import { ViewerProvider, CanvasView, AnnotationList, Metadata, useViewer } from 'iiif-kasane';
+import 'iiif-kasane/style.css';
 
 <ViewerProvider iiifContent={manifestUrl} locale="en" className="my-layout" onSelect={(s) => console.log(s)}>
   <CanvasView className="my-view" />   {/* the page buttons and the image / 3D / A/V display */}

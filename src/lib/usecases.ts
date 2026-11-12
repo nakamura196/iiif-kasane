@@ -1,5 +1,5 @@
-import type { CompareBlend, CompareMode } from '@nakamura196/iiif-viewer';
-import { contentParam } from '@nakamura196/iiif-viewer/core';
+import type { CompareBlend, CompareMode } from 'iiif-kasane';
+import { contentParam } from 'iiif-kasane/core';
 import { withBasePath } from '@/lib/basePath';
 import { BY_SOURCE } from '@/lib/browse';
 import { SITE_URL } from '@/lib/site';

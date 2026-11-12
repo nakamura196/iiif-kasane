@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { buttonClass } from '@nakamura196/react-ui';
-import { DISCOVERY_MAX_ITEMS } from '@nakamura196/iiif-viewer/core';
+import { DISCOVERY_MAX_ITEMS } from 'iiif-kasane/core';
 import { SEARCH_EXAMPLES } from './examples';
 
 /** URL を入れる最初の画面。onOpen で読み込む URL を親に渡す。 */

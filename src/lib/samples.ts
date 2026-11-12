@@ -1,4 +1,4 @@
-import { contentParam } from '@nakamura196/iiif-viewer/core';
+import { contentParam } from 'iiif-kasane/core';
 import { withBasePath } from '@/lib/basePath';
 import type { ViewerTab } from '@/lib/viewerTabs';
 
