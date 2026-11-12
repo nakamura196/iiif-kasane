@@ -96,7 +96,9 @@ function PuzzleDialog({ picture, size, onClose, t }: { picture: Picture; size: n
     setMoves(0);
   };
 
+  // body の下に出すので、ビューアの色と、ビューアに限った見た目（iiif-viewer）をここにも付ける
   return createPortal(
+    <div className="iiif-viewer">
     <div
       role="dialog"
       aria-modal="true"
@@ -174,6 +176,7 @@ function PuzzleDialog({ picture, size, onClose, t }: { picture: Picture; size: n
           {t('close')}
         </button>
       </div>
+    </div>
     </div>,
     document.body,
   );

@@ -1,9 +1,34 @@
 import { defineConfig } from 'vite';
 import tailwindcss from '@tailwindcss/postcss';
 import { fileURLToPath } from 'node:url';
+import type { AtRule, Node, Plugin, Rule } from 'postcss';
 import { generateRegistries } from '../../scripts/gen-registries.mjs';
 
 generateRegistries();
+
+// The viewer's utilities have Tailwind's plain names (.flex, .hidden, .border, ...). A host page may
+// use the same names for its own elements, so limit every utility to the inside of the viewer
+// (the <iiif-viewer> tag, or the element with class "iiif-viewer" that ViewerProvider draws).
+// :where() adds no specificity, so the utilities keep their weight.
+const SCOPE = ':where(.iiif-viewer, .iiif-viewer *, iiif-viewer *)';
+const inUtilities = (rule: Rule): boolean => {
+  for (let node = rule.parent as Node | undefined; node; node = node.parent as Node | undefined) {
+    if (node.type !== 'atrule') continue;
+    const at = node as AtRule;
+    if (/keyframes$/.test(at.name)) return false;
+    if (at.name === 'layer' && at.params === 'utilities') return true;
+  }
+  return false;
+};
+const scopeUtilities = (): Plugin => ({
+  postcssPlugin: 'iiif-viewer-scope-utilities',
+  OnceExit(root) {
+    root.walkRules((rule) => {
+      if (!inUtilities(rule)) return;
+      rule.selectors = rule.selectors.map((s) => (/^[>+~]/.test(s.trim()) ? s : `${SCOPE}${s.trim()}`));
+    });
+  },
+});
 
 // Build of the <iiif-viewer> tag: one ES module (iiif-viewer.js) with React and the
 // viewer inside, plus style.css. The 3D part (three.js, react-three-fiber) is a lazy
@@ -16,7 +41,7 @@ export default defineConfig({
     'process.env.NODE_ENV': JSON.stringify('production'),
   },
   css: {
-    postcss: { plugins: [tailwindcss()] },
+    postcss: { plugins: [tailwindcss(), scopeUtilities()] },
   },
   build: {
     outDir: 'dist',
