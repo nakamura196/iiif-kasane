@@ -1,4 +1,4 @@
-// <iiif-viewer iiif-content="..." locale="ja" theme="auto" options='{"tab":"metadata","panelOpen":false,"pager":false}'></iiif-viewer>
+// <iiif-viewer iiif-content="..." locale="ja" theme="auto" options='{"tab":"metadata","panelOpen":false,"pager":false,"environment":"none"}'></iiif-viewer>
 // Light DOM (no shadow root) so that the host page can set --iiif-viewer-* variables.
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -9,16 +9,27 @@ import type { InfoTab } from '../react/layout/panels/Info';
 
 const TABS: readonly InfoTab[] = ['metadata', 'annotations'];
 
-function parseOptions(raw: string | null): { tab?: InfoTab; panelOpen?: boolean; pager?: boolean } {
+function parseOptions(raw: string | null): {
+  tab?: InfoTab;
+  panelOpen?: boolean;
+  pager?: boolean;
+  environment?: string;
+} {
   if (!raw) return {};
   try {
     const json: unknown = JSON.parse(raw);
     if (typeof json !== 'object' || json === null) return {};
-    const { tab, panelOpen, pager } = json as { tab?: unknown; panelOpen?: unknown; pager?: unknown };
+    const { tab, panelOpen, pager, environment } = json as {
+      tab?: unknown;
+      panelOpen?: unknown;
+      pager?: unknown;
+      environment?: unknown;
+    };
     return {
       ...(typeof tab === 'string' && (TABS as readonly string[]).includes(tab) ? { tab: tab as InfoTab } : {}),
       ...(typeof panelOpen === 'boolean' ? { panelOpen } : {}),
       ...(typeof pager === 'boolean' ? { pager } : {}),
+      ...(typeof environment === 'string' ? { environment } : {}),
     };
   } catch {
     return {};
@@ -81,6 +92,7 @@ export class IiifViewerElement extends HTMLElement {
         tab: this.tab,
         panelOpen: parseOptions(this.getAttribute('options')).panelOpen,
         pager: parseOptions(this.getAttribute('options')).pager,
+        environment: parseOptions(this.getAttribute('options')).environment,
         onTabChange: (next) => {
           this.tab = next;
           this.render();

@@ -10,6 +10,8 @@ interface Env {
   locale: string;
   messages: ViewerMessages;
   resolvedTheme: ResolvedTheme;
+  /** Lighting of the 3D view; see SceneEnvironmentOption. Undefined means the built-in one. */
+  environment?: string;
 }
 
 // Without a provider the viewer still works: Japanese, light.
@@ -21,12 +23,18 @@ export function ViewerEnv({
   locale = 'ja',
   messages,
   resolvedTheme = 'light',
+  environment,
   children,
 }: {
   locale?: string;
   /** Defaults to the messages bundled with the package for `locale`. */
   messages?: ViewerMessages;
   resolvedTheme?: ResolvedTheme;
+  /**
+   * Lighting of the 3D view: "built-in" (default, no network request), "none", a drei preset
+   * name (fetched from raw.githack.com), or the URL of an .hdr / .exr file.
+   */
+  environment?: string;
   children: ReactNode;
 }) {
   const value = useMemo<Env>(
@@ -34,8 +42,9 @@ export function ViewerEnv({
       locale,
       messages: messages ?? (locale === 'en' ? bundled.en : bundled.ja),
       resolvedTheme,
+      environment,
     }),
-    [locale, messages, resolvedTheme],
+    [locale, messages, resolvedTheme, environment],
   );
   return <EnvContext.Provider value={value}>{children}</EnvContext.Provider>;
 }
@@ -67,4 +76,9 @@ export function useLocale(): string {
 /** Same shape as next-themes' useTheme, reduced to what the viewer reads. */
 export function useTheme(): { resolvedTheme: ResolvedTheme } {
   return { resolvedTheme: useContext(EnvContext).resolvedTheme };
+}
+
+/** The 3D lighting chosen for this viewer (undefined: the built-in one). */
+export function useSceneEnvironment(): string | undefined {
+  return useContext(EnvContext).environment;
 }

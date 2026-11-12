@@ -5,6 +5,7 @@ export type { ViewerTarget, ViewerSelection } from './navigation';
 export * from './atoms';
 export {
   ViewerEnv,
+  useSceneEnvironment,
   useLocale,
   useTranslations,
   useTheme,
@@ -16,6 +17,11 @@ export { messages as viewerMessages, type ViewerMessages } from './messages';
 export { default as CanvasComponent } from './three/Canvas';
 export { default as Scene, type PlacedModel, type ViewHandle } from './three/Scene';
 export { default as ModelChoice } from './three/ModelChoice';
+export {
+  default as SceneEnvironment,
+  resolveSceneEnvironment,
+  type SceneEnvironmentOption,
+} from './three/SceneEnvironment';
 export { default as SidePanel } from './layout/SidePanel';
 export { default as Info, type InfoTab } from './layout/panels/Info';
 export { PANEL_IDS } from './panels/registry';

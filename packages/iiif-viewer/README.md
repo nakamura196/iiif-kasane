@@ -86,6 +86,22 @@ A host page that turns the pages itself (through `target`) can pass `pager={fals
 previous / next buttons above the image, so that the reader does not see two sets. The arrow keys
 still turn the pages, and `onSelect` still reports them. On the tag, use `options='{"pager":false}'`.
 
+### Lighting of the 3D view
+
+The 3D view lights models with an environment map. By default (`"built-in"`) the viewer draws a
+small studio-like one itself, so it makes **no network request** and works under a strict
+Content-Security-Policy. Pass `environment` to change it (on the tag, `options='{"environment":"none"}'`):
+
+| Value | Lighting | Network |
+|---|---|---|
+| `"built-in"` (default) | soft panels drawn inside the viewer | none |
+| `"none"` | plain lights only | none |
+| `"city"`, `"studio"`, ... (drei presets) | photographed environments | fetched from raw.githack.com |
+| any other string, e.g. `"/assets/studio.hdr"` | your own `.hdr` / `.exr` file | that URL |
+
+If a preset or file cannot be loaded (blocked by the CSP, 404), the view falls back to `"none"`
+and keeps showing the model.
+
 ### Hiding a side panel tab
 
 Pass `hidePanels` with tab ids (e.g. `hidePanels={['puzzle']}`) to leave out some of the viewer's

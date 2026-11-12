@@ -1,7 +1,7 @@
 'use client';
 
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Environment, OrbitControls } from '@react-three/drei';
+import { OrbitControls } from '@react-three/drei';
 import { Suspense, useCallback, useEffect, useRef, type MutableRefObject } from 'react';
 import { useTheme } from 'next-themes';
 import { useTranslations } from 'next-intl';
@@ -12,6 +12,7 @@ import {
   CompareHint,
   LensRing,
   Scene,
+  SceneEnvironment,
   SwipeHandle,
   compareClipOf,
   lensRingPositionOf,
@@ -106,7 +107,7 @@ function Pane({
         {url && <Scene glbUrl={url} extraModels={extraModels} viewRef={viewRef} />}
         <OrbitControls makeDefault enableDamping dampingFactor={0.1} rotateSpeed={0.5} zoomSpeed={0.8} panSpeed={0.5} />
         <CameraSync index={index} shared={shared} />
-        <Environment preset="city" background={false} environmentIntensity={isDark ? 0.6 : 1} />
+        <SceneEnvironment isDark={isDark} />
         <ambientLight intensity={isDark ? 0.15 : 0.25} />
         <directionalLight position={[10, 10, 5]} intensity={isDark ? 0.5 : 0.7} />
       </Suspense>
