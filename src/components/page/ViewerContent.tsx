@@ -7,61 +7,46 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useTheme } from 'next-themes';
 import { Viewer, manifestUrlAtom, type InfoTab, type ViewerTarget } from 'iiif-kasane';
-// 3D の Scene も表示する（three.js などは 3D を開いたときだけ読み込まれる）
+// Also show 3D Scenes (three.js and the rest load only when a 3D item is opened)
 import 'iiif-kasane/scene';
 import ManifestInput from '@/components/Input';
 import ManifestParamWatcher from '@/components/ManifestParamWatcher';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import { containersOf, convertToV4, fetchManifest, parseManifestV4 } from 'iiif-kasane/core';
+import { containersOf, convertToV4, fetchManifest } from 'iiif-kasane/core';
 import { HIDDEN_VIEWER_TABS, OTHER_VIEWS_TAB, viewerTabOf } from '@/lib/viewerTabs';
 import { puzzleFromParams } from '@/lib/puzzleLink';
-import { canOpenInGallery } from '@/lib/gallery';
-import { canOpenInBrowse } from '@/lib/browse';
 import { otherViewsPanel, type CompareTarget } from '@/components/OtherViewsPanel';
 import { LocalImageError, filesFromDataTransfer, isLocalManifestUrl, openLocalImages } from '@/lib/localImage';
 
 /** Whether a drag carries files (not text or a link, which the viewer handles itself). */
 const dragHasFiles = (e: React.DragEvent) => Array.from(e.dataTransfer.types).includes('Files');
 
-// ビューアが左下に置く場所（renderActions）から、比較に渡せるかを受け取るだけの部品。何も描かない。
-// 候補の無い Canvas に移ると呼ばれなくなる（外される）ので、そのとき null に戻す。
-// The index counts in the manifest shown now (the entry of a Collection, if one is open), so it goes with that URL.
-function CompareReport({
-  target,
-  manifestUrl,
-  onChange,
-}: {
-  target: number | null;
-  manifestUrl: string;
-  onChange: (c: CompareTarget) => void;
-}) {
+// Only receives, from the place the viewer keeps at the bottom left (renderActions), whether the shown item can go
+// to the compare page. It draws nothing. On a Canvas without candidates it is no longer rendered, and resets to null.
+function CompareReport({ target, onChange }: { target: number | null; onChange: (c: CompareTarget) => void }) {
   useEffect(() => {
-    onChange(target === null ? null : { selectedIndex: target, manifestUrl });
+    onChange(target === null ? null : { selectedIndex: target });
     return () => onChange(null);
-  }, [target, manifestUrl, onChange]);
+  }, [target, onChange]);
   return null;
 }
 
-// /viewer?iiif-content=...&tab=...（?manifest=... も読む）: ビューア本体はパッケージの Viewer。
-// ここでは URL の読み書きと、ヘッダー・フッター・入力欄だけを持つ。
+// /viewer?iiif-content=...&tab=... (?manifest=... is read too): the viewer itself is the package's Viewer.
+// This page only reads and writes the URL and holds the header, the footer and the input.
 const ViewerContent: NextPage = () => {
-  // Header も同じ値（ダウンロードのリンクなど）を読むので、サイト側の store に持つ
+  // The Header reads the same value (the download link etc.), so it is in the site's store
   const [manifestUrl, setManifestUrl] = useAtom(manifestUrlAtom);
   const searchParams = useSearchParams();
   const router = useRouter();
   const locale = useLocale();
   const { resolvedTheme } = useTheme();
   const to = useTranslations('OtherViews');
-  // 地図と並べて見られる位置情報（Canvas または Scene の georeferencing）があるか
-  const [hasGeoCanvas, setHasGeoCanvas] = useState(false);
-  // 画像を含み、3D の美術館（/gallery/）の壁に掛けられるか
-  const [galleryOk, setGalleryOk] = useState(false);
-  // Collection か、Canvas が 2 つ以上ある Manifest で、3D の一覧（/browse/）に渡せるか
-  const [browseOk, setBrowseOk] = useState(false);
-  // 表示中の模型か画像に候補が 2 つ以上あれば、比較のページに渡す Canvas / Scene の番号（ビューアが知らせる）
+  // Whether the map, the gallery and the 3D browse can take the item is worked out in the "Other views" tab from the
+  // manifest shown now (an entry of a Collection, once opened).
+  // When the shown model or image has two or more candidates, the Canvas / Scene index for the compare page (the viewer reports it)
   const [compare, setCompare] = useState<CompareTarget>(null);
-  // ?puzzle=<ページ>&grid=<マスの数> で開いたときのパズル。ページの Canvas の id はマニフェストを読んでから決まる
+  // The puzzle opened by ?puzzle=<page>&grid=<pieces>. The page's Canvas id is known once the manifest is read
   const puzzleParam = searchParams?.get('puzzle') ?? null;
   const gridParam = searchParams?.get('grid') ?? null;
   const puzzleLink = useMemo(() => {
@@ -81,22 +66,22 @@ const ViewerContent: NextPage = () => {
     [puzzleCanvasId],
   );
   const tl = useTranslations('LocalImage');
-  // 手元の画像（サーバに送らず、このタブの中だけで開いたもの）
+  // Local images (opened only in this tab, not sent to a server)
   const isLocal = isLocalManifestUrl(manifestUrl);
   const [local, setLocal] = useState({ name: '', count: 0, skipped: 0 });
   const [fileError, setFileError] = useState('');
   const [fileStatus, setFileStatus] = useState('');
   const [dragging, setDragging] = useState(false);
 
-  // 手元の画像を開く。アドレス欄には書かない（blob: の URL は再読み込みすると読めず、共有もできないため）。
-  // 開いていた資料の引数は外し、文字の読み取り（推論）のタブで開く
-  // 複数の画像は名前順に並べ、1 冊のマニフェストにする
+  // Open local images. Not written to the address bar (a blob: URL cannot be read after a reload, nor shared).
+  // The arguments of the item open before are removed, and the text reading (inference) tab is opened.
+  // Several images are sorted by name into one manifest
   const openFiles = useCallback(
     async (files: File[]) => {
       setFileError('');
       try {
         const opened = await openLocalImages(files, (done, total) => {
-          // 1 枚だけのときは一瞬で終わるので出さない
+          // not shown for a single image, which takes no time
           if (total > 1) setFileStatus(tl('reading', { done, total }));
         });
         setLocal({ name: opened.label, count: opened.count, skipped: opened.skipped.length });
@@ -110,7 +95,7 @@ const ViewerContent: NextPage = () => {
     },
     [router, setManifestUrl, tl],
   );
-  // 開いたとき、また入口の事例のリンクで URL の資料が変わったときに読む
+  // Read when the page opens, and when a link on the entry screen changes the item in the URL
   const readUrl = useCallback(
     (manifestParam: string | null) => {
       if (manifestParam) setManifestUrl(manifestParam);
@@ -118,23 +103,15 @@ const ViewerContent: NextPage = () => {
     [setManifestUrl],
   );
 
+  // the Canvas ids of the item in the URL, for a puzzle link (?puzzle=)
   useEffect(() => {
-    setHasGeoCanvas(false);
-    setGalleryOk(false);
-    setBrowseOk(false);
     setCanvasIds([]);
     if (!manifestUrl) return;
     let cancelled = false;
     fetchManifest(manifestUrl)
       .then((raw) => {
         if (cancelled || !raw) return;
-        // 2D の Canvas か、3D の Scene に位置情報（georeferencing）がある
-        const v4 = convertToV4(raw);
-        const { geoCanvasId, geoFeatures } = parseManifestV4(v4);
-        setCanvasIds(containersOf(v4).map((c) => c.id));
-        setHasGeoCanvas(!!geoCanvasId || geoFeatures.length > 0);
-        setGalleryOk(canOpenInGallery(raw));
-        setBrowseOk(canOpenInBrowse(raw));
+        setCanvasIds(containersOf(convertToV4(raw)).map((c) => c.id));
       })
       .catch(() => {});
     return () => {
@@ -142,7 +119,7 @@ const ViewerContent: NextPage = () => {
     };
   }, [manifestUrl]);
 
-  // パズルを閉じたら、リンクの引数を外す（再読み込みや戻る操作で、また開かないように）
+  // When the puzzle is closed, remove the link's arguments (so that a reload or going back does not open it again)
   const closePuzzleLink = useCallback(() => {
     const params = new URLSearchParams(window.location.search);
     if (!params.has('puzzle') && !params.has('grid')) return;
@@ -151,39 +128,40 @@ const ViewerContent: NextPage = () => {
     router.replace(`?${params.toString()}`);
   }, [router]);
 
-  // 比較・地図・3D の美術館・3D の一覧とパズルへは、右の「ほかの表示」タブから行く
+  // Compare, map, 3D gallery, 3D browse and the puzzle are reached from the "Other views" tab on the right
   const otherViewsLabel = to('tab');
   const panels = useMemo(
     () =>
-      // 手元の画像は、ほかのページ（比較・地図・3D）へ URL で渡せないので「ほかの表示」を出さない
+      // Local images cannot be passed by URL to the other pages (compare, map, 3D), so no "Other views"
       manifestUrl && !isLocal
         ? [
             otherViewsPanel(
-              { manifestUrl, hasGeo: hasGeoCanvas, galleryOk, browseOk, compare, puzzle, onPuzzleClose: closePuzzleLink },
+              { manifestUrl, compare, puzzle, onPuzzleClose: closePuzzleLink },
               otherViewsLabel,
             ),
           ]
         : [],
-    [manifestUrl, isLocal, hasGeoCanvas, galleryOk, browseOk, compare, puzzle, closePuzzleLink, otherViewsLabel],
+    [manifestUrl, isLocal, compare, puzzle, closePuzzleLink, otherViewsLabel],
   );
 
   const tabParam = searchParams?.get('tab');
-  // パズルのリンクで開いたときは、パズルのある「ほかの表示」タブを開く
+  // Opened from a puzzle link: open the "Other views" tab, where the puzzle is
   const tab = viewerTabOf(tabParam) ?? (puzzleLink ? OTHER_VIEWS_TAB : undefined);
 
   const handleTabChange = (next: InfoTab) => {
     const params = new URLSearchParams(searchParams?.toString() || '');
     params.set('tab', next);
-    // 履歴に追加して URL を更新
+    // add to the history and update the URL
     router.push(`?${params.toString()}`);
   };
 
   return (
-    // ビューアを開いたら h-dvh で画面の高さに固定する（スマホではブラウザのツールバーの分だけ 100vh が見える範囲より高く、下端が隠れるため）。
-    // 入口の画面は min-h-dvh にしてページごとスクロールさせる。高さを固定すると、スマホではフッターが場所を取り、入口の欄が押しつぶされて見えなくなる
+    // With the viewer open, h-dvh fixes the height to the screen (on phones 100vh is taller than the visible area by the
+    // browser's toolbar, which hides the bottom). The entry screen uses min-h-dvh and scrolls as a page: with a fixed
+    // height the footer takes the room on phones and squeezes the input out of sight
     <div
       className={`flex flex-col relative ${manifestUrl ? 'h-dvh' : 'min-h-dvh'}`}
-      // 画面のどこに画像を落としても開く。文字やリンクのドラッグ（ビューアの中の並べ替えなど）には手を出さない
+      // An image dropped anywhere on the screen is opened. Dragged text or links (reordering inside the viewer etc.) are left alone
       onDragOver={(e) => {
         if (!dragHasFiles(e)) return;
         e.preventDefault();
@@ -238,16 +216,16 @@ const ViewerContent: NextPage = () => {
             panels={panels}
             hidePanels={HIDDEN_VIEWER_TABS}
             target={puzzleTarget}
-            // 閉じた右パネルは中身を描かないので、パズルのリンクで開いたときは開いておく
+            // a closed right panel draws nothing, so it is open when the page comes from a puzzle link
             panelOpen={puzzleLink ? true : undefined}
-            // 左下には何も出さず、候補があるかだけを受け取って「ほかの表示」タブの比較に渡す
-            renderActions={({ iiifContent, hasChoices, selectedIndex }) => (
-              <CompareReport target={hasChoices ? selectedIndex : null} manifestUrl={iiifContent} onChange={setCompare} />
+            // nothing is drawn at the bottom left: only whether there are candidates, passed to the compare of "Other views"
+            renderActions={({ hasChoices, selectedIndex }) => (
+              <CompareReport target={hasChoices ? selectedIndex : null} onChange={setCompare} />
             )}
           />
         ) : (
           <div className="w-full flex px-4 py-8">
-            {/* 入口の画面。画面に余裕があれば真ん中に置き、足りなければページごとスクロールする。幅はトップに近い 768px まで */}
+            {/* The entry screen: centered when there is room, else the page scrolls. Up to 768px wide, close to the top page */}
             <div className="m-auto w-full max-w-3xl">
               <ManifestInput
                 onSubmit={(url: string) => setManifestUrl(url)}

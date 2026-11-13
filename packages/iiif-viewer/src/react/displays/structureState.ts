@@ -54,14 +54,26 @@ export const compareMultiAtom = atom<CompareMulti | null>(null);
 /** 選ばれている代替のページ順（sequence の Range の id）。null は元の順。 */
 export const sequenceIdAtom = atom<string | null>(null);
 
-/** Collection をたどってきた道すじ（戻るために、開く前のものを積む）。 */
-/** One step of the trail: what was shown, its URL and its served JSON (the displays need it after going back). */
+/** One step of the trail: what was shown, its URL, its served JSON and the page the reader was on. */
 export interface TrailItem {
   url: string;
   manifest: ManifestV4;
-  raw?: unknown;
+  raw: unknown;
+  /** Index of the page (container) shown when the reader left it. */
+  index: number;
 }
+
+/** The way taken through Collections: what was shown before each move, to go back to it. */
 export const trailAtom = atom<{ owner: string | null; items: TrailItem[] }>({ owner: null, items: [] });
+
+/**
+ * The page picked by the reader, and the shown manifest (ShownManifest.seq) it belongs to. Another manifest
+ * shown starts at its first page, unless going back restores the page saved on the trail.
+ */
+export const pickedPageAtom = atom<{ shown: number; index: number }>({ shown: 0, index: 0 });
+
+/** seq of a manifest shown again by going back: its first page is not chosen again from content state or `start`. */
+export const restoredSeqAtom = atom<number | null>(null);
 
 let seqCounter = 0;
 export const nextSeq = (): number => ++seqCounter;
@@ -102,26 +114,31 @@ function leaveViewState(store: Store) {
   store.set(compareMultiAtom, null);
 }
 
+/** Result of opening a manifest: shown, could not be read, or dropped because a later request replaced it. */
+export type OpenResult = 'shown' | 'failed' | 'stale';
+
 /**
  * Open the manifest (or Collection) at the URL in the viewer of this store. With push, "back" returns
  * to what is shown now. Only the latest request is shown: when another open, a back or a new
- * iiif-content comes before this one is read, this one is dropped (and counts as done, not failed).
+ * iiif-content comes before this one is read, this one is dropped ('stale').
  */
-export async function openManifest(store: Store, url: string, push: boolean, locale: () => string): Promise<boolean> {
-  const result = await loadManifest(store, url, locale, () => {
+export async function openManifest(store: Store, url: string, push: boolean, locale: () => string): Promise<OpenResult> {
+  return loadManifest(store, url, locale, () => {
     const here = store.get(shownManifestAtom);
-    if (!push || !here) return;
-    // what goes on the trail is the one being left (its own URL, not the one being opened)
-    const item: TrailItem = { url: here.url, manifest: here.manifest, raw: here.raw };
-    const owner = store.get(manifestUrlAtom);
-    store.set(trailAtom, (t) => ({ owner, items: t.owner === owner ? [...t.items, item] : [item] }));
+    if (push && here) {
+      // what goes on the trail is the one being left (its own URL, not the one being opened), with its page
+      const picked = store.get(pickedPageAtom);
+      const index = picked.shown === here.seq ? picked.index : 0;
+      const item: TrailItem = { url: here.url, manifest: here.manifest, raw: here.raw, index };
+      const owner = store.get(manifestUrlAtom);
+      store.set(trailAtom, (t) => ({ owner, items: t.owner === owner ? [...t.items, item] : [item] }));
+    }
+    // before the new manifest is shown, so what is set for it afterwards (a content state's region) stays
+    leaveViewState(store);
   });
-  if (result === 'failed') return false;
-  if (result === 'shown') leaveViewState(store);
-  return true;
 }
 
-/** Go back one step of the trail. false when there is nothing to go back to. */
+/** Go back one step of the trail, to the page the reader was on. false when there is nothing to go back to. */
 export function goBack(store: Store, locale: string): boolean {
   const owner = store.get(manifestUrlAtom);
   const trail = store.get(trailAtom);
@@ -129,22 +146,24 @@ export function goBack(store: Store, locale: string): boolean {
   const prev = items[items.length - 1];
   if (!prev) return false;
   store.set(trailAtom, { owner, items: items.slice(0, -1) });
-  // a step saved without its JSON (older trail) leaves the displays to read it again by its URL
-  showManifest(store, prev.url, { raw: prev.raw ?? null, manifest: prev.manifest }, locale);
   leaveViewState(store);
+  showManifest(store, prev.url, { raw: prev.raw, manifest: prev.manifest }, locale);
+  const seq = store.get(shownManifestAtom)?.seq ?? 0;
+  store.set(pickedPageAtom, { shown: seq, index: prev.index });
+  store.set(restoredSeqAtom, seq);
   return true;
 }
 
-/** マニフェストを（URL から）読み直して、Viewer の状態に入れる。Collection からの移動にも使う。 */
+/** Open manifests (from their URL) in the viewer, and go back. Used by moves inside a Collection. */
 export function useManifestSwitch() {
   const store = useStore();
   const locale = useLocaleRef();
   const manifestUrl = useAtomValue(manifestUrlAtom);
   const trail = useAtomValue(trailAtom);
 
-  /** URL のマニフェスト（または Collection）を開く。push なら「戻る」で今のものに戻れる。 */
+  /** Open the manifest (or Collection) at the URL. With push, "back" returns to what is shown now. */
   const open = useCallback(
-    (url: string, push: boolean): Promise<boolean> => openManifest(store, url, push, () => locale.current),
+    (url: string, push: boolean): Promise<OpenResult> => openManifest(store, url, push, () => locale.current),
     [store, locale],
   );
 

@@ -125,7 +125,7 @@ test('of two entries clicked quickly, the last one is shown even when the first 
   await expect(pager(page)).toContainText('1 / 4');
 });
 
-test('the compare link of an entry carries the entry URL with the page number in it', async ({ page }) => {
+test('the links of the Other views tab open the entry, with the page number in it', async ({ page }) => {
   await serve(page);
   await open(page);
   await page.getByRole('button', { name: /Beta/ }).click();
@@ -140,6 +140,14 @@ test('the compare link of an entry carries the entry URL with the page number in
   const params = new URL(href, 'https://x.example').searchParams;
   expect(params.get('iiif-content') ?? params.get('manifest')).toBe(`${BASE}/b.json`);
   expect(params.get('canvas')).toBe('1');
+
+  // the 3D browse and the gallery also open the entry (it has images and several pages), not the Collection
+  const browse = page.locator('a[href*="/browse"]').first();
+  await expect(browse).toBeVisible();
+  expect(new URL((await browse.getAttribute('href')) ?? '', 'https://x.example').searchParams.get('iiif-content')).toBe(`${BASE}/b.json`);
+  const gallery = page.locator('a[href*="/gallery"]').first();
+  await expect(gallery).toBeVisible();
+  expect(new URL((await gallery.getAttribute('href')) ?? '', 'https://x.example').searchParams.get('u')).toBe(`${BASE}/b.json`);
 });
 
 // A new locale keeps the open entry and page (no reload back to the top of the Collection).

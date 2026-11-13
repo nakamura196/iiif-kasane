@@ -10,6 +10,11 @@ export interface PanelContext {
   annotationCount?: number;
   /** Number of annotation pages made in the browser (inference results etc.), not counting search marks. */
   localAnnotationCount?: number;
+  /**
+   * The shown manifest as served (before conversion), when `manifest` is the one shown in the viewer.
+   * Tabs that need details the conversion drops read it.
+   */
+  rawManifest?: unknown;
   /** Number of annotation pages made in the browser and shown on this container's image, not counting search marks. */
   containerLocalAnnotationCount?: number;
 }

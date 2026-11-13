@@ -199,7 +199,12 @@ function ImageBody({
         >
           {/* the Choice the comparison page compares */}
           {b.content.id === compared?.id &&
-            props.renderActions?.({ iiifContent: props.iiifContent, hasChoices: true, selectedIndex: props.selectedIndex })}
+            props.renderActions?.({
+              iiifContent: props.iiifContent,
+              shownUrl: props.shownUrl,
+              hasChoices: true,
+              selectedIndex: props.selectedIndex,
+            })}
         </ChoiceBar>
       ))}
       <div className="relative flex-1 min-h-0 min-w-0">
@@ -366,7 +371,7 @@ function MediaBody({ props, images, kind }: { props: DisplayProps; images: Canva
 
 function ImageCanvasDisplay(props: DisplayProps) {
   const t = useTranslations('Viewer');
-  const raw = useRawManifest(props.iiifContent);
+  const raw = useRawManifest(props.shownUrl ?? props.iiifContent);
   const { container } = props;
 
   // before the source manifest arrives, a converted Canvas (a Scene) is not yet known to be flat

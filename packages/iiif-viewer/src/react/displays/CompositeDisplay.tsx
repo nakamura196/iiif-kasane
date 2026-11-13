@@ -270,7 +270,7 @@ function CompositeStage({ container, timeline, cover }: { container: ContainerIn
 function CompositeDisplayView(props: DisplayProps) {
   const { container, manifest } = props;
   // 表紙は元のマニフェストの placeholderCanvas、無ければ Canvas の thumbnail（動画を含むときだけ）
-  const raw = useRawManifest(props.iiifContent);
+  const raw = useRawManifest(props.shownUrl ?? props.iiifContent);
   const cover = useMemo(() => {
     const images = canvasImagesOf(rawCanvasOf(raw ?? manifest, container.id));
     return images.placeholder?.layer.url ?? images.thumbnail;

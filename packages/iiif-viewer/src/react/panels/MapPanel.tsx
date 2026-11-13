@@ -103,7 +103,7 @@ function MapPanel({ manifest, container }: PanelContext) {
     setSelected(p.key);
     setFailed(null);
     if (p.scope === 'item' && p.resourceId) {
-      if (!(await open(p.resourceId, true))) setFailed(p.key);
+      if ((await open(p.resourceId, true)) === 'failed') setFailed(p.key);
       return;
     }
     if (p.containerId && p.containerId !== current) setRequest({ seq: nextSeq(), target: { canvasId: p.containerId } });

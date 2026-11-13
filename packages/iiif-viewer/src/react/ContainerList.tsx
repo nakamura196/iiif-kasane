@@ -20,13 +20,14 @@ import {
   type ContentStateTargets,
   type ContainerInfo,
 } from '../core';
-import { manifestAtom } from './atoms';
+import { manifestAtom, shownManifestAtom } from './atoms';
 import {
   compareAtom,
   compareMultiAtom,
   focusAtom,
   navRequestAtom,
   nextSeq,
+  restoredSeqAtom,
   usePageOrder,
   useManifestSwitch,
 } from './displays/structureState';
@@ -60,6 +61,8 @@ const isEditable = (el: EventTarget | null): boolean => {
 export default function ContainerList({ containers, selected, onSelect, pager = true }: Props) {
   const t = useTranslations('Structure');
   const manifest = useAtomValue(manifestAtom);
+  const shown = useAtomValue(shownManifestAtom);
+  const restoredSeq = useAtomValue(restoredSeqAtom);
   const [request, setRequest] = useAtom(navRequestAtom);
   const setFocus = useSetAtom(focusAtom);
   const setCompare = useSetAtom(compareAtom);
@@ -118,9 +121,14 @@ export default function ContainerList({ containers, selected, onSelect, pager = 
         const failed: string[] = [];
         await Promise.all(
           remote.map(async (g) => {
-            const m = await readManifest(g.manifestUrl);
-            if (m) sources.push({ manifestUrl: g.manifestUrl, label: nameOf(m, g.manifestUrl), containers: containersOf(m) });
-            else failed.push(g.manifestUrl);
+            // one source that cannot be read goes to `failed`; the others are still shown
+            try {
+              const m = await readManifest(g.manifestUrl);
+              if (!m) throw new Error('The manifest could not be read');
+              sources.push({ manifestUrl: g.manifestUrl, label: nameOf(m, g.manifestUrl), containers: containersOf(m) });
+            } catch {
+              failed.push(g.manifestUrl);
+            }
           }),
         );
         if (run !== multiRun.current) return;
@@ -145,6 +153,8 @@ export default function ContainerList({ containers, selected, onSelect, pager = 
     const key = `${manifest.id}`;
     if (applied.current === key) return;
     applied.current = key;
+    // shown again by going back: the reader returns to the page they were on, not to the first one
+    if (shown && shown.manifest === manifest && shown.seq === restoredSeq) return;
     let matched: Array<CanvasTarget & { index: number }> = [];
     let allTargets: ContentStateTargets['targets'] = [];
     if (pending.current) {

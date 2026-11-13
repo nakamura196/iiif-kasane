@@ -81,10 +81,6 @@ export interface ShownManifest {
 }
 export const shownManifestAtom = atom<ShownManifest | null>(null);
 
-// URL of the manifest (or Collection) shown now; after opening an entry of a Collection, the entry's URL.
-// Links (the compare page etc.) use it. The served JSON is in shownManifestAtom (not fetched again)
-export const shownManifestUrlAtom = atom((get) => get(shownManifestAtom)?.url ?? null);
-
 // アノテーション表示/非表示のアトム
 export const showAnnotationsAtom = atom<boolean>(true);
 

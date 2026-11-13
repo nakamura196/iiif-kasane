@@ -10,10 +10,10 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { Provider, createStore, useAtomValue, useSetAtom } from 'jotai';
+import { Provider, createStore, useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { containersOf, type ContainerInfo, type ManifestV4 } from '../core';
 import { manifestAtom, modelChoicesAtom, shownManifestAtom } from './atoms';
-import { navRequestAtom, nextSeq } from './displays/structureState';
+import { navRequestAtom, nextSeq, pickedPageAtom } from './displays/structureState';
 import { ViewerEnv, type ResolvedTheme } from './env';
 import {
   CanvasNavigationContext,
@@ -150,10 +150,11 @@ function ViewerStateRoot({
   const { failed } = useManifest(iiifContent);
 
   const containers = useMemo(() => containersOf(manifest), [manifest]);
-  // the page picked belongs to one shown manifest: a new one (another iiif-content, an entry of a Collection,
-  // going back) starts from its first page (or where a content state / `target` / `start` sends it)
+  // the page picked belongs to one shown manifest: a new one (another iiif-content, an entry of a Collection)
+  // starts from its first page (or where a content state / `target` / `start` sends it); going back restores
+  // the page the reader was on. It is in the store so that the trail can keep it.
   const shownSeq = shown?.seq ?? 0;
-  const [picked, setPicked] = useState<{ shown: number; index: number }>({ shown: shownSeq, index: 0 });
+  const [picked, setPicked] = useAtom(pickedPageAtom);
   const selected = pickedIndex(picked, shownSeq, containers.length);
   const container: ContainerInfo | undefined = containers[selected];
 
@@ -229,7 +230,7 @@ function ViewerStateRoot({
         return true;
       },
     }),
-    [containers, shownSeq, setModelChoices],
+    [containers, shownSeq, setPicked, setModelChoices],
   );
 
   // 外（使う側のページ）から指定された Canvas・範囲へ移る。マニフェストが読めてから、値が変わったときだけ。

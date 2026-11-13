@@ -7,8 +7,13 @@ import type { ViewerActionsState } from '../Viewer';
 export interface DisplayProps {
   container: ContainerInfo;
   manifest: ManifestV4;
-  /** URL of the shown manifest (after a move inside a Collection, the entry's URL, not the Collection's). */
+  /** The iiif-content given to the viewer (a Collection stays the Collection after an entry is opened). */
   iiifContent: string;
+  /**
+   * URL of the manifest shown now: iiifContent, or the entry opened from a Collection. Displays that read
+   * the source manifest use `shownUrl ?? iiifContent`.
+   */
+  shownUrl?: string;
   /** All containers of the manifest and the shown one (for paging, a table of contents). */
   containers: ContainerInfo[];
   selectedIndex: number;

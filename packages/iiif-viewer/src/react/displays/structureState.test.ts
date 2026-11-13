@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createStore } from 'jotai';
-import { manifestAtom, manifestUrlAtom, shownManifestAtom, shownManifestUrlAtom } from '../atoms';
+import { manifestAtom, manifestUrlAtom, shownManifestAtom } from '../atoms';
 import { loadManifest } from '../useManifest';
-import { goBack, openManifest, trailAtom } from './structureState';
+import { compareAtom, focusAtom, goBack, openManifest, pickedPageAtom, trailAtom } from './structureState';
 
 // Moves inside a Collection (openManifest) and the first load (loadManifest), checked on a jotai store alone.
 // fetch is replaced, and each test decides the order of the answers.
@@ -57,10 +57,11 @@ describe('openManifest', () => {
     await answer(url('b'));
     await answer(url('a'));
     await Promise.all([a, b]);
-    expect(store.get(shownManifestUrlAtom)).toBe(url('b'));
+    expect(store.get(shownManifestAtom)?.url).toBe(url('b'));
     expect(store.get(manifestAtom)?.id).toBe(url('b'));
-    // the dropped request does not count as a failure (no error on the entry)
-    expect(await a).toBe(true);
+    // the dropped request is neither shown nor a failure (the entry can stop showing "opening")
+    expect(await a).toBe('stale');
+    expect(await b).toBe('shown');
   });
 
   it('is dropped when a new iiif-content starts loading meanwhile', async () => {
@@ -71,7 +72,7 @@ describe('openManifest', () => {
     await answer(url('entry'));
     expect(await top).toBe('shown');
     await entry;
-    expect(store.get(shownManifestUrlAtom)).toBe(url('other-top'));
+    expect(store.get(shownManifestAtom)?.url).toBe(url('other-top'));
   });
 
   it('does not let a slow first load replace an entry opened after it', async () => {
@@ -82,7 +83,7 @@ describe('openManifest', () => {
     await answer(url('top'));
     expect(await top).toBe('stale');
     await entry;
-    expect(store.get(shownManifestUrlAtom)).toBe(url('entry'));
+    expect(store.get(shownManifestAtom)?.url).toBe(url('entry'));
   });
 
   it('keeps the served JSON with the shown manifest, and puts the one being left on the trail', async () => {
@@ -93,7 +94,7 @@ describe('openManifest', () => {
     await top;
     const entry = openManifest(store, url('entry'), true, locale);
     await answer(url('entry'));
-    expect(await entry).toBe(true);
+    expect(await entry).toBe('shown');
 
     const shown = store.get(shownManifestAtom);
     expect(shown?.url).toBe(url('entry'));
@@ -124,7 +125,7 @@ describe('openManifest', () => {
     goBack(store, 'en');
     await answer(url('second'));
     await second;
-    expect(store.get(shownManifestUrlAtom)).toBe(url('collection'));
+    expect(store.get(shownManifestAtom)?.url).toBe(url('collection'));
   });
 
   it('counts each shown manifest, also the same one shown again', async () => {
@@ -139,5 +140,37 @@ describe('openManifest', () => {
     await entry;
     goBack(store, 'en');
     expect(store.get(shownManifestAtom)!.seq).toBe(s1 + 2);
+  });
+
+  it('goes back to the page the reader was on', async () => {
+    const store = createStore();
+    store.set(manifestUrlAtom, url('top'));
+    const top = loadManifest(store, url('top'), locale);
+    await answer(url('top'));
+    await top;
+    // the reader is on the third page of what is shown
+    store.set(pickedPageAtom, { shown: store.get(shownManifestAtom)!.seq, index: 2 });
+    const entry = openManifest(store, url('entry'), true, locale);
+    await answer(url('entry'));
+    await entry;
+    expect(store.get(trailAtom).items[0].index).toBe(2);
+    // the entry starts from its first page (the picked page belonged to the one left)
+    expect(store.get(pickedPageAtom).shown).not.toBe(store.get(shownManifestAtom)!.seq);
+    goBack(store, 'en');
+    expect(store.get(pickedPageAtom)).toEqual({ shown: store.get(shownManifestAtom)!.seq, index: 2 });
+  });
+
+  it('clears the focus and compare of the manifest left before the new one is shown', async () => {
+    const store = createStore();
+    store.set(focusAtom, { seq: 1, target: { canvasId: 'x' } });
+    store.set(compareAtom, [1, 2]);
+    // what is set right when the new manifest is shown (as a content state target would be) stays
+    const unsub = store.sub(manifestAtom, () => store.set(compareAtom, [0, 1]));
+    const entry = openManifest(store, url('entry'), false, locale);
+    await answer(url('entry'));
+    await entry;
+    unsub();
+    expect(store.get(focusAtom)).toBeNull();
+    expect(store.get(compareAtom)).toEqual([0, 1]);
   });
 });

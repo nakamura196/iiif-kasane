@@ -124,8 +124,10 @@ function CollectionDisplay(props: DisplayProps) {
 
   const openEntry = async (e: CollectionEntry) => {
     setState({ id: e.id, kind: 'opening' });
-    const ok = await open(e.id, true);
-    if (!ok) setState({ id: e.id, kind: 'error' });
+    const result = await open(e.id, true);
+    if (result === 'failed') setState({ id: e.id, kind: 'error' });
+    // dropped because something else was asked for: stop showing this entry as opening (unless another entry is)
+    else if (result === 'stale') setState((s) => (s?.id === e.id ? null : s));
   };
 
   if (entries.length === 0) {
