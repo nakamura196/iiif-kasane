@@ -25,6 +25,10 @@ if (packIdx >= 0 && (!argv[packIdx + 1] || argv[packIdx + 1].startsWith('--'))) 
   process.exit(2);
 }
 const packDirArg = packIdx >= 0 ? resolve(argv[packIdx + 1]) : null;
+if (packDirArg && existsSync(packDirArg) && readdirSync(packDirArg).length > 0) {
+  console.error(`--pack-dir ${packDirArg} must be empty, so that only the tested tarball is in it`);
+  process.exit(2);
+}
 const started = Date.now();
 const failures = [];
 
@@ -42,8 +46,13 @@ const check = (ok, msg) => {
 // defines any that would then be skipped.
 step('Build the package');
 const manifestPkg = JSON.parse(readFileSync(join(pkgDir, 'package.json'), 'utf8'));
-for (const hook of ['prepack', 'prepublishOnly', 'prepare', 'prepublish', 'postpack']) {
-  if (manifestPkg.scripts?.[hook] && hook !== 'prepack') {
+const scripts = manifestPkg.scripts ?? {};
+if (scripts.prepack !== undefined && scripts.prepack !== 'npm run build') {
+  console.error(`"prepack" must be exactly "npm run build" (it is: ${scripts.prepack}): the tarball is packed with --ignore-scripts after an explicit build.`);
+  process.exit(2);
+}
+for (const hook of ['prepublishOnly', 'prepare', 'prepublish', 'publish', 'postpublish', 'postpack']) {
+  if (scripts[hook]) {
     console.error(`package.json defines "${hook}", which does not run when a tarball is published: move that work into the build.`);
     process.exit(2);
   }
@@ -53,10 +62,7 @@ run('npm', ['run', 'build', '-w', 'iiif-kasane'], root);
 const work = mkdtempSync(join(tmpdir(), 'kasane-smoke-'));
 const packDir = packDirArg ?? work;
 mkdirSync(packDir, { recursive: true });
-if (packDirArg && readdirSync(packDir).length > 0) {
-  console.error(`--pack-dir ${packDir} must be empty, so that only the tested tarball is in it`);
-  process.exit(2);
-}
+
 try {
 step(`Pack into ${packDir}`);
 const packOut = run('npm', ['pack', '--ignore-scripts', '--json', '--pack-destination', packDir], pkgDir, { quiet: true });
@@ -78,7 +84,11 @@ check(![...tarFiles].some((p) => p.startsWith('src/') || p.endsWith('.map')), 't
 // 3. Install the tarball into a consumer project.
 step('Install into a consumer project');
 const lock = JSON.parse(readFileSync(join(root, 'package-lock.json'), 'utf8'));
-const locked = (name) => lock.packages[`node_modules/${name}`].version;
+const locked = (name) => {
+  const entry = lock.packages[`node_modules/${name}`];
+  if (!entry) throw new Error(`package-lock.json has no entry for ${name}; the smoke test pins its consumer packages to the lockfile`);
+  return entry.version;
+};
 const makeConsumer = (name, deps, devDeps, extraNpmArgs = []) => {
   const dir = join(work, name);
   mkdirSync(dir);
@@ -114,15 +124,15 @@ check(coreOut === 'function undefined', `iiif-kasane/core imports without a DOM 
 // 5. The main entry must not pull three.js, even through its own chunks (static imports only; the 3D part is a lazy import).
 step('Main entry does not need 3D packages');
 const THREE = /^(three|three-stdlib|gsap|@react-three\/.+)(\/|$)/;
-// Static import/export specifiers, read with TypeScript's scanner so that comments, strings and minified
-// syntax (`import{a}from"x"`, `export*from"x"`, `import"x"`) are handled. Dynamic imports (`import("x")`)
-// and require() are lazy chunks and are left out on purpose.
-const staticImports = (src) =>
+// Import/export specifiers, read with TypeScript's scanner so that comments, strings and minified
+// syntax (`import{a}from"x"`, `export*from"x"`, `import"x"`) are handled. Dynamic imports (`import("x")`) are lazy
+// chunks: they are skipped unless `withDynamic` is set (the tag bundle must contain all its chunks, lazy ones included).
+const importsOf = (src, withDynamic) =>
   ts
     .preProcessFile(src, true, true)
-    .importedFiles.filter((f) => !src.slice(0, f.pos).trimEnd().endsWith('('))
+    .importedFiles.filter((f) => withDynamic || !src.slice(0, f.pos).trimEnd().endsWith('('))
     .map((f) => f.fileName);
-const walk = (entryAbs) => {
+const walk = (entryAbs, withDynamic = false) => {
   const seen = new Set();
   const bare = new Set();
   const todo = [entryAbs];
@@ -130,7 +140,7 @@ const walk = (entryAbs) => {
     const f = todo.pop();
     if (seen.has(f)) continue;
     seen.add(f);
-    for (const spec of staticImports(readFileSync(f, 'utf8'))) {
+    for (const spec of importsOf(readFileSync(f, 'utf8'), withDynamic)) {
       if (spec.startsWith('.')) todo.push(resolve(dirname(f), spec));
       else bare.add(spec);
     }
@@ -143,7 +153,7 @@ check(!main.bare.some((s) => THREE.test(s)), 'main entry does not statically imp
 check(main.bare.includes('react') && main.bare.includes('jotai'), 'react and jotai stay external (peers, not bundled)');
 const core = walk(join(installed, pkg.exports['./core'].default));
 check(!core.bare.some((s) => THREE.test(s) || /^(react|react-dom|jotai)(\/|$)/.test(s)), `core entry needs no React, jotai or 3D packages (${core.bare.join(', ') || 'none'})`);
-const tag = walk(join(installed, 'dist', 'iiif-kasane.js'));
+const tag = walk(join(installed, 'dist', 'iiif-kasane.js'), true);
 check(tag.bare.length === 0, `tag bundle and its chunks (${tag.files} files) have no bare imports (self-contained) ${tag.bare.join(', ')}`);
 check(readFileSync(join(installed, 'dist', 'iiif-viewer.js'), 'utf8').includes('iiif-kasane.js'), 'legacy iiif-viewer.js loads iiif-kasane.js');
 check(readFileSync(join(installed, 'dist', 'style.css'), 'utf8').length > 1000, 'style.css is not empty');
@@ -159,39 +169,50 @@ const tsc = (dir, source) => {
     JSON.stringify({ compilerOptions: { module: 'esnext', moduleResolution: 'bundler', target: 'es2022', jsx: 'react-jsx', strict: true, noEmit: true, skipLibCheck: false, types: [] }, files: ['check.ts'] }),
   );
   try {
-    run('node', [join(dir, 'node_modules', 'typescript', 'bin', 'tsc'), '-p', dir], dir);
-    return true;
-  } catch {
-    return false;
+    run('node', [join(dir, 'node_modules', 'typescript', 'bin', 'tsc'), '-p', dir], dir, { quiet: true });
+    return { ok: true, errors: [] };
+  } catch (e) {
+    const errors = String(e.stdout ?? e.message).split('\n').filter((l) => l.includes('error TS'));
+    return { ok: false, errors };
   }
 };
+const report = (r) => r.errors.forEach((l) => console.log(`        ${l}`));
+const mainAndCore = [
+  "import { Viewer, type ViewerState } from 'iiif-kasane';",
+  "import { fetchManifest, containersOf } from 'iiif-kasane/core';",
+  'export const v: typeof Viewer = Viewer;',
+  'export const f: typeof fetchManifest = fetchManifest;',
+  'export const c: typeof containersOf = containersOf;',
+  'export type S = ViewerState;',
+];
+// Known gap, kept as an expected failure: dist/types/core/types/main.d.ts imports types from 'three' (an optional
+// peer), so a consumer without three.js cannot type-check with skipLibCheck off. The published types are not changed
+// here (a public API decision). This check goes red on any other error, and also when the gap is fixed: then replace
+// it with a plain "type-checks" check.
+const plain = tsc(consumer, mainAndCore);
+const KNOWN = /node_modules\/iiif-kasane\/dist\/types\/core\/types\/main\.d\.ts\(\d+,\d+\): error TS2307: Cannot find module 'three' or its corresponding type declarations\./;
+const unexpected = plain.errors.filter((l) => !KNOWN.test(l));
+if (unexpected.length) report({ errors: unexpected });
+check(
+  !plain.ok && plain.errors.length > 0 && unexpected.length === 0,
+  `without three.js, main and core types fail only with the known "Cannot find module 'three'" (expected failure; ${plain.ok ? 'it now passes: flip this check' : plain.errors.length + ' known error(s)'})`,
+);
 const consumer3d = makeConsumer(
   'consumer3d',
   ['react', 'react-dom', 'jotai', 'three', '@react-three/fiber', '@react-three/drei', 'three-stdlib', 'gsap'],
   ['typescript', '@types/react', '@types/react-dom', '@types/three'],
-  // The lockfile has three 0.187, which the package's peer range ("^0.178.0 || ^0.186.0") does not list, so npm would refuse.
-  ['--legacy-peer-deps'],
+  // No --legacy-peer-deps: npm must accept the lockfile versions under the package's peer ranges.
 );
-check(
-  tsc(consumer3d, [
-    "import { Viewer, type ViewerState } from 'iiif-kasane';",
-    "import { fetchManifest, containersOf } from 'iiif-kasane/core';",
-    'export const v: typeof Viewer = Viewer;',
-    'export const f: typeof fetchManifest = fetchManifest;',
-    'export const c: typeof containersOf = containersOf;',
-    'export type S = ViewerState;',
-  ]),
-  'main and core entries type-check against the installed package',
-);
-// The 3D entry is checked separately only to keep the failure message specific.
-check(
-  tsc(consumer3d, [
-    "import { Scene, type PlacedModel } from 'iiif-kasane/scene';",
-    'export const s: typeof Scene = Scene;',
-    'export type P = PlacedModel;',
-  ]),
-  'the scene entry type-checks against the installed package (with the 3D peers)',
-);
+const withPeers = tsc(consumer3d, mainAndCore);
+report(withPeers);
+check(withPeers.ok, 'main and core entries type-check against the installed package (with the 3D peers)');
+const sceneTypes = tsc(consumer3d, [
+  "import { Scene, type PlacedModel } from 'iiif-kasane/scene';",
+  'export const s: typeof Scene = Scene;',
+  'export type P = PlacedModel;',
+]);
+report(sceneTypes);
+check(sceneTypes.ok, 'the scene entry type-checks against the installed package (with the 3D peers)');
 
 // 7. The tag bundle in a real browser.
 if (!args.has('--no-browser') && failures.length === 0) {

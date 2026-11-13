@@ -71,7 +71,14 @@ test.beforeAll(async () => {
   test.skip(!PKG, 'SMOKE_PKG_DIR is not set (run through scripts/smoke-package.mjs)');
   const image = png(800, 600);
   server = createServer((req, res) => {
-    const url = decodeURIComponent(new URL(req.url ?? '/', 'http://localhost').pathname);
+    let url: string;
+    try {
+      url = decodeURIComponent(new URL(req.url ?? '/', 'http://localhost').pathname);
+    } catch {
+      res.writeHead(400);
+      res.end();
+      return;
+    }
     const send = (type: string, body: string | Buffer) => {
       res.writeHead(200, { 'content-type': type, 'access-control-allow-origin': '*' });
       res.end(body);
