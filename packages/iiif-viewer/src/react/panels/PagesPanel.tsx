@@ -190,7 +190,7 @@ function PagesView({ container, manifest }: PanelContext) {
                 }`}
               >
                 <span
-                  className={`${grid ? 'w-full aspect-[4/3]' : 'shrink-0 w-20 h-16'} grid place-items-center rounded bg-gray-100 dark:bg-gray-800 overflow-hidden`}
+                  className={`${grid ? 'w-full aspect-[4/3]' : 'shrink-0 w-20 h-16'} relative grid place-items-center rounded bg-gray-100 dark:bg-gray-800 overflow-hidden`}
                 >
                   {thumb && !broken[c.id] ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -199,7 +199,7 @@ function PagesView({ container, manifest }: PanelContext) {
                       alt=""
                       loading="lazy"
                       draggable={false}
-                      className="max-w-full max-h-full object-contain"
+                      className="absolute inset-0 w-full h-full object-contain p-1"
                       onError={() => setBroken((b) => ({ ...b, [c.id]: true }))}
                     />
                   ) : (
