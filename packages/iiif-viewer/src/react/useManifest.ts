@@ -19,6 +19,7 @@ import {
   manifestUrlAtom,
   modelChoicesAtom,
   paintedModelsAtom,
+  sceneIdAtom,
   shownManifestAtom,
   type ShownOrigin,
 } from './atoms';
@@ -61,6 +62,23 @@ export function beginLoad(store: Store): () => boolean {
   return () => store.get(loadTicketAtom) === ticket;
 }
 
+/** What showManifest derives from a manifest. Computed before anything in the store changes, because it can throw. */
+export interface PreparedShow {
+  annotations: ReturnType<typeof parseManifestV4>['annotations'];
+  hasGeo: boolean;
+  paintedModels: ReturnType<typeof paintedModelsOf>;
+}
+
+/** Parse a manifest for showing. Throws when the manifest's v4 form cannot be parsed (nothing is changed). */
+export function prepareShow(manifest: ManifestV4, locale: string): PreparedShow {
+  const { annotations, geoCanvasId, geoFeatures } = parseManifestV4(manifest, undefined, locale);
+  return {
+    annotations,
+    hasGeo: !!geoCanvasId || geoFeatures.length > 0,
+    paintedModels: paintedModelsOf(firstSceneOf(manifest)),
+  };
+}
+
 /**
  * Put a manifest (or Collection) into the store as the shown one: the manifest, its URL and served JSON,
  * its annotations, the painted 3D models, and reset model choices and layer settings.
@@ -74,12 +92,12 @@ export function showManifest(
   source: ManifestSource,
   locale: string,
   origin: ShownOrigin,
+  prepared: PreparedShow = prepareShow(source.manifest, locale),
 ): void {
   const { manifest, raw } = source;
+  const { annotations, hasGeo, paintedModels } = prepared;
   beginLoad(store);
-  const { annotations, geoCanvasId, geoFeatures } = parseManifestV4(manifest, undefined, locale);
-  const hasGeo = !!geoCanvasId || geoFeatures.length > 0;
-  store.set(paintedModelsAtom, paintedModelsOf(firstSceneOf(manifest)));
+  store.set(paintedModelsAtom, paintedModels);
   store.set(modelChoicesAtom, {});
   store.set(layerSettingsAtom, {});
   store.set(layerOrderAtom, {});
@@ -88,6 +106,22 @@ export function showManifest(
   store.set(shownManifestAtom, { url, raw, manifest, seq, origin, hasGeo });
   store.set(manifestAtom, manifest);
   store.set(annotationsAtom, annotations);
+}
+
+/**
+ * A new locale: read the annotations' labels again from what is shown. Reads the Scene on display, not the first
+ * one: SceneDisplay (below useManifest) sets sceneIdAtom to the Scene it shows, and sceneOf falls back to the
+ * first Scene for an id the manifest does not have (an image or AV canvas shows no Scene, and the first Scene's
+ * notes are what showManifest put there).
+ */
+export function reparseAnnotations(store: Store, locale: string): void {
+  const shown = store.get(shownManifestAtom);
+  if (!shown) return;
+  try {
+    store.set(annotationsAtom, parseManifestV4(shown.manifest, store.get(sceneIdAtom), locale).annotations);
+  } catch (e) {
+    console.error('Error reading manifest:', e);
+  }
 }
 
 /** Result of loading a manifest: shown, could not be read, or dropped because a later request replaced it. */
@@ -120,8 +154,16 @@ export async function loadManifest(
   const source = await readManifestSource(url);
   if (!isCurrent()) return 'stale';
   if (!source) return 'failed';
+  // parsed before beforeShow, so a manifest that cannot be parsed changes nothing (no trail entry, no cleared focus)
+  let prepared: PreparedShow;
+  try {
+    prepared = prepareShow(source.manifest, locale());
+  } catch (e) {
+    console.error('Error reading manifest:', e);
+    return 'failed';
+  }
   beforeShow?.(source);
-  showManifest(store, url, source, locale(), origin);
+  showManifest(store, url, source, locale(), origin, prepared);
   return 'shown';
 }
 
@@ -193,8 +235,7 @@ export function useManifest(iiifContent: string | null): { failed: boolean } {
   useEffect(() => {
     if (parsedLocale.current === locale) return;
     parsedLocale.current = locale;
-    const shown = store.get(shownManifestAtom);
-    if (shown) store.set(annotationsAtom, parseManifestV4(shown.manifest, undefined, locale).annotations);
+    reparseAnnotations(store, locale);
   }, [locale, store]);
 
   return { failed: iiifContent !== null && failedUrl === iiifContent };

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAtomValue } from 'jotai';
 import {
   chronologyOf,
@@ -103,22 +103,17 @@ function CollectionDisplay(props: DisplayProps) {
   // the entries come from the Collection as served: kept with the shown one, or read by its id when a host page
   // put the manifest into the store itself (manifestAtom)
   const shown = useAtomValue(shownManifestAtom);
-  const stored = shown?.manifest === manifest ? shown.raw : null;
-  const [fetched, setFetched] = useState<{ id: string; entries: CollectionEntry[] } | null>(null);
+  const [read, setRead] = useState<{ manifest: unknown; entries: CollectionEntry[] } | null>(null);
   useEffect(() => {
-    if (!isCollection || stored || !manifest.id) return;
+    if (!isCollection || !manifest.id) return;
     let cancelled = false;
-    void collectionEntriesFor(null, manifest).then((entries) => {
-      if (!cancelled) setFetched({ id: manifest.id, entries });
+    void collectionEntriesFor(shown, manifest).then((entries) => {
+      if (!cancelled) setRead({ manifest, entries });
     });
     return () => {
       cancelled = true;
     };
-  }, [isCollection, stored, manifest]);
-  const read = useMemo(
-    () => (!isCollection ? [] : stored ? collectionEntriesOf(stored) : fetched?.id === manifest.id ? fetched.entries : []),
-    [isCollection, stored, fetched, manifest.id],
-  );
+  }, [isCollection, shown, manifest]);
 
   // not a Collection: an empty Scene is a Canvas that the converter turned into a Scene (a rotated image,
   // a Choice, a missing image). The displays after this one decide how it looks (imageCanvas, then scene).
@@ -132,7 +127,8 @@ function CollectionDisplay(props: DisplayProps) {
     type: 'Manifest',
     label: c.label,
   }));
-  const entries = read.length > 0 ? read : fromContainers;
+  const readEntries = read?.manifest === manifest ? read.entries : [];
+  const entries = readEntries.length > 0 ? readEntries : fromContainers;
 
   const openEntry = async (e: CollectionEntry) => {
     setState({ id: e.id, kind: 'opening' });

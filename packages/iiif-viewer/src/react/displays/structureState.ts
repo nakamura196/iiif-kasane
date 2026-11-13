@@ -23,6 +23,7 @@ import { manifestUrlAtom, shownManifestAtom, type ShownOrigin } from '../atoms';
 import {
   isContentLoading,
   loadManifest,
+  prepareShow,
   showManifest,
   trailAtom,
   useLocaleRef,
@@ -151,9 +152,16 @@ export function goBack(store: Store, locale: string): boolean {
   const items = trail.owner === owner ? trail.items : [];
   const prev = items[items.length - 1];
   if (!prev) return false;
+  let prepared;
+  try {
+    prepared = prepareShow(prev.manifest, locale);
+  } catch (e) {
+    console.error('Error reading manifest:', e);
+    return false;
+  }
   store.set(trailAtom, { owner, items: items.slice(0, -1) });
   leaveViewState(store);
-  showManifest(store, prev.url, { raw: prev.raw, manifest: prev.manifest }, locale, 'back');
+  showManifest(store, prev.url, { raw: prev.raw, manifest: prev.manifest }, locale, 'back', prepared);
   store.set(pickedPageAtom, { shown: store.get(shownManifestAtom)?.seq ?? 0, index: prev.index });
   return true;
 }
