@@ -1,6 +1,6 @@
 {
   "name": "iiif-kasane",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "IIIF viewer building blocks: React components, framework-free core, and the <iiif-kasane> tag.",
   "license": "MIT",
   "author": "Satoru Nakamura",
