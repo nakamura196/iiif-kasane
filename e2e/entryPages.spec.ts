@@ -2,16 +2,17 @@ import { readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { test, expect } from '@playwright/test';
 
-// 各ページを、マニフェストなど URL の引数を何も付けずに開いたときの画面（入口）を確かめる。
-// ページの一覧は src/app/[locale]/ から拾うので、ページを足せば自動でここの対象になる。
-// [id] のような動的なページは、開くのに id が要るので除く。
+// Check the screen each page shows when opened without any URL argument such as a manifest (the entry screen).
+// The page list is read from src/app/[locale]/, so adding a page puts it under test automatically.
+// Dynamic pages such as [id] are left out because they need an id to open.
+// Requests to outside hosts (images, YouTube, map tiles) are aborted so that CI does not depend on them.
 //
-// 見ること（PR #180 で見つかった崩れ・書き出しの不備を、ページを足すたびに見落とさないため）:
-//   1. 画面の JS がエラーを出さない
-//   2. サイト内のファイル（画像・動画・JSON など）の読み込みが 404 などで失敗しない
-//   3. 最初の見出しが画面の上にはみ出していない（中身を真ん中寄せにして上が切れる崩れ）
-//   4. 横にスクロールしない（幅いっぱいに広がる崩れ）
-// これらを、パソコンの幅とスマートフォンの幅の両方で、日英の両方について見る。
+// What it checks (so that the breakage and export mistakes found in PR #180 are not missed when pages are added):
+//   1. the page's JS raises no error
+//   2. files of this site (images, videos, JSON, ...) load without 404 and the like
+//   3. the first heading does not run off the top of the screen (content centred so that the top is cut off)
+//   4. the page does not scroll sideways (something spreading wider than the screen)
+// Each is checked at desktop and phone widths, for both Japanese and English.
 
 const APP = join(process.cwd(), 'src', 'app', '[locale]');
 
@@ -52,18 +53,21 @@ for (const locale of ['ja', 'en'] as const) {
           if (r.url().startsWith(origin) && r.status() >= 400) errors.push(`読み込みに失敗 (${r.status()}): ${r.url()}`);
         });
 
+        // Do not depend on outside sites: abort every request that does not go to the site under test
+        await tab.route((url) => url.origin !== origin, (route) => route.abort());
+
         await tab.goto(path);
-        // 上部の帯（header）のサイト名は除き、ページの中身の最初の見出しを見る
+        // Skip the site name in the header bar and look at the first heading of the page content
         const heading = tab.locator('h1:not(header *), h2:not(header *)').first();
         await expect(heading).toBeVisible();
-        // 動画などの遅れて始まる読み込みも拾う
+        // Also catch loads that start late, such as videos (outside hosts are aborted above, so this settles)
         await tab.waitForLoadState('networkidle');
 
         const box = await heading.boundingBox();
         expect(box, '最初の見出しの位置').not.toBeNull();
         expect(box!.y, '最初の見出しが画面の上にはみ出している').toBeGreaterThanOrEqual(0);
-        // 見出しの上に別のもの（フッターなど）が重なっていない。/viewer/ の入口は、スマホの幅で
-        // 中身の欄が高さ 0 に押しつぶされ、見出しがフッターの下に隠れていた（toBeVisible では拾えない）
+        // Nothing else (such as the footer) covers the heading. The /viewer/ entry screen once had its content
+        // column squashed to height 0 at phone width, hiding the heading under the footer (toBeVisible cannot catch this)
         const covered = await heading.evaluate((h) => {
           h.scrollIntoView({ block: 'center' });
           const r = h.getBoundingClientRect();
@@ -75,7 +79,7 @@ for (const locale of ['ja', 'en'] as const) {
         const overflow = await tab.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
         expect(overflow, '横にスクロールする').toBeLessThanOrEqual(1);
 
-        // 画面に入るまで読み込まない動画・画像（preload="none"、loading="lazy"）は上の監視では拾えないので、参照先を直接取りに行く
+        // Videos and images that load only when they come into view (preload="none", loading="lazy") escape the monitoring above, so fetch their targets directly
         const media = await tab.evaluate(() =>
           [...document.querySelectorAll<HTMLElement>('img[src], video[src], video[poster], source[src]')].flatMap((e) =>
             ['src', 'poster'].map((a) => e.getAttribute(a)).filter((v): v is string => !!v).map((v) => new URL(v, location.href).href),

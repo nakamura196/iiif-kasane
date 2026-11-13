@@ -60,6 +60,7 @@ async function find(pathname) {
 function parseRange(header, size) {
   const m = /^bytes=(\d*)-(\d*)$/.exec(header ?? '');
   if (!m || (m[1] === '' && m[2] === '')) return null;
+  if (m[1] !== '' && m[2] !== '' && Number(m[1]) > Number(m[2])) return null; // invalid: ignore it and send the whole file
   let start;
   let end;
   if (m[1] === '') {
@@ -69,7 +70,7 @@ function parseRange(header, size) {
     start = Number(m[1]);
     end = m[2] === '' ? size - 1 : Math.min(Number(m[2]), size - 1);
   }
-  return size === 0 || start > end || start >= size ? 'bad' : [start, end];
+  return size === 0 || start >= size ? 'bad' : [start, end];
 }
 
 async function send(req, res, file) {
@@ -97,15 +98,21 @@ createServer(async (req, res) => {
   try {
     let pathname;
     try {
-      pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
+      pathname = new URL(req.url, 'http://localhost').pathname;
+      try {
+        pathname = decodeURIComponent(pathname);
+      } catch {
+        // an undecodable path cannot match a file: it falls through to 404
+      }
     } catch {
       res.writeHead(400, { 'content-type': 'text/plain' });
       res.end('bad request');
       return;
     }
+    const search = new URL(req.url, 'http://localhost').search;
     const { file, redirect } = await find(pathname);
     if (redirect) {
-      res.writeHead(308, { location: redirect });
+      res.writeHead(308, { location: encodeURI(redirect) + search }); // keep the query; encode non-ASCII for the header
       res.end();
       return;
     }

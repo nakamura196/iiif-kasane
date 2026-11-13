@@ -21,20 +21,40 @@ async function textImage(page: Page): Promise<Buffer> {
 interface Seen {
   url: string;
   method: string;
-  hasBody: boolean;
   body: string;
 }
 
 function recordRequests(page: Page) {
   const seen: Seen[] = [];
-  page.on('request', (r) => seen.push({ url: r.url(), method: r.method(), hasBody: !!r.postDataBuffer()?.length, body: r.postData() ?? '' }));
+  page.on('request', (r) => seen.push({ url: r.url(), method: r.method(), body: r.postData() ?? '' }));
   return seen;
 }
 
 // Page-view analytics (Google Analytics) are on the production site only (they need NEXT_PUBLIC_GA_ID) and use POST beacons.
-// They may go to their own hosts, but must not carry the image: no file name, blob: URL or image data in the address or body.
+// They may go to their own hosts, but must not carry the image: no file or folder name, blob: URL or image data
+// in the address or the body, whether raw, percent-encoded or form-encoded.
 const ANALYTICS = /^https:\/\/([\w-]+\.)*(googletagmanager\.com|google-analytics\.com|analytics\.google\.com)\//;
-const IMAGE_TRACES = /blob:|\.png|\.txt|%E7%8C%AB|猫|銘尽|iVBOR|data:image/;
+// The names of every file and folder these tests open
+const OPENED_NAMES = ['猫.png', '猫', 'p1.png', 'p2.png', 'p10.png', 'p1', 'p2', 'p10', 'memo.txt', 'a.txt', '銘尽'];
+const escapeRe = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const IMAGE_TRACES = new RegExp(
+  ['blob:', 'iVBOR', 'data:image', ...OPENED_NAMES.flatMap((n) => [n, encodeURIComponent(n)])].map(escapeRe).join('|'),
+  'i',
+);
+
+function safeDecode(t: string) {
+  try {
+    return decodeURIComponent(t);
+  } catch {
+    return t;
+  }
+}
+
+function carriesImage(r: Seen) {
+  // The page address ("dl=") legitimately names this site's own URL, so leave it out of the address
+  const address = r.url.replace(/[?&]dl=[^&]*/, '');
+  return [address, r.body].some((t) => [t, safeDecode(t), safeDecode(t.replace(/\+/g, ' '))].some((v) => IMAGE_TRACES.test(v)));
+}
 
 function expectNothingSent(all: Seen[], origin: string) {
   const analytics = all.filter((r) => ANALYTICS.test(r.url));
@@ -44,8 +64,8 @@ function expectNothingSent(all: Seen[], origin: string) {
     (r) => !r.url.startsWith(origin) && !r.url.startsWith('blob:') && !r.url.startsWith('data:') && !allowed.test(r.url),
   );
   expect(outside, 'requests to other hosts').toEqual([]);
-  expect(seen.filter((r) => r.hasBody || !['GET', 'HEAD'].includes(r.method)), 'requests that send data').toEqual([]);
-  expect(analytics.filter((r) => IMAGE_TRACES.test(decodeURIComponent(r.url.replace(/[?&]dl=[^&]*/, ''))) || IMAGE_TRACES.test(r.body)), 'analytics requests carrying the image').toEqual([]);
+  expect(seen.filter((r) => r.body !== '' || !['GET', 'HEAD'].includes(r.method)), 'requests that send data').toEqual([]);
+  expect(analytics.filter(carriesImage), 'analytics requests carrying the image').toEqual([]);
 }
 
 async function openLocal(page: Page, png: Buffer) {
@@ -64,7 +84,7 @@ test('opens a local image without putting it in the address', async ({ page, bas
   await expect(img).toBeVisible();
   expect(await img.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBe(900);
 
-    // Neither the image nor blob: goes into the address; it opens on the inference tab.
+  // Neither the image nor blob: goes into the address; it opens on the inference tab.
   // The address is updated just after the banner appears, so poll for it.
   await expect.poll(() => new URL(page.url()).searchParams.get('tab')).toBe('inference');
   const url = new URL(page.url());

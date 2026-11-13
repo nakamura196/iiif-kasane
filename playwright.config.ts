@@ -19,7 +19,7 @@ export default defineConfig({
   use: { baseURL, trace: 'retain-on-failure' },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: [
-    // IIIF Authorization Flow 2.0 のモックサーバ（e2e/auth.spec.ts が使う）
+    // Mock server for the IIIF Authorization Flow 2.0 (used by e2e/auth.spec.ts)
     { command: 'node scripts/auth-mock-server.mjs 3839', url: 'http://localhost:3839/manifest.json', reuseExistingServer: true },
     ...(process.env.E2E_BASE_URL
       ? []

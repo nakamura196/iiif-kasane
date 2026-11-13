@@ -30,7 +30,7 @@ interface TrackInfo {
   cues: number;
 }
 
-// <video> の字幕をすべて読み込ませ（hidden にすると読み込みが始まる）、種類・言語・行数を返す。
+// Load every caption track of the <video> (setting the mode to hidden starts loading) and return kind, language and cue count.
 async function loadedTracks(page: Page, expected: number): Promise<TrackInfo[]> {
   // the entry screen also shows muted example clips: pick the viewer's player (it has controls)
   const video = page.locator('video[controls]');
@@ -78,7 +78,7 @@ test('provides で字幕の種類を見分ける（0074 v4、preview）', { tag:
   await open(page, v4Preview0074);
   const tracks = (await loadedTracks(page, 2)).sort(byLanguage);
   expect(tracks.map((t) => t.language)).toEqual(['en', 'it']);
-  // 0074 v4 は provides で、英語を subtitles（翻訳）、イタリア語を closedCaptions（原語）としている
+  // 0074 v4 uses provides: English is subtitles (a translation), Italian is closedCaptions (the original language)
   expect(tracks.map((t) => t.kind)).toEqual(['subtitles', 'captions']);
 });
 
