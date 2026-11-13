@@ -28,6 +28,9 @@ v4 form directly (Scene, PointSelector / WKTSelector, PerspectiveCamera).
 - `ndl-emaki-story.json` - 国立国会図書館の電子展示会「絵巻の世界」第2章第2節を、ストーリー（describing 注釈を順に読む）にしたもの。
   8 資料・10 段・2 章（Range）。本文と場面の領域は展示会のページのまま。`scripts/build-ndl-emaki-story.mjs` で作り直す。経緯は `docs/notes/storytelling.md`
 
+- `sample-manifest-mixed.json` - 画像（Canvas）・3D（Scene）・動画（Canvas）・音声（Timeline）を 1 つにした IIIF Presentation 4 の見本。
+  コンテンツは IIIF Cookbook の 0001・0608・0003・0002 から。件ごとに表示が切り替わることを見せる用（Issue #269 の返信がきっかけ）
+
 - `youtube-tutorials/` - YouTube の動画を IIIF の Video として参照する例。`collection.json` に日本語版・英語版のマニフェスト 2 件、各 4 本（IIIF Kasane の使い方動画、作成は中村 覚）。
   字幕は動画を作ったときの WebVTT を複製した。YouTube 側は限定公開
 
