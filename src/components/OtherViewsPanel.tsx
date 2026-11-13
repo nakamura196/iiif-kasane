@@ -2,9 +2,9 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Puzzle, canPlayPuzzle, useOptionalViewer, type Panel, type PanelContext } from 'iiif-kasane';
+import { Puzzle, canPlayPuzzle, type Panel, type PanelContext, type ShownManifest } from 'iiif-kasane';
 import { Link } from '@/i18n/routing';
-import { containersOf, contentParam, parseManifestV4, type ManifestV4 } from 'iiif-kasane/core';
+import { containersOf, contentParam } from 'iiif-kasane/core';
 import { puzzleQuery } from '@/lib/puzzleLink';
 import { OTHER_VIEWS_TAB } from '@/lib/viewerTabs';
 import {
@@ -51,21 +51,15 @@ interface Targets {
   browseOk: boolean;
 }
 
-// what the shown manifest can be opened in; worked out once per shown manifest
-const targetsCache = new WeakMap<ManifestV4, Targets>();
-function targetsOf(ctx: PanelContext): Targets {
-  const { manifest, rawManifest } = ctx;
-  if (!manifest) return { hasGeo: false, galleryOk: false, browseOk: false };
-  let t = targetsCache.get(manifest);
+// what the shown manifest can be opened in; worked out once per shown manifest (georeferencing was found when it was shown)
+const NONE: Targets = { hasGeo: false, galleryOk: false, browseOk: false };
+const targetsCache = new WeakMap<ShownManifest, Targets>();
+function targetsOf({ shown }: PanelContext): Targets {
+  if (!shown) return NONE;
+  let t = targetsCache.get(shown);
   if (!t) {
-    // a 2D Canvas or a 3D Scene with georeferencing
-    const { geoCanvasId, geoFeatures } = parseManifestV4(manifest);
-    t = {
-      hasGeo: !!geoCanvasId || geoFeatures.length > 0,
-      galleryOk: canOpenInGallery(rawManifest),
-      browseOk: canOpenInBrowse(rawManifest),
-    };
-    targetsCache.set(manifest, t);
+    t = { hasGeo: shown.hasGeo, galleryOk: canOpenInGallery(shown.raw), browseOk: canOpenInBrowse(shown.raw) };
+    targetsCache.set(shown, t);
   }
   return t;
 }
@@ -80,7 +74,7 @@ function OtherViews({
   const t = useTranslations('OtherViews');
   const tb = useTranslations('Browse');
   // page indexes count in the shown manifest (the entry of a Collection, if one is open), so links use its URL
-  const manifestUrl = useOptionalViewer()?.shownUrl ?? pageUrl;
+  const manifestUrl = ctx.shown?.url ?? pageUrl;
   const { hasGeo, galleryOk, browseOk } = targetsOf(ctx);
   const [browseLayout, setBrowseLayout] = useState<BrowseLayout>('table');
   const [mode, setMode] = useState<GalleryMode>('orbit');

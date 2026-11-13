@@ -2,6 +2,7 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useLayoutEffect,
@@ -13,11 +14,12 @@ import {
 import { Provider, createStore, useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { containersOf, type ContainerInfo, type ManifestV4 } from '../core';
 import { manifestAtom, modelChoicesAtom, shownManifestAtom } from './atoms';
-import { navRequestAtom, nextSeq, pickedPageAtom, restoredSeqAtom } from './displays/structureState';
+import { navRequestAtom, nextSeq, pickedPageAtom } from './displays/structureState';
 import { ViewerEnv, type ResolvedTheme } from './env';
 import {
   CanvasNavigationContext,
   indexOfCanvas,
+  forShown,
   shouldApplyTarget,
   targetKey,
   type CanvasNavigation,
@@ -161,11 +163,16 @@ function ViewerStateRoot({
 
   // The playback position of video and audio. The transcript (right panel) and the media display follow it.
   // A time given from outside (target.t) is applied when the player of that Canvas is attached.
-  const pendingSeek = useRef<{ canvasId: string; t: number; play: boolean } | null>(null);
+  // Both belong to the shown manifest: another one shown (an entry, going back) starts at 0 with nothing waiting.
+  const pendingSeek = useRef<{ shown: number; value: { canvasId: string; t: number; play: boolean } } | null>(null);
   const shownCanvas = useRef<string | undefined>(undefined);
-  const [currentTime, setCurrentTime] = useState(0);
+  const shownSeqRef = useRef(shownSeq);
+  const [time, setTime] = useState({ shown: shownSeq, value: 0 });
+  const currentTime = forShown(time, shownSeq, 0);
+  const setCurrentTime = useCallback((t: number) => setTime({ shown: shownSeqRef.current, value: t }), []);
   const applySeek = (el: HTMLMediaElement | null) => {
-    const p = pendingSeek.current;
+    const waiting = pendingSeek.current;
+    const p = waiting ? forShown(waiting, shownSeqRef.current, null) : null;
     if (!el || !p || shownCanvas.current !== p.canvasId) return;
     pendingSeek.current = null;
     const go = () => {
@@ -185,6 +192,7 @@ function ViewerStateRoot({
   const applySeekRef = useRef(applySeek);
   useLayoutEffect(() => {
     shownCanvas.current = container?.id;
+    shownSeqRef.current = shownSeq;
     applySeekRef.current = applySeek;
   });
   // Players (MediaView, YouTubeView, the composite stage) put themselves in mediaRef.current; then the waiting time is applied
@@ -211,7 +219,7 @@ function ViewerStateRoot({
         setCurrentTime(seconds);
       },
     }),
-    [currentTime, mediaRef],
+    [currentTime, setCurrentTime, mediaRef],
   );
 
   const select = (index: number) => {
@@ -231,7 +239,7 @@ function ViewerStateRoot({
         return true;
       },
     }),
-    [containers, shownSeq, setPicked, setModelChoices],
+    [containers, shownSeq, setPicked, setModelChoices, setCurrentTime],
   );
 
   // Move to the Canvas / region given by the host page: once the manifest is read, and when the value changes.
@@ -248,8 +256,7 @@ function ViewerStateRoot({
     shownId.current = container?.id;
   });
   const appliedTarget = useRef<{ manifestId: string; key: string } | null>(null);
-  const restoredSeq = useAtomValue(restoredSeqAtom);
-  const restored = !!shown && shown.manifest === manifest && shown.seq === restoredSeq;
+  const origin = shown && shown.manifest === manifest ? shown.origin : 'content';
   const waitingFor = useRef<string | null>(null);
   useEffect(() => {
     const next = targetRef.current;
@@ -257,7 +264,7 @@ function ViewerStateRoot({
       if (!next) waitingFor.current = null;
       return;
     }
-    const now = { manifestId: manifest.id, key, restored };
+    const now = { manifestId: manifest.id, key, origin, hasCanvas: next.canvasId != null };
     const apply = shouldApplyTarget(appliedTarget.current, now);
     appliedTarget.current = { manifestId: manifest.id, key };
     if (!apply) return;
@@ -267,7 +274,7 @@ function ViewerStateRoot({
       return;
     }
     if (next.t != null && Number.isFinite(next.t) && next.t >= 0) {
-      pendingSeek.current = { canvasId, t: next.t, play: !!next.play };
+      pendingSeek.current = { shown: shownSeqRef.current, value: { canvasId, t: next.t, play: !!next.play } };
     }
     if (next.canvasId == null && !next.xywh) {
       // only a time: the page stays. If the player is already attached, seek here
@@ -282,7 +289,7 @@ function ViewerStateRoot({
       highlight: next.highlight,
     });
     if (shownId.current === canvasId) applySeekRef.current(mediaRef.current);
-  }, [key, manifest, containers, restored, setNavRequest, mediaRef]);
+  }, [key, manifest, containers, origin, setNavRequest, mediaRef]);
 
   const reported = useRef<string | null>(null);
   useEffect(() => {

@@ -2,7 +2,7 @@ import { createElement, type FunctionComponent } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { ViewerEnv } from './env';
-import { CanvasNavigationContext, indexOfCanvas, shouldApplyTarget, targetKey } from './navigation';
+import { CanvasNavigationContext, forShown, indexOfCanvas, shouldApplyTarget, targetKey } from './navigation';
 import AnnotationBody from './annotation/AnnotationBody';
 
 describe('indexOfCanvas', () => {
@@ -64,16 +64,37 @@ describe('annotation link body', () => {
 
 describe('shouldApplyTarget', () => {
   const key = 'https://e/c1';
+  const now = (manifestId: string, origin: 'content' | 'move' | 'back', hasCanvas = true, k = key) => ({
+    manifestId,
+    key: k,
+    origin,
+    hasCanvas,
+  });
   it('applies a target once per manifest and value', () => {
-    expect(shouldApplyTarget(null, { manifestId: 'a', key, restored: false })).toBe(true);
-    expect(shouldApplyTarget({ manifestId: 'a', key }, { manifestId: 'a', key, restored: false })).toBe(false);
-    expect(shouldApplyTarget({ manifestId: 'a', key }, { manifestId: 'b', key, restored: false })).toBe(true);
+    expect(shouldApplyTarget(null, now('a', 'content'))).toBe(true);
+    expect(shouldApplyTarget({ manifestId: 'a', key }, now('a', 'content'))).toBe(false);
+    expect(shouldApplyTarget({ manifestId: 'a', key }, now('b', 'content'))).toBe(true);
+    // an entry that has the target's Canvas
+    expect(shouldApplyTarget({ manifestId: 'a', key }, now('b', 'move'))).toBe(true);
   });
   it('leaves a manifest shown again by going back on the page the reader was on', () => {
     // target X, open another manifest, go back: the restored page stays
-    expect(shouldApplyTarget({ manifestId: 'b', key }, { manifestId: 'a', key, restored: true })).toBe(false);
+    expect(shouldApplyTarget({ manifestId: 'b', key }, now('a', 'back'))).toBe(false);
   });
-  it('still applies a new target from the host to a restored manifest', () => {
-    expect(shouldApplyTarget({ manifestId: 'b', key }, { manifestId: 'a', key: 'https://e/c2', restored: true })).toBe(true);
+  it('does not carry a target without a Canvas (a region or a time only) into each entry', () => {
+    const regionOnly = '#1,2,3,4#1##0';
+    expect(shouldApplyTarget({ manifestId: 'collection', key: regionOnly }, now('entry', 'move', false, regionOnly))).toBe(false);
+  });
+  it('still applies a new target from the host', () => {
+    expect(shouldApplyTarget({ manifestId: 'b', key }, now('a', 'back', true, 'https://e/c2'))).toBe(true);
+    expect(shouldApplyTarget({ manifestId: 'b', key }, now('a', 'move', false, 'https://e/c2'))).toBe(true);
+  });
+});
+
+describe('forShown', () => {
+  it('keeps a value (a playback time, a waiting seek) only for the manifest it was set on', () => {
+    expect(forShown({ shown: 3, value: 42 }, 3, 0)).toBe(42);
+    // another manifest shown (an entry, going back): back to the start
+    expect(forShown({ shown: 3, value: 42 }, 4, 0)).toBe(0);
   });
 });

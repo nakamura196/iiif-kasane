@@ -74,9 +74,22 @@ function EntryThumbnail({ entry, className }: { entry: CollectionEntry; classNam
   return need && fetched?.id !== entry.id ? <span ref={ref} aria-hidden className={className} /> : null;
 }
 
+/**
+ * The entries of a Collection, from the JSON kept with the shown manifest when it is this one, else read by the
+ * Collection's id (a host page may set manifestAtom itself).
+ */
+export async function collectionEntriesFor(
+  shown: { manifest: unknown; raw: unknown } | null,
+  manifest: { id: string },
+): Promise<CollectionEntry[]> {
+  if (shown && shown.manifest === manifest) return collectionEntriesOf(shown.raw);
+  const raw = await fetchManifest(manifest.id);
+  return raw ? collectionEntriesOf(raw) : [];
+}
+
 // A Collection (a manifest whose items are Manifests): choose one to open.
 // When two or more items carry a navDate (Cookbook 0230), they can also be shown by date, grouped by year.
-// The converter turns the items into empty Scenes, so the Collection is fetched again
+// The converter turns the items into empty Scenes, so the Collection as served is read
 // to know which entries are Manifests and which are Collections.
 function CollectionDisplay(props: DisplayProps) {
   const { manifest, containers } = props;
@@ -87,10 +100,25 @@ function CollectionDisplay(props: DisplayProps) {
   const [state, setState] = useState<{ id: string; kind: 'opening' | 'error' } | null>(null);
   const [order, setOrder] = useState<'collection' | 'date'>('collection');
 
-  // the entries come from the Collection as served, kept with the shown one (this display shows the shown manifest)
+  // the entries come from the Collection as served: kept with the shown one, or read by its id when a host page
+  // put the manifest into the store itself (manifestAtom)
   const shown = useAtomValue(shownManifestAtom);
-  const raw = shown?.manifest === manifest ? shown.raw : null;
-  const read = useMemo(() => (isCollection && raw ? collectionEntriesOf(raw) : []), [isCollection, raw]);
+  const stored = shown?.manifest === manifest ? shown.raw : null;
+  const [fetched, setFetched] = useState<{ id: string; entries: CollectionEntry[] } | null>(null);
+  useEffect(() => {
+    if (!isCollection || stored || !manifest.id) return;
+    let cancelled = false;
+    void collectionEntriesFor(null, manifest).then((entries) => {
+      if (!cancelled) setFetched({ id: manifest.id, entries });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isCollection, stored, manifest]);
+  const read = useMemo(
+    () => (!isCollection ? [] : stored ? collectionEntriesOf(stored) : fetched?.id === manifest.id ? fetched.entries : []),
+    [isCollection, stored, fetched, manifest.id],
+  );
 
   // not a Collection: an empty Scene is a Canvas that the converter turned into a Scene (a rotated image,
   // a Choice, a missing image). The displays after this one decide how it looks (imageCanvas, then scene).

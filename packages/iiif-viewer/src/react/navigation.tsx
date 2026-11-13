@@ -1,5 +1,6 @@
 'use client';
 
+import type { ShownOrigin } from './atoms';
 import { createContext, useContext } from 'react';
 import type { Xywh } from '../core';
 
@@ -47,14 +48,21 @@ export const targetKey = (target: ViewerTarget | undefined): string =>
     : '';
 
 /**
- * Whether the host page's `target` is applied now. It is applied once per shown manifest and target value,
- * except to a manifest shown again by going back with the same target: the reader returns to the page they were on.
+ * Whether the host page's `target` is applied now. A new target value is always applied. The same value is
+ * applied again to another shown manifest only when it is the iiif-content ('content'), or an entry opened from it
+ * ('move') that has the target's Canvas. A target without a Canvas (a region or a time only) is not carried into
+ * entries, and going back ('back') keeps the page the reader was on.
  */
 export function shouldApplyTarget(
   last: { manifestId: string; key: string } | null,
-  now: { manifestId: string; key: string; restored: boolean },
+  now: { manifestId: string; key: string; origin: ShownOrigin; hasCanvas: boolean },
 ): boolean {
-  if (last && last.manifestId === now.manifestId && last.key === now.key) return false;
-  if (now.restored && last?.key === now.key) return false;
-  return true;
+  if (!last || last.key !== now.key) return true;
+  if (last.manifestId === now.manifestId) return false;
+  if (now.origin === 'content') return true;
+  return now.origin === 'move' && now.hasCanvas;
 }
+
+/** A value that belongs to one shown manifest (ShownManifest.seq): `fallback` once another one is shown. */
+export const forShown = <T,>(v: { shown: number; value: T }, shown: number, fallback: T): T =>
+  v.shown === shown ? v.value : fallback;

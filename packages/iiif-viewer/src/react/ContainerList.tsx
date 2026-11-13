@@ -20,15 +20,14 @@ import {
   type ContentStateTargets,
   type ContainerInfo,
 } from '../core';
-import { manifestAtom, manifestUrlAtom, shownManifestAtom } from './atoms';
+import { manifestAtom, shownManifestAtom } from './atoms';
 import {
   compareAtom,
   compareMultiAtom,
   focusAtom,
   navRequestAtom,
   nextSeq,
-  restoredSeqAtom,
-  urlTargetsUsedForAtom,
+  openWithTargets,
   usePageOrder,
   useManifestSwitch,
 } from './displays/structureState';
@@ -63,9 +62,6 @@ export default function ContainerList({ containers, selected, onSelect, pager = 
   const t = useTranslations('Structure');
   const manifest = useAtomValue(manifestAtom);
   const shown = useAtomValue(shownManifestAtom);
-  const restoredSeq = useAtomValue(restoredSeqAtom);
-  const iiifContent = useAtomValue(manifestUrlAtom);
-  const [urlTargetsUsedFor, setUrlTargetsUsedFor] = useAtom(urlTargetsUsedForAtom);
   const [request, setRequest] = useAtom(navRequestAtom);
   const setFocus = useSetAtom(focusAtom);
   const setCompare = useSetAtom(compareAtom);
@@ -157,7 +153,8 @@ export default function ContainerList({ containers, selected, onSelect, pager = 
     if (applied.current === key) return;
     applied.current = key;
     // shown again by going back: the reader returns to the page they were on, not to the first one
-    if (shown && shown.manifest === manifest && shown.seq === restoredSeq) return;
+    const origin = shown && shown.manifest === manifest ? shown.origin : 'content';
+    if (origin === 'back') return;
     let matched: Array<CanvasTarget & { index: number }> = [];
     let allTargets: ContentStateTargets['targets'] = [];
     if (pending.current) {
@@ -166,8 +163,7 @@ export default function ContainerList({ containers, selected, onSelect, pager = 
       pending.current = null;
     }
     // the page's URL arguments point into the first manifest shown for the iiif-content, not into entries opened later
-    const fromUrl = typeof window !== 'undefined' && urlTargetsUsedFor !== iiifContent;
-    if (fromUrl) setUrlTargetsUsedFor(iiifContent);
+    const fromUrl = typeof window !== 'undefined' && origin === 'content';
     if (matched.length === 0 && fromUrl) {
       const param = new URLSearchParams(window.location.search).get('iiif-content');
       const state = parseContentState(param);
@@ -207,8 +203,8 @@ export default function ContainerList({ containers, selected, onSelect, pager = 
     const url = state?.manifestUrl;
     if (!state || !url || opened.current === manifest.id) return;
     opened.current = manifest.id;
-    pending.current = state.targets;
-    void open(url, false);
+    // the manifest the content state points to is still the iiif-content: its URL arguments and target apply
+    void openWithTargets(open, pending, url, state.targets, 'content');
   }, [manifest, type, open]);
 
   // --- keyboard: arrow keys follow the viewing direction ---
@@ -266,8 +262,7 @@ export default function ContainerList({ containers, selected, onSelect, pager = 
       const state = parseDroppedText(text);
       if (!state) return;
       if (state.manifestUrl) {
-        pending.current = state.targets;
-        void open(state.manifestUrl, false);
+        void openWithTargets(open, pending, state.manifestUrl, state.targets, 'move');
         return;
       }
       const matched = matchTargets(state.targets, containers);

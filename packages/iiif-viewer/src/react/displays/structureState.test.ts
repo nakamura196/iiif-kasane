@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createStore } from 'jotai';
 import { manifestAtom, manifestUrlAtom, shownManifestAtom } from '../atoms';
 import { loadContent } from '../useManifest';
-import { compareAtom, focusAtom, goBack, openManifest, pickedPageAtom, trailAtom } from './structureState';
+import { compareAtom, focusAtom, goBack, openManifest, openWithTargets, pickedPageAtom, trailAtom } from './structureState';
 
 // Moves inside a Collection (openManifest) and the first load (loadContent), checked on a jotai store alone.
 // fetch is replaced, and each test decides the order of the answers.
@@ -171,5 +171,55 @@ describe('openManifest', () => {
     unsub();
     expect(store.get(focusAtom)).toBeNull();
     expect(store.get(compareAtom)).toEqual([0, 1]);
+  });
+
+  it('records how each manifest came to be shown', async () => {
+    const store = createStore();
+    const top = loadContent(store, url('collection'), locale);
+    await answer(url('collection'));
+    await top;
+    expect(store.get(shownManifestAtom)?.origin).toBe('content');
+    const entry = openManifest(store, url('entry'), true, locale);
+    await answer(url('entry'));
+    await entry;
+    expect(store.get(shownManifestAtom)?.origin).toBe('move');
+    goBack(store, 'en');
+    expect(store.get(shownManifestAtom)?.origin).toBe('back');
+  });
+
+  it('does not go back while a new iiif-content is read, and forgets the old trail', async () => {
+    const store = createStore();
+    const top = loadContent(store, url('collection'), locale);
+    await answer(url('collection'));
+    await top;
+    const entry = openManifest(store, url('entry'), true, locale);
+    await answer(url('entry'));
+    await entry;
+    expect(store.get(trailAtom).items).toHaveLength(1);
+
+    const other = loadContent(store, url('other'), locale);
+    // no stale "back" into the old iiif-content, and its JSON is not kept
+    expect(store.get(trailAtom).items).toEqual([]);
+    expect(goBack(store, 'en')).toBe(false);
+    await answer(url('other'));
+    expect(await other).toBe('shown');
+    expect(store.get(shownManifestAtom)?.url).toBe(url('other'));
+  });
+});
+
+describe('openWithTargets', () => {
+  it('forgets the targets when the manifest is not shown', async () => {
+    const pending: { current: string[] | null } = { current: null };
+    expect(await openWithTargets(async () => 'stale', pending, 'u', ['t'], 'move')).toBe('stale');
+    expect(pending.current).toBeNull();
+    expect(await openWithTargets(async () => 'failed', pending, 'u', ['t'], 'move')).toBe('failed');
+    expect(pending.current).toBeNull();
+  });
+  it('keeps them for the manifest that is shown', async () => {
+    const pending: { current: string[] | null } = { current: null };
+    const targets = ['t'];
+    // the shown manifest takes them (ContainerList empties pending when it applies them)
+    await openWithTargets(async () => 'shown', pending, 'u', targets, 'content');
+    expect(pending.current).toBe(targets);
   });
 });

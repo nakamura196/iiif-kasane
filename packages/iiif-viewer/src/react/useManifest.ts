@@ -20,6 +20,7 @@ import {
   modelChoicesAtom,
   paintedModelsAtom,
   shownManifestAtom,
+  type ShownOrigin,
 } from './atoms';
 import { useLocale } from './env';
 
@@ -67,19 +68,42 @@ export function beginLoad(store: Store): () => boolean {
  * The only way a manifest is shown: the first load, the moves inside a Collection and going back all use it,
  * so the parts that need the served JSON always get the one of what is shown.
  */
-export function showManifest(store: Store, url: string, source: ManifestSource, locale: string): void {
+export function showManifest(
+  store: Store,
+  url: string,
+  source: ManifestSource,
+  locale: string,
+  origin: ShownOrigin,
+): void {
   const { manifest, raw } = source;
   beginLoad(store);
-  const { annotations } = parseManifestV4(manifest, undefined, locale);
+  const { annotations, geoCanvasId, geoFeatures } = parseManifestV4(manifest, undefined, locale);
+  const hasGeo = !!geoCanvasId || geoFeatures.length > 0;
   store.set(paintedModelsAtom, paintedModelsOf(firstSceneOf(manifest)));
   store.set(modelChoicesAtom, {});
   store.set(layerSettingsAtom, {});
   store.set(layerOrderAtom, {});
   store.set(layerPlaybackAtom, null);
-  store.set(shownManifestAtom, { url, raw, manifest, seq: (store.get(shownManifestAtom)?.seq ?? 0) + 1 });
+  const seq = (store.get(shownManifestAtom)?.seq ?? 0) + 1;
+  store.set(shownManifestAtom, { url, raw, manifest, seq, origin, hasGeo });
   store.set(manifestAtom, manifest);
   store.set(annotationsAtom, annotations);
 }
+
+/** Result of loading a manifest: shown, could not be read, or dropped because a later request replaced it. */
+export type OpenResult = 'shown' | 'failed' | 'stale';
+
+/** One step of the trail: what was shown, its URL, its served JSON and the page the reader was on. */
+export interface TrailItem {
+  url: string;
+  manifest: ManifestV4;
+  raw: unknown;
+  /** Index of the page (container) shown when the reader left it. */
+  index: number;
+}
+
+/** The way taken through Collections: what was shown before each move, to go back to it. Emptied for a new iiif-content. */
+export const trailAtom = atom<{ owner: string | null; items: TrailItem[] }>({ owner: null, items: [] });
 
 /**
  * Read the manifest at the URL and show it, unless a later load or show started meanwhile.
@@ -89,14 +113,15 @@ export async function loadManifest(
   store: Store,
   url: string,
   locale: () => string,
+  origin: ShownOrigin,
   beforeShow?: (source: ManifestSource) => void,
-): Promise<'shown' | 'failed' | 'stale'> {
+): Promise<OpenResult> {
   const isCurrent = beginLoad(store);
   const source = await readManifestSource(url);
   if (!isCurrent()) return 'stale';
   if (!source) return 'failed';
   beforeShow?.(source);
-  showManifest(store, url, source, locale());
+  showManifest(store, url, source, locale(), origin);
   return 'shown';
 }
 
@@ -108,8 +133,10 @@ const contentLoadAtom = atom<object | null>(null);
 export const isContentLoading = (store: Store): boolean => store.get(contentLoadAtom) !== null;
 
 /** Read the iiif-content given to the viewer and show it. Moves started meanwhile are dropped, not this load. */
-export async function loadContent(store: Store, url: string, locale: () => string): Promise<'shown' | 'failed' | 'stale'> {
+export async function loadContent(store: Store, url: string, locale: () => string): Promise<OpenResult> {
   store.set(manifestUrlAtom, url);
+  // the way taken through the old iiif-content does not lead back from the new one
+  store.set(trailAtom, { owner: url, items: [] });
   const token = {};
   store.set(contentLoadAtom, token);
   const done = () => {
@@ -117,7 +144,7 @@ export async function loadContent(store: Store, url: string, locale: () => strin
   };
   try {
     // done before it is shown: what is shown (a content state Annotation) may open its manifest right away
-    return await loadManifest(store, url, locale, done);
+    return await loadManifest(store, url, locale, 'content', done);
   } finally {
     done();
   }

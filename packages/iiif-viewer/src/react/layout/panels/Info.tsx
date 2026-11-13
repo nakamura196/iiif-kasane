@@ -45,8 +45,14 @@ const Info = ({ tab, onTabChange, container, manifest, extraPanels, hiddenPanels
   // the annotations tab lists only the current Canvas, so whether it shows is decided by the current Canvas too
   const containerLocalAnnotationCount = localPageCountOn(localPages, container?.id, CONTENT_SEARCH_SOURCE);
   const shown = useAtomValue(shownManifestAtom);
-  const rawManifest = shown && manifest && shown.manifest === manifest ? shown.raw : undefined;
-  const ctx = { container, manifest, annotationCount, localAnnotationCount, containerLocalAnnotationCount, rawManifest };
+  const ctx = {
+    container,
+    manifest,
+    annotationCount,
+    localAnnotationCount,
+    containerLocalAnnotationCount,
+    shown: shown && manifest && shown.manifest === manifest ? shown : undefined,
+  };
   const available = withExtraPanels(extraPanels).filter((p) => !hiddenPanels?.includes(p.id) && p.available(ctx));
   const ids = available.map((p) => p.id);
   // "Metadata" also stands for the former "About" tab: old links with ?tab=about go there

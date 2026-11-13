@@ -73,11 +73,22 @@ export const manifestUrlAtom = atom<string | null>(null);
  * which drops the Image API service and other details that the displays need) and the converted one.
  * `seq` grows by one each time something is shown, so parts can tell a new manifest from the same one shown again.
  */
+/** How a manifest came to be shown (see ShownManifest.origin). */
+export type ShownOrigin = 'content' | 'move' | 'back';
+
 export interface ShownManifest {
   url: string;
   raw: unknown;
   manifest: ManifestV4;
   seq: number;
+  /**
+   * How it came to be shown: 'content' the iiif-content given to the viewer (or the manifest its content state
+   * points to), 'move' an entry opened from what was shown, 'back' going back along the trail.
+   * The page URL arguments and the host's target belong to 'content'; 'back' keeps the reader's page.
+   */
+  origin: ShownOrigin;
+  /** A Canvas or Scene of the manifest has a geographic position (georeferencing, navPlace features). */
+  hasGeo: boolean;
 }
 export const shownManifestAtom = atom<ShownManifest | null>(null);
 

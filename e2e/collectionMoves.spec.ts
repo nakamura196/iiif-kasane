@@ -170,12 +170,15 @@ test('the links of the Other views tab open the entry, with the page number in i
 
 // A new locale keeps the open entry and page (no reload back to the top of the Collection).
 // The site's pages are rebuilt on a language change, so this uses <iiif-kasane>, whose locale is an attribute.
-// The element is read from packages/iiif-viewer/dist (`npm run build:element -w packages/iiif-viewer`); skipped without it
+// The element is read from packages/iiif-viewer/dist (`npm run build:element -w packages/iiif-viewer`; `npm run build`
+// makes it too, as CI does). Locally it is skipped without the build; in CI a missing build fails the test
 const DIST = path.resolve(__dirname, '../packages/iiif-viewer/dist');
 const HOST = 'https://element-host.example';
 
 test('changing the locale of <iiif-kasane> keeps the opened entry and its page', async ({ page }) => {
-  test.skip(!fs.existsSync(path.join(DIST, 'iiif-kasane.js')), 'build the element first (npm run build:element)');
+  const built = fs.existsSync(path.join(DIST, 'iiif-kasane.js'));
+  test.skip(!built && !process.env.CI, 'build the element first (npm run build:element)');
+  expect(built, 'packages/iiif-viewer/dist/iiif-kasane.js (npm run build makes it)').toBe(true);
   await serve(page);
   await page.route(`${HOST}/**`, (route) => {
     const { pathname } = new URL(route.request().url());

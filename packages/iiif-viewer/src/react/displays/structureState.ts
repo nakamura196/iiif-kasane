@@ -19,8 +19,16 @@ import {
   type SequenceInfo,
   type ViewingInfo,
 } from '../../core';
-import { manifestUrlAtom, shownManifestAtom } from '../atoms';
-import { isContentLoading, loadManifest, showManifest, useLocaleRef } from '../useManifest';
+import { manifestUrlAtom, shownManifestAtom, type ShownOrigin } from '../atoms';
+import {
+  isContentLoading,
+  loadManifest,
+  showManifest,
+  trailAtom,
+  useLocaleRef,
+  type OpenResult,
+  type TrailItem,
+} from '../useManifest';
 
 /** A request to move (sent by the table of contents etc., received by ContainerList). */
 export interface NavRequest {
@@ -54,32 +62,16 @@ export const compareMultiAtom = atom<CompareMulti | null>(null);
 /** The alternative page order chosen (the id of a sequence Range). null: the original order. */
 export const sequenceIdAtom = atom<string | null>(null);
 
-/** One step of the trail: what was shown, its URL, its served JSON and the page the reader was on. */
-export interface TrailItem {
-  url: string;
-  manifest: ManifestV4;
-  raw: unknown;
-  /** Index of the page (container) shown when the reader left it. */
-  index: number;
-}
+export { trailAtom, type OpenResult, type TrailItem };
 
-/** The way taken through Collections: what was shown before each move, to go back to it. */
-export const trailAtom = atom<{ owner: string | null; items: TrailItem[] }>({ owner: null, items: [] });
+/** How an opened manifest counts: part of the iiif-content (its content state), or a move from what was shown. */
+type OpenOrigin = Exclude<ShownOrigin, 'back'>;
 
 /**
  * The page picked by the reader, and the shown manifest (ShownManifest.seq) it belongs to. Another manifest
  * shown starts at its first page, unless going back restores the page saved on the trail.
  */
 export const pickedPageAtom = atom<{ shown: number; index: number }>({ shown: 0, index: 0 });
-
-/**
- * The iiif-content whose page URL arguments (?canvas=, ?pos=, a content state in ?iiif-content=) were used.
- * They point into the first manifest shown for it, not into the entries opened from it afterwards.
- */
-export const urlTargetsUsedForAtom = atom<string | null>(null);
-
-/** seq of a manifest shown again by going back: its first page is not chosen again from content state or `start`. */
-export const restoredSeqAtom = atom<number | null>(null);
 
 let seqCounter = 0;
 export const nextSeq = (): number => ++seqCounter;
@@ -120,19 +112,22 @@ function leaveViewState(store: Store) {
   store.set(compareMultiAtom, null);
 }
 
-/** Result of opening a manifest: shown, could not be read, or dropped because a later request replaced it. */
-export type OpenResult = 'shown' | 'failed' | 'stale';
-
 /**
  * Open the manifest (or Collection) at the URL in the viewer of this store. With push, "back" returns
  * to what is shown now. Only the latest request is shown: when another open, a back or a new
  * iiif-content comes before this one is read, this one is dropped ('stale'). It is also dropped at once while
- * a new iiif-content is being read.
+ * a new iiif-content is being read. `origin` is 'content' when the iiif-content (a content state) leads here.
  */
-export async function openManifest(store: Store, url: string, push: boolean, locale: () => string): Promise<OpenResult> {
+export async function openManifest(
+  store: Store,
+  url: string,
+  push: boolean,
+  locale: () => string,
+  origin: OpenOrigin = 'move',
+): Promise<OpenResult> {
   // a new iiif-content is being read: it wins, and this move (inside what was shown before) is dropped
   if (isContentLoading(store)) return 'stale';
-  return loadManifest(store, url, locale, () => {
+  return loadManifest(store, url, locale, origin, () => {
     const here = store.get(shownManifestAtom);
     if (push && here) {
       // what goes on the trail is the one being left (its own URL, not the one being opened), with its page
@@ -149,6 +144,8 @@ export async function openManifest(store: Store, url: string, push: boolean, loc
 
 /** Go back one step of the trail, to the page the reader was on. false when there is nothing to go back to. */
 export function goBack(store: Store, locale: string): boolean {
+  // a new iiif-content is being read: it wins (and the trail belongs to the old one)
+  if (isContentLoading(store)) return false;
   const owner = store.get(manifestUrlAtom);
   const trail = store.get(trailAtom);
   const items = trail.owner === owner ? trail.items : [];
@@ -156,11 +153,27 @@ export function goBack(store: Store, locale: string): boolean {
   if (!prev) return false;
   store.set(trailAtom, { owner, items: items.slice(0, -1) });
   leaveViewState(store);
-  showManifest(store, prev.url, { raw: prev.raw, manifest: prev.manifest }, locale);
-  const seq = store.get(shownManifestAtom)?.seq ?? 0;
-  store.set(pickedPageAtom, { shown: seq, index: prev.index });
-  store.set(restoredSeqAtom, seq);
+  showManifest(store, prev.url, { raw: prev.raw, manifest: prev.manifest }, locale, 'back');
+  store.set(pickedPageAtom, { shown: store.get(shownManifestAtom)?.seq ?? 0, index: prev.index });
   return true;
+}
+
+/**
+ * Open a manifest whose Canvases the targets point into (a content state, a dropped link). The targets wait in
+ * `pending` until the manifest is shown; when it is not (dropped or unreadable), they are cleared so that they
+ * do not apply to whatever is shown next.
+ */
+export async function openWithTargets<T>(
+  open: (url: string, push: boolean, origin?: OpenOrigin) => Promise<OpenResult>,
+  pending: { current: T | null },
+  url: string,
+  targets: T,
+  origin: OpenOrigin,
+): Promise<OpenResult> {
+  pending.current = targets;
+  const result = await open(url, false, origin);
+  if (result !== 'shown' && pending.current === targets) pending.current = null;
+  return result;
 }
 
 /** Open manifests (from their URL) in the viewer, and go back. Used by moves inside a Collection. */
@@ -172,7 +185,8 @@ export function useManifestSwitch() {
 
   /** Open the manifest (or Collection) at the URL. With push, "back" returns to what is shown now. */
   const open = useCallback(
-    (url: string, push: boolean): Promise<OpenResult> => openManifest(store, url, push, () => locale.current),
+    (url: string, push: boolean, origin?: OpenOrigin): Promise<OpenResult> =>
+      openManifest(store, url, push, () => locale.current, origin),
     [store, locale],
   );
 
