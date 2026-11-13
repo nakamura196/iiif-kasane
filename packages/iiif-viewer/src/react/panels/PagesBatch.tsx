@@ -1,14 +1,14 @@
 'use client';
 
-// ページ一覧（グリッド）で、モデルを全ページにかける操作と、読み終えたページのサムネイルに重ねる枠。
-// 枠は推論タブの結果（inferenceResultsAtom）から作るので、推論タブで 1 枚ずつ実行したページにも付く。
-// 区分のボタンは、注釈タブのタグの絞り込み（canvasAnnotationTagsAtom）と同じ状態を使う。
-// ここで区分を選ぶと、画像の上の印と注釈タブの一覧も同じ区分に絞られる。
+// In the pages grid: the controls that run a model over every page, and the marks drawn over the thumbnails of
+// pages already read. The marks come from the inference tab's results (inferenceResultsAtom), so pages read one at a
+// time in the inference tab get them too. The class buttons share the annotations tab's tag filter
+// (canvasAnnotationTagsAtom): choosing a class here also narrows the marks on the image and the annotations list.
 import { useEffect, useMemo, useState } from 'react';
 import { atom, useAtom, useAtomValue, useStore } from 'jotai';
 import { pageMarksOf, type ContainerInfo, type ManifestV4, type PageMark } from '../../core';
 import { useLocale, useTranslations } from '../env';
-import { batchStateAtom, batchTargetsOf, startBatch, stopBatch } from '../inference/batch';
+import { batchStateAtom, batchTargetsOf, readingPageAtom, startBatch, stopBatch } from '../inference/batch';
 import { modelStatus } from '../inference/modelStore';
 import { MODELS } from '../inference/models/registry';
 import type { InferenceModel } from '../inference/models/types';
@@ -22,7 +22,7 @@ const PRIMARY = 'px-2.5 py-1 rounded text-xs text-white bg-blue-600 hover:bg-blu
 /** The model whose results the thumbnails show (the one chosen in the pages grid). */
 export const batchModelAtom = atom<string | null>(null);
 
-// 同じ結果の枠を何度も読み直さない（全ページの実行中は、1 ページ終わるたびに区分を数え直すため）
+// Do not rebuild the marks of the same result again (during a run the classes are counted after every page).
 const marksCache = new WeakMap<object, PageMark[]>();
 const marksOf = (page: Record<string, unknown> | undefined): PageMark[] => {
   if (!page) return [];
@@ -88,7 +88,7 @@ export function PagesBatchBar({ pages, manifest }: { pages: ContainerInfo[]; man
   const [chosenTags, setChosenTags] = useAtom(canvasAnnotationTagsAtom);
   const running = !!batch?.running;
 
-  // 選んだモデルが無ければ、ダウンロード済みの最初のもの
+  // Without a chosen model, take the first downloaded one
   useEffect(() => {
     if (ready && ready.length > 0 && !ready.some((m) => m.id === modelId)) setModelId(ready[0].id);
   }, [ready, modelId, setModelId]);
@@ -104,7 +104,7 @@ export function PagesBatchBar({ pages, manifest }: { pages: ContainerInfo[]; man
   }
 
   const targets = batchTargetsOf(pages);
-  // 結果の無いページだけを読む（止めたあとは続きから）
+  // Only pages without a result are read (after a stop, the run goes on from there)
   const remaining = model ? targets.filter((c) => !results[resultKey(c.id, model.id)]).length : targets.length;
   const resuming = remaining < targets.length;
   const status = !batch || batch.modelId !== shownModel
@@ -197,7 +197,7 @@ export function PagesBatchBar({ pages, manifest }: { pages: ContainerInfo[]; man
 }
 
 const shapeOf = (m: PageMark, i: number) => {
-  // 読んだ行は細かく並ぶので、サムネイルでは枠線を引かず薄く塗るだけにする（線が詰まって塗りつぶしに見えるため）
+  // Read lines sit close together, so on a thumbnail they are lightly filled, not outlined (outlines merge into a solid block)
   const common = m.text
     ? { fill: m.color, fillOpacity: 0.3, stroke: 'none' }
     : { fill: 'none', stroke: m.color, strokeWidth: 1.5, vectorEffect: 'non-scaling-stroke' as const };
@@ -207,6 +207,57 @@ const shapeOf = (m: PageMark, i: number) => {
     <rect key={i} x={m.x} y={m.y} width={m.w} height={m.h} {...common} />
   );
 };
+
+// How the page being read and a page just read look. CSS animations only (no new dependency). The scan line
+// sweeps down the thumbnail while the model reads it, and the frame pulses with a glow; when the page's result
+// arrives the thumbnail flashes once and the marks fade in. With reduced motion asked for, only a still frame shows.
+const READING_CSS = `
+@keyframes kasane-scan-sweep {
+  /* The bar is 35% of the thumbnail high and its bottom edge is the line: from -100% to 186% the line runs from the
+     top of the thumbnail to its bottom, so it is in view for the whole sweep. */
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(186%); }
+}
+@keyframes kasane-scan-frame {
+  0%, 100% { box-shadow: inset 0 0 0 2px rgba(34, 211, 238, 0.95), 0 0 6px 1px rgba(34, 211, 238, 0.55); }
+  50% { box-shadow: inset 0 0 0 2px rgba(165, 243, 252, 1), 0 0 16px 4px rgba(34, 211, 238, 0.9); }
+}
+@keyframes kasane-scan-done {
+  0% { opacity: 0.85; }
+  100% { opacity: 0; }
+}
+@keyframes kasane-marks-in {
+  0% { opacity: 0; transform: scale(1.06); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.kasane-scan-frame {
+  box-shadow: inset 0 0 0 2px rgba(34, 211, 238, 0.95), 0 0 6px 1px rgba(34, 211, 238, 0.55);
+  animation: kasane-scan-frame 1s ease-in-out infinite;
+}
+.kasane-scan-tint { background: rgba(8, 145, 178, 0.12); }
+.kasane-scan-sweep {
+  position: absolute; left: 0; right: 0; top: 0; height: 35%;
+  animation: kasane-scan-sweep 1.3s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  background: linear-gradient(to bottom, rgba(34, 211, 238, 0) 0%, rgba(34, 211, 238, 0.18) 60%, rgba(34, 211, 238, 0.5) 90%,
+    rgba(236, 254, 255, 1) 94%, rgba(236, 254, 255, 1) 97%, rgba(34, 211, 238, 0.9) 100%);
+  filter: drop-shadow(0 2px 4px rgba(34, 211, 238, 1));
+}
+.kasane-scan-done {
+  box-shadow: inset 0 0 0 2px rgba(52, 211, 153, 1), 0 0 14px 3px rgba(52, 211, 153, 0.8);
+  background: rgba(209, 250, 229, 0.35);
+  animation: kasane-scan-done 900ms ease-out both;
+}
+.kasane-marks-in { animation: kasane-marks-in 500ms ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .kasane-scan-frame, .kasane-marks-in { animation: none; }
+  .kasane-scan-sweep, .kasane-scan-done, .kasane-scan-tint { display: none; }
+}
+`;
+
+/** The animation styles for the pages grid; render once next to the grid. */
+export function PagesReadingStyle() {
+  return <style>{READING_CSS}</style>;
+}
 
 /**
  * The marks of the chosen model's result over a page thumbnail. The SVG covers the thumbnail's box and fits the
@@ -219,8 +270,11 @@ export function PageThumbMarks({ page }: { page: ContainerInfo }) {
   const chosenTags = useAtomValue(shownChosenTagsAtom);
   const result = shown ? results[resultKey(page.id, shown)] : undefined;
   const marks = marksOf(result?.page);
-  const reading = !!batch?.running && batch.current === page.id;
-  // 区分を選んだら、どのページでもその区分の枠だけを出す（その区分の無いページは枠が消え、ある頁が目立つ）
+  const reading = useAtomValue(readingPageAtom) === page.id;
+  // The page read last flashes once and its marks fade in (the animations end on their own, so nothing has to
+  // remove the classes). Results already there when the grid opens, or read in the inference tab, show plainly.
+  const justRead = !!result && batch?.modelId === shown && batch?.lastRead === page.id;
+  // With classes chosen, every page shows only those classes (pages without them lose their marks, so the others stand out)
   const visible = useMemo(
     () => (chosenTags.length === 0 ? marks : marks.filter((m) => m.tag && chosenTags.includes(m.tag))),
     [marks, chosenTags],
@@ -230,7 +284,7 @@ export function PageThumbMarks({ page }: { page: ContainerInfo }) {
     <>
       {page.width && page.height && visible.length > 0 ? (
         <svg
-          className="absolute inset-0 w-full h-full p-1 pointer-events-none"
+          className={`absolute inset-0 w-full h-full p-1 pointer-events-none ${justRead ? 'kasane-marks-in' : ''}`}
           viewBox={`0 0 ${page.width} ${page.height}`}
           preserveAspectRatio="xMidYMid meet"
           aria-hidden="true"
@@ -238,7 +292,13 @@ export function PageThumbMarks({ page }: { page: ContainerInfo }) {
           {visible.map(shapeOf)}
         </svg>
       ) : null}
-      {reading ? <span aria-hidden="true" className="absolute inset-0 rounded ring-2 ring-inset ring-amber-500 animate-pulse" /> : null}
+      {reading ? (
+        <span aria-hidden="true" className="absolute inset-0 rounded overflow-hidden pointer-events-none kasane-scan-frame">
+          <span className="absolute inset-0 kasane-scan-tint" />
+          <span className="kasane-scan-sweep" />
+        </span>
+      ) : null}
+      {justRead ? <span aria-hidden="true" className="absolute inset-0 rounded pointer-events-none kasane-scan-done" /> : null}
     </>
   );
 }

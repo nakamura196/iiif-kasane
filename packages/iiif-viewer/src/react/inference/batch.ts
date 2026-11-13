@@ -1,10 +1,11 @@
 'use client';
 
-// ページ一覧から、1 つのモデルを全ページに順にかける。結果は 1 ページずつ、推論タブで 1 枚ずつ実行したときと
-// 同じ形（inferenceResultsAtom と、画像に重ねる localAnnotationPagesAtom）に入れる。
-// 実行は Viewer の store に結び付け、画面の部品（パネル）を閉じても止まらない。止めるのは stopBatch だけ。
-// Worker は 1 つなので推論は 1 枚ずつ。画像は先の PREFETCH 枚だけ並行して取り、画像サーバに負荷をかけすぎない。
-// 既に結果のあるページは飛ばす（止めたあと続きから再開できる。やり直すときは推論タブで結果を捨てる）。
+// From the pages grid, run one model over every page in turn. Each page's result is stored the same way as when the
+// inference tab reads one page (inferenceResultsAtom, and localAnnotationPagesAtom for the marks over the image).
+// A run belongs to the Viewer's store and goes on when the panel is closed; only stopBatch stops it.
+// There is one Worker, so pages are read one at a time. Only the next PREFETCH images are fetched ahead, so the
+// image server is not loaded too much. Pages that already have a result are skipped (a stopped run can go on from
+// where it stopped; to read a page again, discard its result in the inference tab).
 import { atom, type useStore } from 'jotai';
 import { imageLayerCount, toAnnotationPage, type ContainerInfo, type ManifestV4 } from '../../core';
 import { localAnnotationPagesAtom } from '../overlays/canvasAnnotationState';
@@ -24,12 +25,26 @@ export interface BatchState {
   failed: number;
   /** The page being read. */
   current: string | null;
+  /**
+   * The page whose result has just arrived (the pages grid flashes it once). Cleared again after JUST_READ_MS, so a
+   * thumbnail shown later does not flash.
+   */
+  lastRead?: string | null;
   running: boolean;
   /** Whether the run was stopped before the end. */
   stopped: boolean;
 }
 
 export const batchStateAtom = atom<BatchState | null>(null);
+
+/** The page being read during a run over every page (null when no run is going on). */
+export const readingPageAtom = atom((get) => {
+  const b = get(batchStateAtom);
+  return b?.running ? b.current : null;
+});
+
+/** How long a page counts as just read (a little longer than the flash in the pages grid). */
+const JUST_READ_MS = 1000;
 
 /** Images fetched ahead of the page being read. */
 const PREFETCH = 2;
@@ -66,7 +81,7 @@ export const startBatch = async (
     loads.set(i, p);
   };
   const source = `inference:${model.id}`;
-  // 止めたあと・別の実行に替わったあとに届いた結果や進み具合は、書き込まない
+  // Results and progress that arrive after a stop, or after another run took over, are not written
   const mine = () => controllers.get(store) === ac && !ac.signal.aborted;
 
   for (let i = 0; i < todo.length && !ac.signal.aborted; i++) {
@@ -74,6 +89,7 @@ export const startBatch = async (
     const c = todo[i];
     if (mine()) store.set(batchStateAtom, (s) => s && { ...s, current: c.id });
     let failed = false;
+    let read = false;
     try {
       const src = await loads.get(i)!;
       loads.delete(i);
@@ -98,23 +114,31 @@ export const startBatch = async (
         ms: r.ms,
         created: new Date().toISOString(),
       };
-      // 推論タブで捨てた・別の実行で入ったものは上書きしない（入っていれば先のものを残す）
+      // A result put there meanwhile (by the inference tab or another run) is kept, not overwritten
       if (store.get(inferenceResultsAtom)[resultKey(c.id, model.id)]) continue;
       store.set(inferenceResultsAtom, (rs) => ({ ...rs, [resultKey(c.id, model.id)]: res }));
       store.set(localAnnotationPagesAtom, (ls) => [
         ...ls.filter((l) => !(l.source === source && l.canvasId === c.id)),
         { source, canvasId: c.id, page },
       ]);
+      read = true;
     } catch {
       loads.delete(i);
       failed = true;
     } finally {
-      if (mine()) store.set(batchStateAtom, (s) => s && { ...s, done: s.done + 1, failed: s.failed + (failed ? 1 : 0) });
+      if (mine()) {
+        store.set(batchStateAtom, (s) =>
+          s && { ...s, done: s.done + 1, failed: s.failed + (failed ? 1 : 0), ...(read ? { lastRead: c.id } : {}) },
+        );
+        if (read) {
+          setTimeout(() => store.set(batchStateAtom, (s) => (s?.lastRead === c.id ? { ...s, lastRead: null } : s)), JUST_READ_MS);
+        }
+      }
     }
   }
 
   for (const p of loads.values()) p.then((s) => s.bitmap.close(), () => {});
-  // 別の実行に替わっていたら、その実行の状態に触らない
+  // If another run took over, its state is left alone
   if (controllers.get(store) !== ac) return;
   controllers.delete(store);
   store.set(batchStateAtom, (s) => s && { ...s, running: false, current: null, stopped: ac.signal.aborted });

@@ -6,7 +6,8 @@ import { containersOf, labelIn, pageMediaOf, pageThumbnailUrl, type MediaKind } 
 import { manifestAtom } from '../atoms';
 import { navRequestAtom, nextSeq, usePageOrder } from '../displays/structureState';
 import { useLocale, useTranslations } from '../env';
-import { PageThumbMarks, PagesBatchBar } from './PagesBatch';
+import { readingPageAtom } from '../inference/batch';
+import { PageThumbMarks, PagesBatchBar, PagesReadingStyle } from './PagesBatch';
 import type { Panel, PanelContext } from './types';
 
 // The viewer remembers the chosen layout per browser (a convenience only; it works without storage).
@@ -86,9 +87,26 @@ const MEDIA_LABEL_KEYS = {
   empty: 'noImage',
 } as const;
 
-// ページ（Canvas / Scene）の一覧。Mirador の「索引」と同じく、右パネルに縦に並べる。
-// グリッドに切り替えると、パネルの幅に入るだけ列を並べる（パネルを広げると一度に見えるページが増える）。
-// 選ぶと目次と同じ依頼を出し、ContainerList がページを移す。
+// The list of pages (Canvases / Scenes), down the right panel like Mirador's index. As a grid it fits as many
+// columns as the panel is wide (a wider panel shows more pages at once). Choosing a page sends the same request as
+// the table of contents, and ContainerList moves to that page.
+/** The nearest ancestor that scrolls (null when the page itself scrolls). */
+const scrollBoxOf = (el: HTMLElement): HTMLElement | null => {
+  for (let box = el.parentElement; box && box !== document.body && box !== document.documentElement; box = box.parentElement) {
+    const { overflowY } = getComputedStyle(box);
+    if ((overflowY === 'auto' || overflowY === 'scroll') && box.scrollHeight > box.clientHeight) return box;
+  }
+  return null;
+};
+
+/** Is part of the element in view in its scroll box, below the sticky band? */
+const inView = (el: HTMLElement, band: HTMLElement | null): boolean => {
+  const box = scrollBoxOf(el)?.getBoundingClientRect() ?? { top: 0, bottom: window.innerHeight };
+  const top = Math.max(box.top, band?.getBoundingClientRect().bottom ?? box.top);
+  const r = el.getBoundingClientRect();
+  return r.bottom > top && r.top < box.bottom;
+};
+
 function PagesView({ container, manifest }: PanelContext) {
   const t = useTranslations('Structure');
   const locale = useLocale();
@@ -111,6 +129,17 @@ function PagesView({ container, manifest }: PanelContext) {
     }
   };
   const grid = layout === 'grid';
+  const reading = useAtomValue(readingPageAtom);
+  // The sticky band over the list: scrolling a page into view leaves room for it
+  const head = useRef<HTMLDivElement>(null);
+  const [headHeight, setHeadHeight] = useState(0);
+  useEffect(() => {
+    const el = head.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => setHeadHeight(el.offsetHeight));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const rawItems = useMemo(() => {
     const map = new Map<string, unknown>();
@@ -118,10 +147,44 @@ function PagesView({ container, manifest }: PanelContext) {
     return map;
   }, [m]);
 
-  // 表示中のページが見えるように送る
+  // Keep the page being shown in view
   useEffect(() => {
     list.current?.querySelector<HTMLElement>('[aria-current="true"]')?.scrollIntoView?.({ block: 'nearest' });
   }, [container?.id, layout]);
+
+  // During a run over every page, keep the page being read in view, so the reading can be followed (and filmed).
+  // Scrolling by hand (wheel, touch, keys) stops the following, so someone looking at other pages stays there; it
+  // starts again when they come back to where the reading is.
+  const following = useRef(true);
+  const readBefore = useRef<HTMLElement | null>(null);
+  const running = !!reading;
+  useEffect(() => {
+    if (!grid || !running || !list.current) return;
+    const box: HTMLElement | Window = scrollBoxOf(list.current) ?? window;
+    const stop = () => {
+      following.current = false;
+    };
+    box.addEventListener('wheel', stop, { passive: true });
+    box.addEventListener('touchmove', stop, { passive: true });
+    box.addEventListener('keydown', stop);
+    return () => {
+      box.removeEventListener('wheel', stop);
+      box.removeEventListener('touchmove', stop);
+      box.removeEventListener('keydown', stop);
+    };
+  }, [grid, running]);
+  useEffect(() => {
+    if (!grid || !reading) {
+      following.current = true;
+      readBefore.current = null;
+      return;
+    }
+    const el = list.current?.querySelector<HTMLElement>('[data-reading="true"]') ?? null;
+    const before = readBefore.current;
+    if (!following.current && before?.isConnected && inView(before, head.current)) following.current = true;
+    if (following.current) el?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+    readBefore.current = el;
+  }, [grid, reading]);
 
   const toggle = (value: Layout, label: string, icon: ReactNode) => (
     <button
@@ -142,31 +205,35 @@ function PagesView({ container, manifest }: PanelContext) {
 
   return (
     <div>
-      <div role="group" aria-label={t('pagesLayout')} className="flex justify-end gap-1 px-2 pt-2">
-        {toggle(
-          'list',
-          t('pagesList'),
-          <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="currentColor">
-            <rect x="1" y="2" width="4" height="3" rx="0.5" />
-            <rect x="6.5" y="3" width="8.5" height="1" />
-            <rect x="1" y="6.5" width="4" height="3" rx="0.5" />
-            <rect x="6.5" y="7.5" width="8.5" height="1" />
-            <rect x="1" y="11" width="4" height="3" rx="0.5" />
-            <rect x="6.5" y="12" width="8.5" height="1" />
-          </svg>,
-        )}
-        {toggle(
-          'grid',
-          t('pagesGrid'),
-          <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="currentColor">
-            <rect x="1" y="1" width="6" height="6" rx="0.5" />
-            <rect x="9" y="1" width="6" height="6" rx="0.5" />
-            <rect x="1" y="9" width="6" height="6" rx="0.5" />
-            <rect x="9" y="9" width="6" height="6" rx="0.5" />
-          </svg>,
-        )}
+      {/* The layout switch and the run controls stay at the top while the pages scroll (the progress stays in view) */}
+      <div ref={head} className="sticky top-0 z-10 bg-white dark:bg-gray-900 pb-1">
+        <div role="group" aria-label={t('pagesLayout')} className="flex justify-end gap-1 px-2 pt-2">
+          {toggle(
+            'list',
+            t('pagesList'),
+            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="currentColor">
+              <rect x="1" y="2" width="4" height="3" rx="0.5" />
+              <rect x="6.5" y="3" width="8.5" height="1" />
+              <rect x="1" y="6.5" width="4" height="3" rx="0.5" />
+              <rect x="6.5" y="7.5" width="8.5" height="1" />
+              <rect x="1" y="11" width="4" height="3" rx="0.5" />
+              <rect x="6.5" y="12" width="8.5" height="1" />
+            </svg>,
+          )}
+          {toggle(
+            'grid',
+            t('pagesGrid'),
+            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="currentColor">
+              <rect x="1" y="1" width="6" height="6" rx="0.5" />
+              <rect x="9" y="1" width="6" height="6" rx="0.5" />
+              <rect x="1" y="9" width="6" height="6" rx="0.5" />
+              <rect x="9" y="9" width="6" height="6" rx="0.5" />
+            </svg>,
+          )}
+        </div>
+        {grid ? <PagesReadingStyle /> : null}
+        {grid ? <PagesBatchBar pages={pages} manifest={m} /> : null}
       </div>
-      {grid ? <PagesBatchBar pages={pages} manifest={m} /> : null}
       <ol
         ref={list}
         className={grid ? 'p-2 grid gap-2' : 'p-2 space-y-1'}
@@ -185,6 +252,8 @@ function PagesView({ container, manifest }: PanelContext) {
                 type="button"
                 onClick={() => setRequest({ seq: nextSeq(), target: { canvasId: c.id } })}
                 aria-current={active ? 'true' : undefined}
+                data-reading={grid && c.id === reading ? 'true' : undefined}
+                style={headHeight ? { scrollMarginTop: headHeight } : undefined}
                 title={grid ? label : undefined}
                 className={`w-full ${grid ? 'flex flex-col gap-1 p-1' : 'flex items-center gap-3 p-2'} rounded text-left text-sm transition-colors ${
                   active
@@ -237,7 +306,7 @@ export const pagesPanel: Panel = {
   id: 'pages',
 
   order: 20,
-  // 2 ページ以上あるマニフェストだけ（コレクションは別の表示で一覧を出す）
+  // Only for manifests with two pages or more (a Collection is listed by another display)
   available: ({ manifest }) =>
     (manifest as { type?: string } | null | undefined)?.type !== 'Collection' && containersOf(manifest).length >= 2,
   Component: (ctx) => <PagesView {...ctx} />,
