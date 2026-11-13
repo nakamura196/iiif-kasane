@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useAtomValue } from 'jotai';
 import {
   chronologyOf,
   collectionEntriesOf,
@@ -12,6 +13,7 @@ import {
   yearText,
   type CollectionEntry,
 } from '../../core';
+import { shownManifestAtom } from '../atoms';
 import { useLocale, useTranslations } from '../env';
 import { displayAfter } from './registry';
 import { useManifestSwitch } from './structureState';
@@ -72,9 +74,22 @@ function EntryThumbnail({ entry, className }: { entry: CollectionEntry; classNam
   return need && fetched?.id !== entry.id ? <span ref={ref} aria-hidden className={className} /> : null;
 }
 
+/**
+ * The entries of a Collection, from the JSON kept with the shown manifest when it is this one, else read by the
+ * Collection's id (a host page may set manifestAtom itself).
+ */
+export async function collectionEntriesFor(
+  shown: { manifest: unknown; raw: unknown } | null,
+  manifest: { id: string },
+): Promise<CollectionEntry[]> {
+  if (shown && shown.manifest === manifest) return collectionEntriesOf(shown.raw);
+  const raw = await fetchManifest(manifest.id);
+  return raw ? collectionEntriesOf(raw) : [];
+}
+
 // A Collection (a manifest whose items are Manifests): choose one to open.
 // When two or more items carry a navDate (Cookbook 0230), they can also be shown by date, grouped by year.
-// The converter turns the items into empty Scenes, so the Collection is fetched again
+// The converter turns the items into empty Scenes, so the Collection as served is read
 // to know which entries are Manifests and which are Collections.
 function CollectionDisplay(props: DisplayProps) {
   const { manifest, containers } = props;
@@ -82,20 +97,28 @@ function CollectionDisplay(props: DisplayProps) {
   const locale = useLocale();
   const { open } = useManifestSwitch();
   const isCollection = (manifest as { type?: string }).type === 'Collection';
-  const [fetched, setFetched] = useState<{ id: string; entries: CollectionEntry[] } | null>(null);
   const [state, setState] = useState<{ id: string; kind: 'opening' | 'error' } | null>(null);
   const [order, setOrder] = useState<'collection' | 'date'>('collection');
 
+  // the entries come from the Collection as served: kept with the shown one, or read by its id when a host page
+  // put the manifest into the store itself (manifestAtom)
+  const shown = useAtomValue(shownManifestAtom);
+  const stored = shown?.manifest === manifest ? shown.raw : null;
+  const [fetched, setFetched] = useState<{ id: string; entries: CollectionEntry[] } | null>(null);
   useEffect(() => {
-    if (!isCollection || !manifest.id) return;
+    if (!isCollection || stored || !manifest.id) return;
     let cancelled = false;
-    fetchManifest(manifest.id).then((raw) => {
-      if (!cancelled && raw) setFetched({ id: manifest.id, entries: collectionEntriesOf(raw) });
+    void collectionEntriesFor(null, manifest).then((entries) => {
+      if (!cancelled) setFetched({ id: manifest.id, entries });
     });
     return () => {
       cancelled = true;
     };
-  }, [isCollection, manifest.id]);
+  }, [isCollection, stored, manifest]);
+  const read = useMemo(
+    () => (!isCollection ? [] : stored ? collectionEntriesOf(stored) : fetched?.id === manifest.id ? fetched.entries : []),
+    [isCollection, stored, fetched, manifest.id],
+  );
 
   // not a Collection: an empty Scene is a Canvas that the converter turned into a Scene (a rotated image,
   // a Choice, a missing image). The displays after this one decide how it looks (imageCanvas, then scene).
@@ -109,13 +132,14 @@ function CollectionDisplay(props: DisplayProps) {
     type: 'Manifest',
     label: c.label,
   }));
-  const entries =
-    fetched?.id === manifest.id && fetched.entries.length > 0 ? fetched.entries : fromContainers;
+  const entries = read.length > 0 ? read : fromContainers;
 
   const openEntry = async (e: CollectionEntry) => {
     setState({ id: e.id, kind: 'opening' });
-    const ok = await open(e.id, true);
-    if (!ok) setState({ id: e.id, kind: 'error' });
+    const result = await open(e.id, true);
+    if (result === 'failed') setState({ id: e.id, kind: 'error' });
+    // dropped because something else was asked for: stop showing this entry as opening (unless another entry is)
+    else if (result === 'stale') setState((s) => (s?.id === e.id ? null : s));
   };
 
   if (entries.length === 0) {

@@ -22,7 +22,7 @@ import type { PlacedModel } from '../three/Scene';
 // three.js and react-three-fiber are only fetched when a Scene is shown.
 const CanvasComponent = lazy(() => import('../three/Canvas'));
 
-function SceneDisplay({ container, manifest, iiifContent, renderActions, selectedIndex }: DisplayProps) {
+function SceneDisplay({ container, manifest, iiifContent, shownUrl, renderActions, selectedIndex }: DisplayProps) {
   const t = useTranslations('Viewer');
   const locale = useLocale();
   const paintedModels = useAtomValue(paintedModelsAtom);
@@ -96,7 +96,7 @@ function SceneDisplay({ container, manifest, iiifContent, renderActions, selecte
       </div>
       <div className="absolute bottom-4 left-4 z-10 flex items-end gap-2">
         <ModelChoice />
-        {renderActions?.({ iiifContent, hasChoices, selectedIndex })}
+        {renderActions?.({ iiifContent, shownUrl, hasChoices, selectedIndex })}
       </div>
     </div>
   );

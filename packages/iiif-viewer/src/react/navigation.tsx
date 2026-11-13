@@ -1,10 +1,11 @@
 'use client';
 
+import type { ShownOrigin } from './atoms';
 import { createContext, useContext } from 'react';
 import type { Xywh } from '../core';
 
-// パネルから「この Canvas へ移動する」を呼ぶための口。
-// 注釈のリンク本文が同じ資料の Canvas id のとき、クリックでそこへ移る。
+// The way panels ask "move to this Canvas".
+// When an annotation's link body is a Canvas id of the same item, a click moves there.
 export interface CanvasNavigation {
   /** Move to the Canvas with this id. Returns false when the id is not a Canvas of this item. */
   goToCanvas: (canvasId: string) => boolean;
@@ -45,3 +46,23 @@ export const targetKey = (target: ViewerTarget | undefined): string =>
   target
     ? `${target.canvasId ?? ''}#${target.xywh?.join(',') ?? ''}#${target.highlight === false ? 0 : 1}#${target.t ?? ''}#${target.play ? 1 : 0}`
     : '';
+
+/**
+ * Whether the host page's `target` is applied now. A new target value is always applied. The same value is
+ * applied again to another shown manifest only when it is the iiif-content ('content'), or an entry opened from it
+ * ('move') that has the target's Canvas. A target without a Canvas (a region or a time only) is not carried into
+ * entries, and going back ('back') keeps the page the reader was on.
+ */
+export function shouldApplyTarget(
+  last: { manifestId: string; key: string } | null,
+  now: { manifestId: string; key: string; origin: ShownOrigin; hasCanvas: boolean },
+): boolean {
+  if (!last || last.key !== now.key) return true;
+  if (last.manifestId === now.manifestId) return false;
+  if (now.origin === 'content') return true;
+  return now.origin === 'move' && now.hasCanvas;
+}
+
+/** A value that belongs to one shown manifest (ShownManifest.seq): `fallback` once another one is shown. */
+export const forShown = <T,>(v: { shown: number; value: T }, shown: number, fallback: T): T =>
+  v.shown === shown ? v.value : fallback;

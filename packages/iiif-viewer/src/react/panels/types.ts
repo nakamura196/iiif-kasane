@@ -1,8 +1,9 @@
 import type { ComponentType } from 'react';
 import type { ContainerInfo, ManifestV4 } from '../../core';
+import type { ShownManifest } from '../atoms';
 
-// 右パネルのタブ 1 つ分の契約。新しいタブは、このファイルの型で panels/ に 1 ファイルを足す
-// （一覧には自動で入る）。文言は messages/features/<機能>.{ja,en}.json の Info.<id> に書く。
+// The contract of one tab of the right panel. A new tab adds one file to panels/ with these types
+// (it joins the list by itself). Its text goes in Info.<id> of messages/features/<feature>.{ja,en}.json.
 export interface PanelContext {
   container?: ContainerInfo;
   manifest?: ManifestV4 | null;
@@ -10,6 +11,11 @@ export interface PanelContext {
   annotationCount?: number;
   /** Number of annotation pages made in the browser (inference results etc.), not counting search marks. */
   localAnnotationCount?: number;
+  /**
+   * The manifest shown in the viewer (its URL, the JSON as served, how it came to be shown), when `manifest`
+   * is that one. Tabs that link to the shown item or need details the conversion drops read it.
+   */
+  shown?: ShownManifest;
   /** Number of annotation pages made in the browser and shown on this container's image, not counting search marks. */
   containerLocalAnnotationCount?: number;
 }

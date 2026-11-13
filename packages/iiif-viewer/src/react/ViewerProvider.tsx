@@ -2,6 +2,7 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useLayoutEffect,
@@ -10,14 +11,16 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { Provider, createStore, useAtomValue, useSetAtom } from 'jotai';
+import { Provider, createStore, useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { containersOf, type ContainerInfo, type ManifestV4 } from '../core';
-import { manifestAtom, modelChoicesAtom } from './atoms';
-import { navRequestAtom, nextSeq } from './displays/structureState';
+import { manifestAtom, modelChoicesAtom, shownManifestAtom } from './atoms';
+import { navRequestAtom, nextSeq, pickedPageAtom } from './displays/structureState';
 import { ViewerEnv, type ResolvedTheme } from './env';
 import {
   CanvasNavigationContext,
   indexOfCanvas,
+  forShown,
+  shouldApplyTarget,
   targetKey,
   type CanvasNavigation,
   type ViewerSelection,
@@ -52,6 +55,11 @@ export interface ViewerProviderProps {
 /** What the parts inside a `ViewerProvider` share: the loaded manifest and the shown Canvas. */
 export interface ViewerState {
   iiifContent: string;
+  /**
+   * URL of the manifest (or Collection) shown now: `iiifContent`, or the entry opened from a Collection.
+   * Parts that read the source manifest again use this one.
+   */
+  shownUrl: string;
   /** null until the manifest is read. */
   manifest: ManifestV4 | null;
   /** The manifest could not be read. */
@@ -122,6 +130,14 @@ export function ViewerProvider({
   );
 }
 
+/**
+ * Index of the shown container: the picked one while the same manifest is shown, else the first.
+ * Kept within the containers.
+ */
+function pickedIndex(picked: { shown: number; index: number }, shownSeq: number, count: number): number {
+  return Math.min(picked.shown === shownSeq ? picked.index : 0, Math.max(count - 1, 0));
+}
+
 function ViewerStateRoot({
   iiifContent,
   target,
@@ -132,21 +148,31 @@ function ViewerStateRoot({
   resolvedTheme: ResolvedTheme;
 }) {
   const manifest = useAtomValue(manifestAtom);
+  const shown = useAtomValue(shownManifestAtom);
   const setModelChoices = useSetAtom(modelChoicesAtom);
   const { failed } = useManifest(iiifContent);
 
   const containers = useMemo(() => containersOf(manifest), [manifest]);
-  const [picked, setPicked] = useState<{ content: string; index: number }>({ content: iiifContent, index: 0 });
-  const selected = Math.min(picked.content === iiifContent ? picked.index : 0, Math.max(containers.length - 1, 0));
+  // the page picked belongs to one shown manifest: a new one (another iiif-content, an entry of a Collection)
+  // starts from its first page (or where a content state / `target` / `start` sends it); going back restores
+  // the page the reader was on. It is in the store so that the trail can keep it.
+  const shownSeq = shown?.seq ?? 0;
+  const [picked, setPicked] = useAtom(pickedPageAtom);
+  const selected = pickedIndex(picked, shownSeq, containers.length);
   const container: ContainerInfo | undefined = containers[selected];
 
-  // 動画・音声の再生位置。文字起こし（右パネル）と動画・音声の表示がこれで連動する。
-  // 外から指定された時刻（target.t）。その Canvas の再生の部品が付いたときに、そこへ動かす。
-  const pendingSeek = useRef<{ canvasId: string; t: number; play: boolean } | null>(null);
+  // The playback position of video and audio. The transcript (right panel) and the media display follow it.
+  // A time given from outside (target.t) is applied when the player of that Canvas is attached.
+  // Both belong to the shown manifest: another one shown (an entry, going back) starts at 0 with nothing waiting.
+  const pendingSeek = useRef<{ shown: number; value: { canvasId: string; t: number; play: boolean } } | null>(null);
   const shownCanvas = useRef<string | undefined>(undefined);
-  const [currentTime, setCurrentTime] = useState(0);
+  const shownSeqRef = useRef(shownSeq);
+  const [time, setTime] = useState({ shown: shownSeq, value: 0 });
+  const currentTime = forShown(time, shownSeq, 0);
+  const setCurrentTime = useCallback((t: number) => setTime({ shown: shownSeqRef.current, value: t }), []);
   const applySeek = (el: HTMLMediaElement | null) => {
-    const p = pendingSeek.current;
+    const waiting = pendingSeek.current;
+    const p = waiting ? forShown(waiting, shownSeqRef.current, null) : null;
     if (!el || !p || shownCanvas.current !== p.canvasId) return;
     pendingSeek.current = null;
     const go = () => {
@@ -158,7 +184,7 @@ function ViewerStateRoot({
         /* the reader can still move the position by hand */
       }
     };
-    // <video> / <audio> は長さが分かるまで動かせない。YouTube や合成の舞台の受け口は readyState を持たないので、すぐ動かす
+    // <video> / <audio> cannot seek before the duration is known. YouTube and the composite stage have no readyState, so seek at once
     if (typeof el.readyState === 'number' && el.readyState < 1 && typeof el.addEventListener === 'function') {
       el.addEventListener('loadedmetadata', go, { once: true });
     } else go();
@@ -166,9 +192,10 @@ function ViewerStateRoot({
   const applySeekRef = useRef(applySeek);
   useLayoutEffect(() => {
     shownCanvas.current = container?.id;
+    shownSeqRef.current = shownSeq;
     applySeekRef.current = applySeek;
   });
-  // 再生の部品（MediaView・YouTubeView・合成の舞台）は mediaRef.current に自分を入れる。入った時点で、待っている時刻へ動かす
+  // Players (MediaView, YouTubeView, the composite stage) put themselves in mediaRef.current; then the waiting time is applied
   const mediaRef = useMemo(() => {
     let el: HTMLMediaElement | null = null;
     return {
@@ -177,7 +204,7 @@ function ViewerStateRoot({
       },
       set current(v: HTMLMediaElement | null) {
         el = v;
-        // 新しい Canvas の部品は、この部品の useLayoutEffect（shownCanvas の更新）より先に入るので、描画が終わってから見る
+        // the player of a new Canvas arrives before this component's useLayoutEffect (which updates shownCanvas), so check after rendering
         if (v) queueMicrotask(() => applySeekRef.current(v));
       },
     };
@@ -192,11 +219,11 @@ function ViewerStateRoot({
         setCurrentTime(seconds);
       },
     }),
-    [currentTime, mediaRef],
+    [currentTime, setCurrentTime, mediaRef],
   );
 
   const select = (index: number) => {
-    setPicked({ content: iiifContent, index });
+    setPicked({ shown: shownSeq, index });
     setModelChoices({});
     setCurrentTime(0);
   };
@@ -206,18 +233,18 @@ function ViewerStateRoot({
       goToCanvas: (canvasId: string) => {
         const index = indexOfCanvas(containers, canvasId);
         if (index < 0) return false;
-        setPicked({ content: iiifContent, index });
+        setPicked({ shown: shownSeq, index });
         setModelChoices({});
         setCurrentTime(0);
         return true;
       },
     }),
-    [containers, iiifContent, setModelChoices],
+    [containers, shownSeq, setPicked, setModelChoices, setCurrentTime],
   );
 
-  // 外（使う側のページ）から指定された Canvas・範囲へ移る。マニフェストが読めてから、値が変わったときだけ。
-  // 移り終わるまでは、途中で出た最初の頁（start など）を onSelect で知らせない。
-  // 知らせると、使う側がそれを target に戻して、指定した頁に着かなくなるため。
+  // Move to the Canvas / region given by the host page: once the manifest is read, and when the value changes.
+  // Until the move is done, the first page shown on the way (start etc.) is not reported through onSelect:
+  // the host would put it back into target, and the viewer would never reach the page asked for.
   const setNavRequest = useSetAtom(navRequestAtom);
   const key = targetKey(target);
   const targetRef = useRef(target);
@@ -228,7 +255,8 @@ function ViewerStateRoot({
     onSelectRef.current = onSelect;
     shownId.current = container?.id;
   });
-  const appliedTarget = useRef<string | null>(null);
+  const appliedTarget = useRef<{ manifestId: string; key: string } | null>(null);
+  const origin = shown && shown.manifest === manifest ? shown.origin : 'content';
   const waitingFor = useRef<string | null>(null);
   useEffect(() => {
     const next = targetRef.current;
@@ -236,19 +264,20 @@ function ViewerStateRoot({
       if (!next) waitingFor.current = null;
       return;
     }
-    const applied = `${manifest.id}|${key}`;
-    if (appliedTarget.current === applied) return;
-    appliedTarget.current = applied;
+    const now = { manifestId: manifest.id, key, origin, hasCanvas: next.canvasId != null };
+    const apply = shouldApplyTarget(appliedTarget.current, now);
+    appliedTarget.current = { manifestId: manifest.id, key };
+    if (!apply) return;
     const canvasId = next.canvasId ?? shownId.current ?? containers[0].id;
     if (indexOfCanvas(containers, canvasId) < 0) {
       waitingFor.current = null;
       return;
     }
     if (next.t != null && Number.isFinite(next.t) && next.t >= 0) {
-      pendingSeek.current = { canvasId, t: next.t, play: !!next.play };
+      pendingSeek.current = { shown: shownSeqRef.current, value: { canvasId, t: next.t, play: !!next.play } };
     }
     if (next.canvasId == null && !next.xywh) {
-      // 時刻だけの指定: 頁は動かさない。再生の部品がもう付いていれば、ここで動かす
+      // only a time: the page stays. If the player is already attached, seek here
       waitingFor.current = null;
       applySeekRef.current(mediaRef.current);
       return;
@@ -260,7 +289,7 @@ function ViewerStateRoot({
       highlight: next.highlight,
     });
     if (shownId.current === canvasId) applySeekRef.current(mediaRef.current);
-  }, [key, manifest, containers, setNavRequest, mediaRef]);
+  }, [key, manifest, containers, origin, setNavRequest, mediaRef]);
 
   const reported = useRef<string | null>(null);
   useEffect(() => {
@@ -277,6 +306,7 @@ function ViewerStateRoot({
 
   const state: ViewerState = {
     iiifContent,
+    shownUrl: shown?.url ?? iiifContent,
     manifest,
     failed,
     containers,

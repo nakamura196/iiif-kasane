@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Puzzle, canPlayPuzzle, type Panel, type PanelContext } from 'iiif-kasane';
+import { Puzzle, canPlayPuzzle, type Panel, type PanelContext, type ShownManifest } from 'iiif-kasane';
 import { Link } from '@/i18n/routing';
 import { containersOf, contentParam } from 'iiif-kasane/core';
 import { puzzleQuery } from '@/lib/puzzleLink';
@@ -12,44 +12,60 @@ import {
   GALLERY_LOOKS,
   GALLERY_MODES,
   GALLERY_QUALITIES,
+  canOpenInGallery,
   galleryQuery,
   type GalleryLook,
   type GalleryMode,
   type GalleryQuality,
 } from '@/lib/gallery';
-import { BROWSE_LAYOUTS, browseQuery, type BrowseLayout } from '@/lib/browse';
+import { BROWSE_LAYOUTS, browseQuery, canOpenInBrowse, type BrowseLayout } from '@/lib/browse';
 
-// 右パネルの「ほかの表示」タブ。同じ資料を Kasane の別のページ（比較・地図・3D の美術館）で開く。
-// 以前はビューアの左下に常にボタンを出していたが、絵や動画に重なるのでタブに移した。
-// 比較は、表示中の模型か画像に候補（Choice）が 2 つ以上あるときだけ出す。
-// 美術館は歩き方・内装・画質・枚数を選んでから開く（どれも /gallery/ の URL 引数になる）。
-// パズルはビューアのタブにあったものをここへ移した（読む道具ではないので）。ほかと違い、別のページへは移らず
-// その場で開くので、いちばん下に置く。
+// The "Other views" tab of the right panel: opens the shown item in Kasane's other pages (compare, map, 3D gallery).
+// These were buttons at the bottom left of the viewer, moved to a tab because they covered pictures and video.
+// Compare is offered only when the shown model or image has two or more candidates (a Choice).
+// The gallery is opened after choosing the walk mode, interior, quality and count (all /gallery/ URL arguments).
+// The puzzle was a tab of the viewer, moved here (it is not a reading tool). Unlike the others it opens in place,
+// not on another page, so it is last.
+// Every link and its visibility follow the manifest shown now: after an entry of a Collection is opened, that entry.
 
 const BUTTON =
   'inline-block px-3 py-1.5 rounded text-sm text-white bg-blue-600 hover:bg-blue-700 no-underline';
 const SELECT = 'rounded border border-gray-300 dark:border-gray-600 bg-transparent px-1 py-0.5 text-xs';
 
-/** 比較のページに渡せるとき、表示中の Canvas / Scene の番号。渡せないときは null。 */
+/** When the compare page can take it: the index of the shown Canvas / Scene. null when it cannot. */
 export type CompareTarget = { selectedIndex: number } | null;
 
 interface Props {
+  /** The iiif-content of the page; the links use the shown manifest's URL when the viewer knows it. */
   manifestUrl: string;
-  hasGeo: boolean;
-  galleryOk: boolean;
-  browseOk: boolean;
   compare: CompareTarget;
-  /** リンク（?puzzle=）で開くパズル。Canvas の id と、マスの数。 */
+  /** The puzzle opened from a link (?puzzle=): the Canvas id and the number of pieces. */
   puzzle?: { canvasId: string; size: number } | null;
-  /** パズルを閉じたとき（リンクの引数を外すため）。 */
+  /** The puzzle was closed (to remove the link's arguments). */
   onPuzzleClose?: () => void;
 }
 
+interface Targets {
+  hasGeo: boolean;
+  galleryOk: boolean;
+  browseOk: boolean;
+}
+
+// what the shown manifest can be opened in; worked out once per shown manifest (georeferencing was found when it was shown)
+const NONE: Targets = { hasGeo: false, galleryOk: false, browseOk: false };
+const targetsCache = new WeakMap<ShownManifest, Targets>();
+function targetsOf({ shown }: PanelContext): Targets {
+  if (!shown) return NONE;
+  let t = targetsCache.get(shown);
+  if (!t) {
+    t = { hasGeo: shown.hasGeo, galleryOk: canOpenInGallery(shown.raw), browseOk: canOpenInBrowse(shown.raw) };
+    targetsCache.set(shown, t);
+  }
+  return t;
+}
+
 function OtherViews({
-  manifestUrl,
-  hasGeo,
-  galleryOk,
-  browseOk,
+  manifestUrl: pageUrl,
   compare,
   puzzle,
   onPuzzleClose,
@@ -57,6 +73,9 @@ function OtherViews({
 }: Props & { ctx: PanelContext }) {
   const t = useTranslations('OtherViews');
   const tb = useTranslations('Browse');
+  // page indexes count in the shown manifest (the entry of a Collection, if one is open), so links use its URL
+  const manifestUrl = ctx.shown?.url ?? pageUrl;
+  const { hasGeo, galleryOk, browseOk } = targetsOf(ctx);
   const [browseLayout, setBrowseLayout] = useState<BrowseLayout>('table');
   const [mode, setMode] = useState<GalleryMode>('orbit');
   const [look, setLook] = useState<GalleryLook>('standard');
@@ -170,18 +189,21 @@ function OtherViews({
   );
 }
 
-// 表示中のページのパズルを開くリンク。いま開いているページ（言語の入った /ja/viewer など）の URL をもとにする
+// A link that opens the puzzle of the shown page, built on the URL of the page open now (/ja/viewer etc., with the locale)
 const puzzleShareUrl = (manifestUrl: string, ctx: PanelContext, size: number) => {
   const index = Math.max(0, containersOf(ctx.manifest).findIndex((c) => c.id === ctx.container?.id));
   return `${window.location.origin}${window.location.pathname}?${puzzleQuery(manifestUrl, index, size)}`;
 };
 
-/** 比較・地図・美術館のどれかに渡せる資料か、パズルにできる画像のときだけ出すタブ。 */
+/** Shown when the item can go to the compare page, the map or the gallery, or the image can be a puzzle. */
 export const otherViewsPanel = (props: Props, label: string): Panel => ({
   id: OTHER_VIEWS_TAB,
-  // パズル（110）の後ろ、いちばん右
+  // after the puzzle (110), rightmost
   order: 120,
   label,
-  available: (ctx) => !!props.compare || props.hasGeo || props.galleryOk || props.browseOk || canPlayPuzzle(ctx),
+  available: (ctx) => {
+    const t = targetsOf(ctx);
+    return !!props.compare || t.hasGeo || t.galleryOk || t.browseOk || canPlayPuzzle(ctx);
+  },
   Component: (ctx) => <OtherViews {...props} ctx={ctx} />,
 });

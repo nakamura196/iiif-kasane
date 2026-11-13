@@ -6,12 +6,12 @@ import type { ContainerInfo, ManifestV4 } from '../../../core';
 import { useTranslations } from '../../env';
 import { withExtraPanels } from '../../panels/registry';
 import type { Panel } from '../../panels/types';
-import { annotationsAtom } from '../../atoms';
+import { annotationsAtom, shownManifestAtom } from '../../atoms';
 import { inferenceResultsAtom } from '../../inference/state';
 import { localAnnotationPagesAtom, localPageCountOn } from '../../overlays/canvasAnnotationState';
 import { CONTENT_SEARCH_SOURCE } from '../../panels/ContentSearchPanel';
 
-// 既知のタブ名。機能を足すと増えるので、任意の文字列も受ける。
+// Known tab names. Features add more, so any string is accepted too.
 export type InfoTab = 'metadata' | 'annotations' | 'transcript' | (string & {});
 
 type Props = {
@@ -40,14 +40,22 @@ const Info = ({ tab, onTabChange, container, manifest, extraPanels, hiddenPanels
   const annotationCount = useAtomValue(annotationsAtom).length;
   const localPages = useAtomValue(localAnnotationPagesAtom);
   const inferenceCount = Object.keys(useAtomValue(inferenceResultsAtom)).length;
-  // 文字の検索の印そのものは数えない（印だけが残ってタブが消えなくなるため）
+  // text search marks themselves are not counted (else the marks alone would keep the tab)
   const localAnnotationCount = localPages.filter((l) => l.source !== CONTENT_SEARCH_SOURCE).length + inferenceCount;
-  // 注釈タブの一覧は今の Canvas の分だけなので、出すかどうかも今の Canvas の分で決める
+  // the annotations tab lists only the current Canvas, so whether it shows is decided by the current Canvas too
   const containerLocalAnnotationCount = localPageCountOn(localPages, container?.id, CONTENT_SEARCH_SOURCE);
-  const ctx = { container, manifest, annotationCount, localAnnotationCount, containerLocalAnnotationCount };
+  const shown = useAtomValue(shownManifestAtom);
+  const ctx = {
+    container,
+    manifest,
+    annotationCount,
+    localAnnotationCount,
+    containerLocalAnnotationCount,
+    shown: shown && manifest && shown.manifest === manifest ? shown : undefined,
+  };
   const available = withExtraPanels(extraPanels).filter((p) => !hiddenPanels?.includes(p.id) && p.available(ctx));
   const ids = available.map((p) => p.id);
-  // 「資料情報」は前の「資料情報（about）」タブも兼ねる。古いリンクの ?tab=about はそこへ
+  // "Metadata" also stands for the former "About" tab: old links with ?tab=about go there
   const asked = tab === 'about' ? 'metadata' : tab;
   const wanted = asked ?? inner ?? ids[0];
   const active = available.find((p) => p.id === wanted) ?? available[0];
@@ -59,7 +67,7 @@ const Info = ({ tab, onTabChange, container, manifest, extraPanels, hiddenPanels
 
   return (
     <div className="h-full min-w-0 flex flex-col">
-      {/* タブヘッダー */}
+      {/* tab headers */}
       <div className="flex overflow-x-auto border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
         {available.map((p) => (
           <button key={p.id} onClick={() => handleTabChange(p.id)} className={TAB_CLASS(active?.id === p.id)}>
@@ -68,7 +76,7 @@ const Info = ({ tab, onTabChange, container, manifest, extraPanels, hiddenPanels
         ))}
       </div>
 
-      {/* タブコンテンツ */}
+      {/* tab content */}
       <div className="flex-1 overflow-auto bg-white dark:bg-gray-900">
         {active ? <active.Component {...ctx} /> : null}
       </div>

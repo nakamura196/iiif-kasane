@@ -50,14 +50,14 @@ import Waveform from './Waveform';
 import { DISPLAYS } from './registry';
 import type { Display, DisplayProps } from './types';
 
-// Canvas 全体を「元の manifest のまま」読んで表示する。
-// 画像の Image API による深いズーム・回転・合成・Choice・画像を持つ注釈・placeholderCanvas・
-// accompanyingCanvas・サムネイル・画像が無い Canvas を扱う。
-// 音声は accompanyingCanvas（無ければ placeholderCanvas）の絵を出し、どちらも無ければ波形を出す（Waveform.tsx）。
+// Shows a whole Canvas read from the source manifest as served.
+// It handles deep zoom through the Image API, rotation, compositing, Choice, annotations with images,
+// placeholderCanvas, accompanyingCanvas, thumbnails, and Canvases without an image.
+// Audio shows the picture of accompanyingCanvas (else placeholderCanvas), or a waveform without either (Waveform.tsx).
 //
-// なぜ元の manifest を取り直すか: 読み込み時の変換（convertToV4）と ContainerInfo は、Canvas の
-// 大きさ・Image API の service・SpecificResource（回転や領域）・注釈の位置を落とすため。
-// 取り直しはブラウザのキャッシュに当たる。取れなかったときは、変換後の manifest で続ける。
+// Why the source manifest: the conversion on load (convertToV4) and ContainerInfo drop the Canvas size,
+// the Image API service, SpecificResource (rotation, region) and the annotations' positions. The served JSON
+// is kept with the shown manifest (shownManifestAtom); without it, the display goes on with the converted one.
 
 
 const hasKind = (p: CanvasPainting, ...kinds: string[]) => p.options.some((o) => kinds.includes(o.kind));
@@ -87,7 +87,7 @@ function ImageBody({
   // the bottom image whose picture has come (until then the ring is shown), and its tiles still coming
   const [shownBase, setShownBase] = useState<string | null>(null);
   const [pendingTiles, setPendingTiles] = useState(0);
-  // 認証の確認中・案内中は、画像が届かないのが当然なので「読み込めませんでした」を出さない
+  // while access is being checked or the login is offered, no image is expected, so no "could not load"
   const authPending = useAuthPanels().some(({ state }) => state.phase !== 'ok');
   const settings = useAtomValue(layerSettingsAtom);
   const setSettings = useSetAtom(layerSettingsAtom);
@@ -100,7 +100,7 @@ function ImageBody({
     setCanvasLayers({ canvasId: container.id, items });
   }, [container.id, items, setCanvasLayers]);
 
-  // レイヤーの再生（右パネルのレイヤーのタブで始める）。タブを閉じても、ここで進める
+  // layer playback (started in the Layers tab of the right panel). It goes on here even when the tab is closed
   const [playback, setPlayback] = useAtom(layerPlaybackAtom);
   const { seconds, loop } = useAtomValue(layerPlaybackOptionsAtom);
   const playing = playback && playback.canvasId === container.id ? playback : null;
@@ -114,12 +114,12 @@ function ImageBody({
         return;
       }
       setSettings((s) => playbackSettings(s, playing.ids, playing.groups, step, playing.direction));
-      // 繰り返さないときは、最後の段を出したところで止める
+      // without repeat, stop at the last step
       setPlayback(!loop && step === count - 1 ? null : { ...playing, step });
     }, seconds * 1000);
     return () => clearTimeout(timer);
   }, [playing, seconds, loop, setSettings, setPlayback]);
-  // 別の Canvas に移ったら止める
+  // stop when moving to another Canvas
   useEffect(
     () => () => setPlayback((p) => (p && p.canvasId === container.id ? null : p)),
     [container.id, setPlayback],
@@ -163,7 +163,7 @@ function ImageBody({
   const waitingBase = !!baseLayer && !!width && !!height && !baseShown && !failedBase && !authPending;
   const compared = imageChoiceOf(images);
 
-  // その場の比較（Choice のバーで選ぶ）: A はいま表示中の候補、B はもう 1 つの候補（既定は A の次）
+  // in-place comparison (chosen in the Choice bar): A is the shown candidate, B another one (by default the next)
   const [cmp, setCmp] = useAtom(choiceCompareAtom);
   const comparedBar = compared ? bars.find((b) => b.painting.id === compared.id) : undefined;
   const pickA = comparedBar ? choiceIndex(comparedBar.painting) : 0;
@@ -199,7 +199,12 @@ function ImageBody({
         >
           {/* the Choice the comparison page compares */}
           {b.content.id === compared?.id &&
-            props.renderActions?.({ iiifContent: props.iiifContent, hasChoices: true, selectedIndex: props.selectedIndex })}
+            props.renderActions?.({
+              iiifContent: props.iiifContent,
+              shownUrl: props.shownUrl,
+              hasChoices: true,
+              selectedIndex: props.selectedIndex,
+            })}
         </ChoiceBar>
       ))}
       <div className="relative flex-1 min-h-0 min-w-0">
@@ -238,7 +243,7 @@ function ImageBody({
                   stage={stage}
                   opacity={layerOpacity(it, settings)}
                   onFailed={it.id === base ? () => setFailedBase(true) : undefined}
-                  // ログイン前に失敗していても、ログイン後に読めたら「読み込めませんでした」を消す
+                  // a failure before login is cleared when the image loads after login
                   onLoaded={
                     it.id === base
                       ? () => {
@@ -308,9 +313,9 @@ function MediaBody({ props, images, kind }: { props: DisplayProps; images: Canva
   const next = nextDisplay(props);
   const { mediaRef, currentTime } = usePlayback();
   const [dismissedId, setDismissedId] = useState<string | null>(null);
-  // 表紙が無い動画は、動画の途中から絵を取って表紙にする
+  // a video without a cover gets one from a frame inside the video
   const own = kind === 'Video' ? images.placeholder?.layer.url ?? images.thumbnail : undefined;
-  // YouTube の動画は YouTube のプレーヤーが自前の表紙と再生ボタンを出すので、表紙は重ねない
+  // the YouTube player shows its own cover and play button, so no cover over it
   const youTube = kind === 'Video' && images.paintings.some((p) => p.options.some((o) => o.kind === 'Video' && youTubeIdOf(o.url)));
   const video = kind === 'Video' && !youTube && !own && !images.accompanying
     ? images.paintings.flatMap((p) => p.options).find((o) => o.kind === 'Video')?.url
@@ -366,7 +371,7 @@ function MediaBody({ props, images, kind }: { props: DisplayProps; images: Canva
 
 function ImageCanvasDisplay(props: DisplayProps) {
   const t = useTranslations('Viewer');
-  const raw = useRawManifest(props.iiifContent);
+  const raw = useRawManifest(props.shownUrl ?? props.iiifContent);
   const { container } = props;
 
   // before the source manifest arrives, a converted Canvas (a Scene) is not yet known to be flat
@@ -406,7 +411,7 @@ function ImageCanvasDisplay(props: DisplayProps) {
     return delegate();
   }
 
-  // ページの一覧は右パネルの「ページ一覧」タブ（panels/PagesPanel.tsx）にある
+  // the list of pages is the Pages tab of the right panel (panels/PagesPanel.tsx)
   return <>{body}</>;
 }
 

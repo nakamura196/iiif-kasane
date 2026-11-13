@@ -28,9 +28,9 @@ import { useSeekOnFocus } from './structureState';
 import { fmt } from './TranscriptPanel';
 import type { Display, DisplayProps } from './types';
 
-// 1 つの Canvas に、画像・動画・音声・テキストが時間と場所を決めて並ぶ表示（0489・0560 など）。
-// Canvas の座標のまま描いた舞台を、枠に合わせて縮小して見せる。時刻は舞台ごとに持つ時計で進め、
-// 動画・音声はその時刻に合わせる。
+// One Canvas where images, video, audio and text are placed in time and space (0489, 0560 etc.).
+// The stage is drawn in Canvas coordinates and scaled down to the frame. Each stage has its own clock,
+// and video and audio follow its time.
 
 const TICK_MS = 100;
 
@@ -64,7 +64,7 @@ function TimedMedia({ item, time, playing }: { item: TimelineItem; time: number;
   const common = {
     preload: 'auto' as const,
     onLoadedMetadata: (e: React.SyntheticEvent<HTMLMediaElement>) => {
-      // 0 秒のままだと最初のフレームが描かれず黒くなるので、ほんの少し進める
+      // at 0 seconds the first frame is not drawn (black), so move a little
       e.currentTarget.currentTime = Math.max(localRef.current, FIRST_FRAME);
     },
   };
@@ -114,7 +114,7 @@ function CompositeStage({ container, timeline, cover }: { container: ContainerIn
 
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
-  // 一度でも再生するか、位置を動かすまでは表紙を出す
+  // the cover shows until the reader plays once or moves the position
   const [started, setStarted] = useState(false);
   const clock = useRef({ t0: 0, base: 0 });
   const timeRef = useRef(0);
@@ -127,7 +127,7 @@ function CompositeStage({ container, timeline, cover }: { container: ContainerIn
     if (v > 0) setStarted(true);
   }, [duration]);
 
-  // 文字起こし（右パネル）から時刻を動かせるように、再生位置の受け口を舞台の時計にする
+  // the stage's clock takes the playback position, so the transcript (right panel) can move the time
   useEffect(() => {
     const proxy = {
       get currentTime() {
@@ -166,7 +166,7 @@ function CompositeStage({ container, timeline, cover }: { container: ContainerIn
     return () => clearInterval(id);
   }, [playing, duration, timeline.repeat]);
 
-  // 右パネルへの再生位置の通知は、細かくなりすぎないように間引く
+  // the position reported to the right panel is thinned out so it is not too frequent
   const reported = useRef(-1);
   useEffect(() => {
     if (Math.abs(time - reported.current) >= 0.25 || !playing) {
@@ -184,7 +184,7 @@ function CompositeStage({ container, timeline, cover }: { container: ContainerIn
   );
   const active = activeItemsAt({ ...timeline, items: visible }, time);
 
-  // 舞台（Canvas の座標）を枠に合わせて縮める
+  // scale the stage (in Canvas coordinates) to the frame
   const boxRef = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ w: 0, h: 0 });
   useEffect(() => {
@@ -269,8 +269,8 @@ function CompositeStage({ container, timeline, cover }: { container: ContainerIn
 
 function CompositeDisplayView(props: DisplayProps) {
   const { container, manifest } = props;
-  // 表紙は元のマニフェストの placeholderCanvas、無ければ Canvas の thumbnail（動画を含むときだけ）
-  const raw = useRawManifest(props.iiifContent);
+  // the cover is the source manifest's placeholderCanvas, else the Canvas thumbnail (only with video)
+  const raw = useRawManifest(props.shownUrl ?? props.iiifContent);
   const cover = useMemo(() => {
     const images = canvasImagesOf(rawCanvasOf(raw ?? manifest, container.id));
     return images.placeholder?.layer.url ?? images.thumbnail;
@@ -279,15 +279,15 @@ function CompositeDisplayView(props: DisplayProps) {
     () => timelineOf(rawContainerOf(manifest, container.id), manifest),
     [manifest, container.id]
   );
-  // 時間の指定が読めなかったときは、これまでどおりの表示にする
+  // when the timing cannot be read, show it the usual way
   if (!timeline || !isComposite(timeline)) return <flatDisplay.Component {...props} />;
   const hasVideo = timeline.items.some((m) => m.kind === 'Video');
   return <CompositeStage key={container.id} container={container} timeline={timeline} cover={hasVideo ? cover : undefined} />;
 }
 
-// 共有の読み取り（ContainerInfo）には時間が無いので、ここでは「動画・音声か duration があり、
-// 画像・動画・音声が 2 つ以上ある」ことだけを見る。時間の有無は Component が読み、
-// 合成でなければ flatDisplay に渡す。
+// The shared reading (ContainerInfo) has no timing, so this only checks "video, audio or a duration, and two or
+// more images, videos or sounds". The Component reads the timing and hands over to flatDisplay when it is not
+// a composite.
 export const compositeDisplay: Display = {
   id: 'composite',
   match: (c) => {
