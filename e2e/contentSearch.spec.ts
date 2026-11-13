@@ -96,7 +96,7 @@ test('Content Search 2.0: 当たりの一覧・単位の絞り込み・候補語
   await expect(page.locator(`[data-overlay="annotations"] [data-annotation-id^="${BASE}/annotation/word-12"]`)).toHaveCount(2);
 });
 
-test('Content Search 1.0（MDZ の実物）: ?q= で開くと探してある', async ({ page }) => {
+test('Content Search 1.0（MDZ の実物）: ?q= で開くと探してある', { tag: '@external' }, async ({ page }) => {
   const m = 'https://api.digitale-sammlungen.de/iiif/presentation/v2/bsb00026283/manifest';
   await page.goto(`/ja/viewer/?iiif-content=${encodeURIComponent(m)}&tab=contentSearch&q=der`);
   await expect(page.getByText(/「der」: \d+ 件（全 \d+ 件）/)).toBeVisible();
@@ -104,7 +104,7 @@ test('Content Search 1.0（MDZ の実物）: ?q= で開くと探してある', a
   await expect(page.locator('[data-overlay="annotations"] [data-annotation-id*="/search/v1/bsb00026283/anno/"]').first()).toBeVisible();
 });
 
-test('見開きの両ページにも当たりの印を出す（MDZ の 2・3 コマ目）', async ({ page }) => {
+test('見開きの両ページにも当たりの印を出す（MDZ の 2・3 コマ目）', { tag: '@external' }, async ({ page }) => {
   const m = 'https://api.digitale-sammlungen.de/iiif/presentation/v2/bsb00026283/manifest';
   await page.goto(`/ja/viewer/?iiif-content=${encodeURIComponent(m)}&tab=contentSearch&q=der&canvas=2`);
   await expect(page.getByText('2・3 / 79')).toBeVisible();

@@ -1,8 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// ブラウザで実際に画面を開いて確かめるテスト。手元で実行する（GitHub Actions では走らせない）。
-//   npm run test:e2e                                   … next dev を立ち上げて試す
+// ブラウザで実際に画面を開いて確かめるテスト。
+//   npm run test:e2e                                   … next dev を立ち上げて試す（外のサイトを読むものも含む）
 //   E2E_BASE_URL=https://kasane.ldas.jp npm run test:e2e … 本番を試す
+// 外のサイト（iiif.io・Hugging Face など）を読むテストは、題に { tag: '@external' } を付ける。
+// GitHub Actions（.github/workflows/e2e.yml）は書き出した out/ を相手に、@external を除いて走らせる:
+//   npm run build && npm run serve:export &  →  E2E_BASE_URL=http://localhost:3862 npm run test:e2e:ci
 const baseURL = process.env.E2E_BASE_URL ?? 'http://localhost:3838';
 
 export default defineConfig({
