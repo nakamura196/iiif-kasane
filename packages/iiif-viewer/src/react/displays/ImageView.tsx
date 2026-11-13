@@ -5,7 +5,7 @@ import { useAtomValue } from 'jotai';
 import type { ContainerInfo, Xywh } from '../../core';
 import { useTranslations } from '../env';
 import { OVERLAYS } from '../overlays/registry';
-import { focusAtom } from './structureState';
+import { focusAtom } from '../internalState';
 
 const MIN = 0.2;
 const MAX = 20;

@@ -14,7 +14,8 @@ import {
 import { Provider, createStore, useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { containersOf, type ContainerInfo, type ManifestV4 } from '../core';
 import { manifestAtom, modelChoicesAtom, shownManifestAtom } from './atoms';
-import { navRequestAtom, nextSeq, pickedPageAtom } from './displays/structureState';
+import { backFailedAtom, pickedIndex, pickedPageAtom } from './internalState';
+import { navRequestAtom, nextSeq } from './displays/structureState';
 import { ViewerEnv, type ResolvedTheme } from './env';
 import {
   CanvasNavigationContext,
@@ -130,14 +131,6 @@ export function ViewerProvider({
   );
 }
 
-/**
- * Index of the shown container: the picked one while the same manifest is shown, else the first.
- * Kept within the containers.
- */
-function pickedIndex(picked: { shown: number; index: number }, shownSeq: number, count: number): number {
-  return Math.min(picked.shown === shownSeq ? picked.index : 0, Math.max(count - 1, 0));
-}
-
 function ViewerStateRoot({
   iiifContent,
   target,
@@ -150,8 +143,6 @@ function ViewerStateRoot({
   const manifest = useAtomValue(manifestAtom);
   const shown = useAtomValue(shownManifestAtom);
   const setModelChoices = useSetAtom(modelChoicesAtom);
-  const { failed } = useManifest(iiifContent);
-
   const containers = useMemo(() => containersOf(manifest), [manifest]);
   // the page picked belongs to one shown manifest: a new one (another iiif-content, an entry of a Collection)
   // starts from its first page (or where a content state / `target` / `start` sends it); going back restores
@@ -160,6 +151,12 @@ function ViewerStateRoot({
   const [picked, setPicked] = useAtom(pickedPageAtom);
   const selected = pickedIndex(picked, shownSeq, containers.length);
   const container: ContainerInfo | undefined = containers[selected];
+  // a notice about Back goes when the reader moves on to another page or manifest
+  const setBackFailed = useSetAtom(backFailedAtom);
+  useEffect(() => {
+    setBackFailed(false);
+  }, [selected, shown, setBackFailed]);
+  const { failed } = useManifest(iiifContent);
 
   // The playback position of video and audio. The transcript (right panel) and the media display follow it.
   // A time given from outside (target.t) is applied when the player of that Canvas is attached.

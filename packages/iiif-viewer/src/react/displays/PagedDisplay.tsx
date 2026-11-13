@@ -9,7 +9,8 @@ import { flatDisplay } from './FlatDisplay';
 import { imageCanvasDisplay } from './ImageCanvasDisplay';
 import { OverlayLayer } from './ImageView';
 import { storyOpenAtom } from '../overlays/storyState';
-import { compareAtom, compareMultiAtom, focusAtom, usePageOrder, useSeekOnFocus } from './structureState';
+import { compareAtom, compareMultiAtom, focusAtom } from '../internalState';
+import { usePageOrder, useSeekOnFocus } from './structureState';
 import { containedBox, regionBox, type PageBox } from './pageBox';
 import type { Display, DisplayProps } from './types';
 

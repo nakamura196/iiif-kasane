@@ -68,14 +68,14 @@ export const selectedAnnotationIdAtom = atom<string | null>(null);
 // The URL first given to the viewer (iiif-content). It stays the same while moving inside a Collection
 export const manifestUrlAtom = atom<string | null>(null);
 
+/** How a manifest came to be shown (see ShownManifest.origin). */
+export type ShownOrigin = 'content' | 'move' | 'back';
+
 /**
  * The manifest (or Collection) shown now, as one value: its URL, the JSON as served (before convertToV4,
  * which drops the Image API service and other details that the displays need) and the converted one.
  * `seq` grows by one each time something is shown, so parts can tell a new manifest from the same one shown again.
  */
-/** How a manifest came to be shown (see ShownManifest.origin). */
-export type ShownOrigin = 'content' | 'move' | 'back';
-
 export interface ShownManifest {
   url: string;
   raw: unknown;

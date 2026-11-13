@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createStore } from 'jotai';
 import { manifestAtom, manifestUrlAtom, shownManifestAtom } from '../atoms';
 import { loadContent } from '../useManifest';
-import { compareAtom, focusAtom, goBack, openManifest, openWithTargets, pickedPageAtom, trailAtom } from './structureState';
+import { goBack, openManifest, openWithTargets, trailAtom } from './structureState';
+import { compareAtom, focusAtom, pickedPageAtom } from '../internalState';
 
 // Moves inside a Collection (openManifest) and the first load (loadContent), checked on a jotai store alone.
 // fetch is replaced, and each test decides the order of the answers.

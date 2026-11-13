@@ -74,15 +74,16 @@ function EntryThumbnail({ entry, className }: { entry: CollectionEntry; classNam
   return need && fetched?.id !== entry.id ? <span ref={ref} aria-hidden className={className} /> : null;
 }
 
-/**
- * The entries of a Collection, from the JSON kept with the shown manifest when it is this one, else read by the
- * Collection's id (a host page may set manifestAtom itself).
- */
-export async function collectionEntriesFor(
+/** The entries from the JSON kept with the shown manifest, when it is this one. null: nothing kept for it. */
+export function storedEntriesFor(
   shown: { manifest: unknown; raw: unknown } | null,
-  manifest: { id: string },
-): Promise<CollectionEntry[]> {
-  if (shown && shown.manifest === manifest) return collectionEntriesOf(shown.raw);
+  manifest: unknown,
+): CollectionEntry[] | null {
+  return shown && shown.manifest === manifest ? collectionEntriesOf(shown.raw) : null;
+}
+
+/** The entries of the Collection read by its id (a host page may set manifestAtom itself). [] when it cannot be read. */
+export async function fetchedEntriesFor(manifest: { id: string }): Promise<CollectionEntry[]> {
   const raw = await fetchManifest(manifest.id);
   return raw ? collectionEntriesOf(raw) : [];
 }
@@ -103,22 +104,20 @@ function CollectionDisplay(props: DisplayProps) {
   // the entries come from the Collection as served: kept with the shown one, or read by its id when a host page
   // put the manifest into the store itself (manifestAtom)
   const shown = useAtomValue(shownManifestAtom);
-  const stored = shown?.manifest === manifest ? shown.raw : null;
-  const [fetched, setFetched] = useState<{ id: string; entries: CollectionEntry[] } | null>(null);
+  // the kept ones are worked out while rendering, so the first paint has them; only the fallback is asynchronous
+  const stored = useMemo(() => (isCollection ? storedEntriesFor(shown, manifest) : null), [isCollection, shown, manifest]);
+  const hasStored = stored !== null;
+  const [read, setRead] = useState<{ id: string; entries: CollectionEntry[] } | null>(null);
   useEffect(() => {
-    if (!isCollection || stored || !manifest.id) return;
+    if (!isCollection || hasStored || !manifest.id) return;
     let cancelled = false;
-    void collectionEntriesFor(null, manifest).then((entries) => {
-      if (!cancelled) setFetched({ id: manifest.id, entries });
+    void fetchedEntriesFor(manifest).then((entries) => {
+      if (!cancelled) setRead({ id: manifest.id, entries });
     });
     return () => {
       cancelled = true;
     };
-  }, [isCollection, stored, manifest]);
-  const read = useMemo(
-    () => (!isCollection ? [] : stored ? collectionEntriesOf(stored) : fetched?.id === manifest.id ? fetched.entries : []),
-    [isCollection, stored, fetched, manifest.id],
-  );
+  }, [isCollection, hasStored, manifest]);
 
   // not a Collection: an empty Scene is a Canvas that the converter turned into a Scene (a rotated image,
   // a Choice, a missing image). The displays after this one decide how it looks (imageCanvas, then scene).
@@ -132,7 +131,8 @@ function CollectionDisplay(props: DisplayProps) {
     type: 'Manifest',
     label: c.label,
   }));
-  const entries = read.length > 0 ? read : fromContainers;
+  const readEntries = stored ?? (read?.id === manifest.id ? read.entries : []);
+  const entries = readEntries.length > 0 ? readEntries : fromContainers;
 
   const openEntry = async (e: CollectionEntry) => {
     setState({ id: e.id, kind: 'opening' });
