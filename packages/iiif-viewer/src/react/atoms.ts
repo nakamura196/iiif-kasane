@@ -73,5 +73,8 @@ export const showAnnotationsAtom = atom<boolean>(true);
 // 主モデルの外接球の半径（モデルの単位のまま）。ズームボタンの距離の制限に使う
 export const modelRadiusAtom = atom<number | null>(null);
 
+// 3D の床の格子。閲覧の邪魔になるので既定では出さず、ボタンで出す
+export const showGridAtom = atom<boolean>(false);
+
 // 3D の「測る」が入っているか。入っている間、モデルのクリックは距離の計測に使い、注釈の印は隠す
 export const measuringAtom = atom<boolean>(false);

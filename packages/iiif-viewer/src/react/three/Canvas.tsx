@@ -5,7 +5,7 @@ import { Suspense, useEffect, useState, useRef, useImperativeHandle, forwardRef,
 import Scene, { type PlacedModel, type ViewHandle } from '../three/Scene';
 import ModelErrorBoundary from './ModelErrorBoundary';
 import { useAtom, useAtomValue } from 'jotai';
-import { manifestAtom, measuringAtom, modelAnimationAtom, modelRadiusAtom, sceneIdAtom } from '../atoms';
+import { manifestAtom, measuringAtom, modelAnimationAtom, modelRadiusAtom, sceneIdAtom, showGridAtom } from '../atoms';
 import { sceneCamerasOf, sceneSpatialScaleOf } from '../../core';
 import { nextZoomDistance, zoomLimitsFor } from '../../core';
 import { labelIn } from '../../core';
@@ -143,6 +143,7 @@ const CanvasComponent = ({ glbUrl, extraModels, attribution }: CanvasComponentPr
   const cameraControllerRef = useRef<{ zoomIn: () => void; zoomOut: () => void }>(null);
   const viewRef = useRef<ViewHandle>(null);
   const [autoRotate, setAutoRotate] = useState(false);
+  const [showGrid, setShowGrid] = useAtom(showGridAtom);
   const [manifest] = useAtom(manifestAtom);
   const sceneId = useAtomValue(sceneIdAtom);
   const [animation, setAnimation] = useAtom(modelAnimationAtom);
@@ -228,7 +229,6 @@ const CanvasComponent = ({ glbUrl, extraModels, attribution }: CanvasComponentPr
             autoRotate={autoRotate}
           />
           <CameraController ref={cameraControllerRef} controlsRef={controlsRef} />
-          <gridHelper args={[10, 10, isDark ? 0x374151 : 0x9ca3af, isDark ? 0x1f2937 : 0xe5e7eb]} />
           {/* IBL(環境マップ)で PBR マテリアルに反射・陰影を与える＝Voyagerに近い質感の主因。
               背景は差し替えず(テーマ色を維持)、ライティングのみ利用。 */}
           <SceneEnvironment isDark={isDark} />
@@ -287,9 +287,19 @@ const CanvasComponent = ({ glbUrl, extraModels, attribution }: CanvasComponentPr
           </button>
           <button
             onClick={() => viewRef.current?.top()}
-            className={`${VIEW_BUTTON} ${VIEW_BUTTON_IDLE} ${canMeasure ? 'border-b border-gray-200 dark:border-gray-600' : ''}`}
+            className={`${VIEW_BUTTON} ${VIEW_BUTTON_IDLE} border-b border-gray-200 dark:border-gray-600`}
           >
             {t('topView')}
+          </button>
+          <button
+            onClick={() => setShowGrid((v) => !v)}
+            aria-pressed={showGrid}
+            title={t('gridHint')}
+            className={`${VIEW_BUTTON} ${canMeasure ? 'border-b border-gray-200 dark:border-gray-600' : ''} ${
+              showGrid ? 'bg-blue-600 text-white hover:bg-blue-700' : VIEW_BUTTON_IDLE
+            }`}
+          >
+            {t('grid')}
           </button>
           {canMeasure && (
             <button
