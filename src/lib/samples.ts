@@ -44,6 +44,15 @@ export const SAMPLES: Sample[] = [
     manifest: withBasePath('/manifests/sample-manifest-story-3d.json'), tab: 'story',
   },
   {
+    id: 'smithsonian-triceratops', media: '3d',
+    title: { ja: 'スミソニアンのトリケラトプス（Voyager のツアー）', en: 'Smithsonian Triceratops (Voyager tour)' },
+    note: {
+      ja: 'スミソニアン（国立自然史博物館）の Voyager のシーンを、scripts/svx-to-iiif.mjs で IIIF に変換した例。8 段のツアーと 9 件の注釈が、視点ごと移ります。模型はスミソニアンの配信元から直接読みます（CC0）',
+      en: 'A Smithsonian Voyager scene (National Museum of Natural History) converted to IIIF with scripts/svx-to-iiif.mjs. The 8-step tour and 9 annotations keep their viewpoints. The model is loaded straight from the Smithsonian (CC0)',
+    },
+    manifest: withBasePath('/manifests/si-triceratops.json'), tab: 'story',
+  },
+  {
     id: 'video-transcript', media: 'video',
     title: { ja: '動画と時刻つき文字起こし', en: 'Video with timed transcript' },
     note: {
