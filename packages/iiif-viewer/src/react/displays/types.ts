@@ -7,6 +7,7 @@ import type { ViewerActionsState } from '../Viewer';
 export interface DisplayProps {
   container: ContainerInfo;
   manifest: ManifestV4;
+  /** URL of the shown manifest (after a move inside a Collection, the entry's URL, not the Collection's). */
   iiifContent: string;
   /** All containers of the manifest and the shown one (for paging, a table of contents). */
   containers: ContainerInfo[];

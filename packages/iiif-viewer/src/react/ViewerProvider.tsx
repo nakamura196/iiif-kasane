@@ -12,7 +12,7 @@ import {
 } from 'react';
 import { Provider, createStore, useAtomValue, useSetAtom } from 'jotai';
 import { containersOf, type ContainerInfo, type ManifestV4 } from '../core';
-import { manifestAtom, modelChoicesAtom } from './atoms';
+import { manifestAtom, modelChoicesAtom, shownManifestUrlAtom } from './atoms';
 import { navRequestAtom, nextSeq } from './displays/structureState';
 import { ViewerEnv, type ResolvedTheme } from './env';
 import {
@@ -52,6 +52,11 @@ export interface ViewerProviderProps {
 /** What the parts inside a `ViewerProvider` share: the loaded manifest and the shown Canvas. */
 export interface ViewerState {
   iiifContent: string;
+  /**
+   * URL of the manifest (or Collection) shown now: `iiifContent`, or the entry opened from a Collection.
+   * Parts that read the source manifest again use this one.
+   */
+  shownUrl: string;
   /** null until the manifest is read. */
   manifest: ManifestV4 | null;
   /** The manifest could not be read. */
@@ -132,6 +137,7 @@ function ViewerStateRoot({
   resolvedTheme: ResolvedTheme;
 }) {
   const manifest = useAtomValue(manifestAtom);
+  const shownUrl = useAtomValue(shownManifestUrlAtom);
   const setModelChoices = useSetAtom(modelChoicesAtom);
   const { failed } = useManifest(iiifContent);
 
@@ -277,6 +283,7 @@ function ViewerStateRoot({
 
   const state: ViewerState = {
     iiifContent,
+    shownUrl: shownUrl ?? iiifContent,
     manifest,
     failed,
     containers,

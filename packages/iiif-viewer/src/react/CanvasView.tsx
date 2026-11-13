@@ -23,7 +23,7 @@ export interface CanvasViewProps {
  */
 export function CanvasView({ pager, renderActions, className = '' }: CanvasViewProps) {
   const t = useTranslations('Viewer');
-  const { iiifContent, manifest, failed, containers, selectedIndex, container, select } = useViewer();
+  const { shownUrl, manifest, failed, containers, selectedIndex, container, select } = useViewer();
 
   const display = container ? DISPLAYS.find((d) => d.match(container)) : undefined;
 
@@ -45,7 +45,7 @@ export function CanvasView({ pager, renderActions, className = '' }: CanvasViewP
       <display.Component
         container={container}
         manifest={manifest}
-        iiifContent={iiifContent}
+        iiifContent={shownUrl}
         containers={containers}
         selectedIndex={selectedIndex}
         select={select}

@@ -65,7 +65,12 @@ export const annotationsAtom3 = atom<Annotation3[]>([]);
 // 選択中のアノテーションIDのアトム
 export const selectedAnnotationIdAtom = atom<string | null>(null);
 
+// 最初に渡された URL（iiif-content）。Collection をたどっても変わらない
 export const manifestUrlAtom = atom<string | null>(null);
+
+// いま表示している manifest（または Collection）の URL。Collection の項目を開くと、その項目の URL になる。
+// 元の manifest を読み直す部品（画像の表示・合成・比較）は、この URL を使う
+export const shownManifestUrlAtom = atom<string | null>(null);
 
 // アノテーション表示/非表示のアトム
 export const showAnnotationsAtom = atom<boolean>(true);

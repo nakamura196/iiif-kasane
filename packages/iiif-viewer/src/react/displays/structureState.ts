@@ -5,17 +5,11 @@
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { usePlayback } from '../playback';
-import { useLocale } from '../env';
 import { atom, useAtomValue, useSetAtom } from 'jotai';
 import {
   canvasBehaviorsOf,
-  convertToV4,
-  fetchManifest,
-  firstSceneOf,
   groupSpreads,
   orderOf,
-  paintedModelsOf,
-  parseManifestV4,
   sequencesOf,
   viewingOf,
   type CanvasTarget,
@@ -25,7 +19,8 @@ import {
   type SequenceInfo,
   type ViewingInfo,
 } from '../../core';
-import { annotationsAtom, manifestAtom, manifestUrlAtom, modelChoicesAtom, paintedModelsAtom } from '../atoms';
+import { manifestAtom, manifestUrlAtom, shownManifestUrlAtom } from '../atoms';
+import { readManifest, useShowManifest } from '../useManifest';
 
 /** 移動の依頼（右パネルの目次などが出し、ContainerList が受ける）。 */
 export interface NavRequest {
@@ -60,7 +55,12 @@ export const compareMultiAtom = atom<CompareMulti | null>(null);
 export const sequenceIdAtom = atom<string | null>(null);
 
 /** Collection をたどってきた道すじ（戻るために、開く前のものを積む）。 */
-export const trailAtom = atom<{ owner: string | null; items: ManifestV4[] }>({ owner: null, items: [] });
+/** One step of the trail: what was shown, and its URL (to read the source manifest again after going back). */
+export interface TrailItem {
+  url: string;
+  manifest: ManifestV4;
+}
+export const trailAtom = atom<{ owner: string | null; items: TrailItem[] }>({ owner: null, items: [] });
 
 let seqCounter = 0;
 export const nextSeq = (): number => ++seqCounter;
@@ -95,54 +95,43 @@ export function usePageOrder(manifest: ManifestV4 | null | undefined, containers
 export function useManifestSwitch() {
   const manifest = useAtomValue(manifestAtom);
   const manifestUrl = useAtomValue(manifestUrlAtom);
+  const shownUrl = useAtomValue(shownManifestUrlAtom);
   const trail = useAtomValue(trailAtom);
-  const locale = useLocale();
-  const setManifest = useSetAtom(manifestAtom);
-  const setAnnotations = useSetAtom(annotationsAtom);
-  const setPainted = useSetAtom(paintedModelsAtom);
-  const setChoices = useSetAtom(modelChoicesAtom);
+  const show = useShowManifest();
   const setTrail = useSetAtom(trailAtom);
   const setSequence = useSetAtom(sequenceIdAtom);
   const setFocus = useSetAtom(focusAtom);
   const setCompare = useSetAtom(compareAtom);
   const setCompareMulti = useSetAtom(compareMultiAtom);
 
+  // the first load does the same through useShowManifest; a move also leaves the sequence, focus and compare
   const apply = useCallback(
-    (next: ManifestV4) => {
-      const { annotations } = parseManifestV4(next, undefined, locale);
-      setPainted(paintedModelsOf(firstSceneOf(next)));
-      setChoices({});
-      setManifest(next);
-      setAnnotations(annotations);
+    (url: string, next: ManifestV4) => {
+      show(url, next);
       setSequence(null);
       setFocus(null);
       setCompare([]);
       setCompareMulti(null);
     },
-    [setManifest, setAnnotations, setPainted, setChoices, setSequence, setFocus, setCompare, setCompareMulti, locale],
+    [show, setSequence, setFocus, setCompare, setCompareMulti],
   );
 
   /** URL のマニフェスト（または Collection）を開く。push なら「戻る」で今のものに戻れる。 */
   const open = useCallback(
     async (url: string, push: boolean): Promise<boolean> => {
-      const raw = await fetchManifest(url);
-      if (!raw) return false;
-      try {
-        const next = convertToV4(raw);
-        if (push && manifest) {
-          setTrail((t) => ({
-            owner: manifestUrl,
-            items: t.owner === manifestUrl ? [...t.items, manifest] : [manifest],
-          }));
-        }
-        apply(next);
-        return true;
-      } catch (e) {
-        console.error('Error reading manifest:', e);
-        return false;
+      const next = await readManifest(url);
+      if (!next) return false;
+      if (push && manifest) {
+        const here: TrailItem = { url: shownUrl ?? manifestUrl ?? url, manifest };
+        setTrail((t) => ({
+          owner: manifestUrl,
+          items: t.owner === manifestUrl ? [...t.items, here] : [here],
+        }));
       }
+      apply(url, next);
+      return true;
     },
-    [apply, manifest, manifestUrl, setTrail],
+    [apply, manifest, manifestUrl, shownUrl, setTrail],
   );
 
   const items = useMemo(() => (trail.owner === manifestUrl ? trail.items : []), [trail, manifestUrl]);
@@ -151,7 +140,7 @@ export function useManifestSwitch() {
     const prev = items[items.length - 1];
     if (!prev) return;
     setTrail({ owner: manifestUrl, items: items.slice(0, -1) });
-    apply(prev);
+    apply(prev.url, prev.manifest);
   }, [items, manifestUrl, setTrail, apply]);
 
   return { open, back, canGoBack: items.length > 0 };
