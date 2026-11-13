@@ -7,7 +7,7 @@ import PageContainer from '@/components/layout/PageContainer';
 import { SAMPLES, sampleHref, sampleThumbnail, type Sample } from '@/lib/samples';
 
 // 3D（アノテーションつき）が Kasane の中心の機能なので先に出す
-const MEDIA_ORDER: Sample['media'][] = ['3d', 'image', 'audio', 'video'];
+const MEDIA_ORDER: Sample['media'][] = ['3d', 'image', 'audio', 'video', 'mixed'];
 
 // 一覧ページの置き場所。Cookbook のレシピ（CookbookSamplesContent）と Kasane 独自のマニフェスト（ここ）を別のページにする
 export const SAMPLE_PAGES = {

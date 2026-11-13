@@ -4,7 +4,7 @@ import type { ViewerTab } from '@/lib/viewerTabs';
 
 export interface Sample {
   id: string;
-  media: 'image' | 'audio' | 'video' | '3d';
+  media: 'image' | 'audio' | 'video' | '3d' | 'mixed';
   title: { ja: string; en: string };
   note: { ja: string; en: string };
   manifest: string;
@@ -60,6 +60,15 @@ export const SAMPLES: Sample[] = [
       en: 'A long handscroll (about 7.9 m). The Canvas carries its physical size (physdim), so a ruler appears along the top and left edges and its ticks get finer as you zoom. The gear at the top left changes the unit (mm, cm, in) and colours',
     },
     manifest: withBasePath('/manifests/physdim-hyakki.json'),
+  },
+  {
+    id: 'mixed-containers', media: 'mixed',
+    title: { ja: '画像・3D・動画・音声を 1 つに', en: 'Image, 3D, video and audio in one manifest' },
+    note: {
+      ja: 'IIIF Presentation 4 では、1 つのマニフェストに Canvas（画像・動画）、Scene（3D）、Timeline（音声）を並べられます。IIIF Cookbook の 4 つのレシピのコンテンツを組み合わせた見本です。次へ送ると、件ごとに表示が切り替わります',
+      en: 'In IIIF Presentation 4, one manifest can hold Canvases (image, video), a Scene (3D) and a Timeline (audio). A sample combining the content of four IIIF Cookbook recipes. Step through it and the display switches with each item',
+    },
+    manifest: withBasePath('/manifests/sample-manifest-mixed.json'), tab: 'pages',
   },
 ];
 
