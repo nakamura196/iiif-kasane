@@ -106,4 +106,17 @@ describe('storyOf in a Scene', () => {
     ]);
     expect(storyOf(m)).toBeNull();
   });
+
+  // A Voyager tour step opens its active annotation: `scope` names the step's Camera and that note.
+  it('takes the notes a step names in its scope, besides its Camera', () => {
+    const note = { ...step(9, 'Skull', { motivation: 'commenting', point: true }), id: `${S}/notes/1` };
+    const s1 = { ...step(1, '<h2>Skull</h2>'), scope: [{ id: `${S}/cameras/1`, type: 'Annotation' }, { id: `${S}/notes/1`, type: 'Annotation' }] };
+    const s2 = step(2, '<h2>End</h2>', { camera: 2 });
+    const story = storyOf(manifest([
+      { id: `${S}/notes`, type: 'AnnotationPage', items: [note] },
+      { id: `${S}/tour`, type: 'AnnotationPage', behavior: ['sequence'], items: [s1, s2] },
+    ]));
+    expect(story?.steps.map((x) => x.notes)).toEqual([[`${S}/notes/1`], undefined]);
+    expect(story?.steps[0].camera?.position).toEqual([0, 1, 5]);
+  });
 });

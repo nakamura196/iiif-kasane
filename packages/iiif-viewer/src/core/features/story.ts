@@ -38,6 +38,8 @@ export interface StoryStep {
   bodies: AnnotationBodyItem[];
   /** A step in a Scene: the Camera it is seen from (`scope`), or null to stay where the view is. */
   camera?: DefaultCamera | null;
+  /** A step in a Scene: the notes it selects (the ids of their Annotations; `scope`). */
+  notes?: string[];
 }
 
 export interface StoryChapter {
@@ -204,10 +206,10 @@ export function storyOf(manifest: ManifestV4 | null | undefined, locale = 'en'):
   const steps: StoryStep[] = [];
   for (const c of containersOf(manifest)) {
     if (c.kind === 'Scene') {
-      for (const { anno, camera } of sceneStoryAnnotationsOf(sceneOf(manifest, c.id))) {
+      for (const { anno, camera, notes } of sceneStoryAnnotationsOf(sceneOf(manifest, c.id))) {
         const bodies = readAnnotationBodies(anno as unknown as Record<string, unknown>);
         if (!bodies.some((b) => b.kind === 'text')) continue;
-        steps.push({ id: anno.id, canvasId: c.id, region: { type: 'canvas' }, bodies, camera });
+        steps.push({ id: anno.id, canvasId: c.id, region: { type: 'canvas' }, bodies, camera, ...(notes.length ? { notes } : {}) });
       }
       continue;
     }

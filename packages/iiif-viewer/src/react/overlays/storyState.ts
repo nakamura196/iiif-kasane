@@ -28,3 +28,6 @@ export const storyCameraAtom = atom<StoryCameraRequest | null>(null);
 
 /** The `seq` of the last request the 3D view has flown to (a new 3D view for the same Scene must not fly again). */
 export const storyCameraDoneAtom = atom<number>(0);
+
+/** The notes the current step in a Scene selects (`scope`): their labels open, the other marks step back. */
+export const storyNotesAtom = atom<string[]>([]);

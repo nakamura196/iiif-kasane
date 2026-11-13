@@ -19,8 +19,12 @@
 //   カメラは自分の -Z を向くので、位置は R·offset、見る点は R·(x, y, 0)。roll は IIIF の lookAt では書けないので捨てる。
 // - ツアー: setups[0].tours の各段 → behavior: sequence の AnnotationPage の describing 注釈。
 //   段の視点は、隠した（behavior: hidden）PerspectiveCamera を scope で指す。
-//   本文は段の題と、段で開く注釈の説明（無ければ記事の説明）。記事の HTML そのものは取り込まない。
-// - 注釈: models[].annotations → commenting の注釈（PointSelector は模型の変換をかけた位置）。
+//   本文は段の題と説明。説明は、段で記事が開くなら（reader/enabled）記事の説明、
+//   開かないなら段で開く注釈の説明。記事を開く段には、記事の HTML を外部の資源（type Text、
+//   format text/html）として body に足す。記事の中身は写さず、配信元の URL を指す。
+//   段で開く注釈（viewer/activeAnnotation）は、カメラと並べて scope で指す（表示側がその札を開く）。
+// - 注釈: models[].annotations → commenting の注釈（PointSelector はノードの変換と単位だけをかけた位置。
+//   svx の注釈の座標には、模型の translation・rotation が既にかかっている）。
 //   viewId があれば、その視点のカメラを scope で指す。
 // - 光・shader・exposure・場面の切り替わりの速さは、IIIF に当たるものが無いので捨てる。
 
@@ -117,7 +121,10 @@ const tour = [];
 placements.forEach(({ node, model, matrix }, i) => {
   const unit = (UNIT[model.units] ?? sceneUnit) / sceneUnit;
   const m = compose(matrix, { ...trs(model), s: (model.scale ?? [1, 1, 1]).map((v) => v * unit) });
-  model.__matrix = m;
+  // 注釈の位置は、模型の translation・rotation をかけた後の座標で保存されている
+  // （Voyager の CVModel2.updateMatrixFromProps は、模型を動かすと注釈の座標も一緒に動かす）。
+  // そのため注釈には、ノードの変換と単位だけをかけ、模型の分はかけない
+  model.__annoMatrix = compose(matrix, { t: [0, 0, 0], r: trs().r, s: [unit, unit, unit] });
   const derivs = model.derivatives.filter((d) => d.usage === 'Web3D');
   const d = derivs.find((x) => x.quality === quality) ?? derivs.find((x) => x.quality === 'Medium') ?? derivs[0];
   const uri = d.assets.find((a) => a.type === 'Model' || /\.glb$/i.test(a.uri)).uri;
@@ -145,6 +152,7 @@ const at = (suffix) => snap.targets.findIndex((t) => t.endsWith(suffix));
 const iOrbit = at('navigation/orbit');
 const iOffset = at('navigation/offset');
 const iAnno = at('viewer/activeAnnotation');
+const iReader = at('reader/enabled');
 const iArticle = at('reader/articleId');
 const states = new Map(snap.states.map((s) => [s.id, s]));
 const fov = svx.cameras?.[0]?.perspective?.yfov;
@@ -194,7 +202,7 @@ const annotationsById = new Map();
 for (const { model } of placements) {
   for (const a of model.annotations ?? []) {
     annotationsById.set(a.id, a);
-    const p = applyTrs(model.__matrix, a.position);
+    const p = applyTrs(model.__annoMatrix, a.position);
     const cam = a.viewId ? cameraFor(a.viewId) : null;
     const lead = text(a, 'lead');
     comments.push({
@@ -214,27 +222,42 @@ for (const { model } of placements) {
 }
 
 // ---- ツアー ----
-const articles = new Map((meta.articles ?? []).map((a) => [a.id, a]));
+// 記事は、場面の meta ではなく模型のノードの meta にあることもある（トリケラトプス）。全部の meta から集める
+const articles = new Map((svx.metas ?? []).flatMap((m) => m.articles ?? []).map((a) => [a.id, a]));
 const tours = Array.isArray(setup.tours) ? setup.tours : setup.tours?.tours ?? [];
 const t0 = tours[0];
 for (const step of t0?.steps ?? []) {
   const s = states.get(step.id);
   const anno = s && annotationsById.get(s.values[iAnno]);
   const article = s && articles.get(s.values[iArticle]);
-  const lead = (anno && text(anno, 'lead')) || (article && text(article, 'lead')) || '';
+  // Voyager は、記事を開く段では記事を右に出し、注釈は題の札だけになる。そのため記事を先に使う
+  const reader = s && s.values[iReader] === true;
+  const lead = (reader && article && text(article, 'lead')) || (anno && text(anno, 'lead')) || '';
+  const articleUri = article && text(article, 'uri');
+  const articleUrl = reader && articleUri && base ? new URL(articleUri, base).href : '';
   const cam = cameraFor(step.id);
+  const scope = [
+    ...(cam ? [{ id: cam, type: 'Annotation' }] : []),
+    ...(anno ? [{ id: `${sceneId}/annotations/${anno.id}`, type: 'Annotation' }] : []),
+  ];
   tour.push({
     id: `${sceneId}/tour/${step.id}`,
     type: 'Annotation',
     motivation: ['describing'],
-    body: {
-      type: 'TextualBody',
-      value: `<h2>${esc(text(step, 'title'))}</h2>${lead.trim() ? `<p>${esc(lead.trim())}</p>` : ''}`,
-      format: 'text/html',
-      language: lang.toLowerCase(),
-    },
+    body: [
+      {
+        type: 'TextualBody',
+        // 外の HTML の本文を読まないビューアでも記事に行けるよう、記事へのリンクも本文に書く
+        value: `<h2>${esc(text(step, 'title'))}</h2>${lead.trim() ? `<p>${esc(lead.trim())}</p>` : ''}${articleUrl ? `<p><a href="${esc(articleUrl)}">Read the article: ${esc(text(article, 'title'))}</a></p>` : ''}`,
+        format: 'text/html',
+        language: lang.toLowerCase(),
+      },
+      ...(articleUrl
+        ? [{ id: articleUrl, type: 'Text', format: 'text/html', language: lang.toLowerCase(), label: { [lang.toLowerCase()]: [text(article, 'title')] } }]
+        : []),
+    ],
     target: sceneRef,
-    ...(cam ? { scope: [{ id: cam, type: 'Annotation' }] } : {}),
+    ...(scope.length ? { scope } : {}),
   });
 }
 

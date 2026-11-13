@@ -3,6 +3,9 @@
 import { useAtom, useSetAtom } from 'jotai';
 import { useEffect, useRef } from 'react';
 import {
+  articleBodiesOf,
+  articleSandbox,
+  labelIn,
   chapterLabel,
   openingStep,
   sanitizeAnnotationHtml,
@@ -37,6 +40,21 @@ function Text({ body, large }: { body: AnnotationBodyItem; large?: boolean }) {
     <p className={`${size} text-[var(--ds-fg)] whitespace-pre-wrap break-words`} lang={body.language}>
       {body.value}
     </p>
+  );
+}
+
+// An article of a step (an external HTML body), shown as it is in a closed frame, as a Voyager tour
+// step opens one beside the model. The viewer does not read it: its look, images and videos are its own.
+function Article({ body, locale }: { body: AnnotationBodyItem; locale: string }) {
+  const t = useTranslations('Story');
+  const url = body.url ?? '';
+  const sandbox = articleSandbox(url, typeof window === 'undefined' ? '' : window.location.origin);
+  if (!sandbox) return null;
+  const label = labelIn(body.label, locale) || t('article');
+  return (
+    <section aria-label={t('article')} className="rounded border border-[var(--ds-border)] overflow-hidden">
+      <iframe key={url} src={url} title={label} sandbox={sandbox} loading="lazy" className="w-full h-[60vh] border-0 bg-white" />
+    </section>
   );
 }
 
@@ -173,6 +191,10 @@ function StoryPanel({ manifest }: PanelContext) {
           ))}
         </article>
       )}
+
+      {articleBodiesOf(step.bodies).map((b) => (
+        <Article key={b.url} body={b} locale={locale} />
+      ))}
 
       <nav aria-label={t('steps')}>
         <StepList story={story} at={at} locale={locale} onGo={byHand} currentRef={current} label={(n) => t('step', { n })} />

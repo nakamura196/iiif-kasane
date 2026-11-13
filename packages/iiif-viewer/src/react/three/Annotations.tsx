@@ -5,9 +5,10 @@ import { useThree, useFrame } from '@react-three/fiber';
 import gsap from 'gsap';
 import AnnotationMarker from '../three/AnnotationMarker';
 import AreaMarker from '../three/AreaMarker';
-import { useAtom } from 'jotai';
+import { useAtom, useAtomValue } from 'jotai';
 import { annotationsAtom, visibleAnnotationsAtom } from '../atoms';
 import { selectedAnnotationIdAtom } from '../atoms';
+import { storyNotesAtom, storyOpenAtom } from '../overlays/storyState';
 import { useTranslations } from '../env';
 import { useEffect } from 'react';
 import { Vector3, Mesh, Frustum, Matrix4, Raycaster, Box3, Sphere } from 'three';
@@ -224,6 +225,14 @@ export default function Annotations({ model }: { model: GLTF }) {
     stay.current = !ownCamera(a);
     setSelectedAnnotationId(a.id);
   };
+  // While a story is read, each step opens the label of the notes it names (`scope`), as a Voyager tour
+  // step opens its active annotation, and the other marks step back. A step that names none closes it.
+  const storyOpen = useAtomValue(storyOpenAtom);
+  const storyNotes = useAtomValue(storyNotesAtom);
+  const told = storyOpen ? storyNotes : null;
+  useEffect(() => {
+    if (told) setOpenAnnotationId(told[0] ?? null);
+  }, [told]);
   const zoom = { label: t('zoomToNote'), onClick: () => openAnnotationId && focusOnAnnotation(openAnnotationId) };
 
   useEffect(() => {
@@ -241,6 +250,7 @@ export default function Annotations({ model }: { model: GLTF }) {
         const annotation = group.annotations[0];
         const type = annotation.data?.target?.selector?.type;
         const isOpen = group.annotations.some((a) => a.id === openAnnotationId);
+        const dimmed = !!told?.length && !group.annotations.some((a) => told.includes(a.id));
         const label = group.annotations.length > 1
           ? group.annotations.map((a) => a.data.body.label).filter(Boolean).join(' / ')
           : undefined;
@@ -254,6 +264,8 @@ export default function Annotations({ model }: { model: GLTF }) {
             onClick={() => pick(annotation)}
             action={isOpen ? zoom : undefined}
             isVisible={visibilityMap[annotation.id] ?? true}
+            dimmed={dimmed}
+            named={storyOpen}
           />
         ) : (
           <AreaMarker

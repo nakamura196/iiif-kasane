@@ -7,7 +7,7 @@ import { manifestAtom } from '../atoms';
 import { navRequestAtom, nextSeq } from '../displays/structureState';
 import { useLocale } from '../env';
 import { selectedCanvasAnnotationAtom } from './canvasAnnotationState';
-import { storyCameraAtom, storyStepAtom } from './storyState';
+import { storyCameraAtom, storyNotesAtom, storyStepAtom } from './storyState';
 
 /** How long autoplay stays on a step: the time to read it, and the move there (the glide takes up to 1.8 s). */
 export const autoplayDelay = (step: StoryStep, locale: string): number => readingTime(step, locale) + 1200;
@@ -32,6 +32,7 @@ export function useStory(given?: ManifestV4 | null) {
   const setSelected = useSetAtom(selectedCanvasAnnotationAtom);
   const setRequest = useSetAtom(navRequestAtom);
   const setCamera = useSetAtom(storyCameraAtom);
+  const setNotes = useSetAtom(storyNotesAtom);
   const total = story?.steps.length ?? 0;
   const at = Math.min(Math.max(index, 0), Math.max(total - 1, 0));
 
@@ -41,6 +42,8 @@ export function useStory(given?: ManifestV4 | null) {
       if (!s) return;
       setIndex(i);
       setSelected(s.id);
+      // a new array each time, so that the 3D view opens the step's notes again
+      setNotes(s.notes ? [...s.notes] : []);
       if (s.camera !== undefined) {
         // a step in a Scene: show that Scene, and fly to the step's Camera (none: the view stays)
         if (s.camera) setCamera({ seq: nextSeq(), sceneId: s.canvasId, camera: s.camera });
@@ -50,7 +53,7 @@ export function useStory(given?: ManifestV4 | null) {
       const view = scroll?.views?.[i];
       setRequest({ seq: nextSeq(), target: view ? { canvasId: s.canvasId, xywh: view } : stepTarget(s, sizes.get(s.canvasId)) });
     },
-    [story, scroll, sizes, setIndex, setSelected, setRequest, setCamera],
+    [story, scroll, sizes, setIndex, setSelected, setRequest, setCamera, setNotes],
   );
 
   return { story, at, total, go, setIndex, scroll, sizes, locale };

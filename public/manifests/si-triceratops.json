@@ -763,9 +763,9 @@
         "selector": [
          {
           "type": "PointSelector",
-          "x": 0.801672,
-          "y": -1.077752,
-          "z": -0.628874
+          "x": 1.187572,
+          "y": 0.059101,
+          "z": -0.026922
          }
         ]
        },
@@ -802,9 +802,9 @@
         "selector": [
          {
           "type": "PointSelector",
-          "x": -0.652518,
-          "y": 0.618066,
-          "z": 0.089449
+          "x": -0.266619,
+          "y": -0.634053,
+          "z": 1.679338
          }
         ]
        },
@@ -841,9 +841,9 @@
         "selector": [
          {
           "type": "PointSelector",
-          "x": -0.358133,
-          "y": -0.130054,
-          "z": 0.055175
+          "x": 0.027766,
+          "y": -0.610851,
+          "z": 0.930793
          }
         ]
        },
@@ -880,9 +880,9 @@
         "selector": [
          {
           "type": "PointSelector",
-          "x": -0.20356,
-          "y": 0.962666,
-          "z": 0.168881
+          "x": 0.182339,
+          "y": -0.708378,
+          "z": 2.025075
          }
         ]
        },
@@ -919,9 +919,9 @@
         "selector": [
          {
           "type": "PointSelector",
-          "x": -1.278119,
-          "y": 1.038905,
-          "z": -0.081941
+          "x": -0.89222,
+          "y": -0.456455,
+          "z": 2.097595
          }
         ]
        },
@@ -958,9 +958,9 @@
         "selector": [
          {
           "type": "PointSelector",
-          "x": -0.521227,
-          "y": -0.653789,
-          "z": 0.128384
+          "x": -0.135328,
+          "y": -0.691802,
+          "z": 0.408198
          }
         ]
        },
@@ -997,9 +997,9 @@
         "selector": [
          {
           "type": "PointSelector",
-          "x": -0.699634,
-          "y": 0.521277,
-          "z": 0.107466
+          "x": -0.313735,
+          "y": -0.6535,
+          "z": 1.582826
          }
         ]
        },
@@ -1036,9 +1036,9 @@
         "selector": [
          {
           "type": "PointSelector",
-          "x": -0.307863,
-          "y": -3.147928,
-          "z": -0.010252
+          "x": 0.078037,
+          "y": -0.590084,
+          "z": -2.087719
          }
         ]
        },
@@ -1075,9 +1075,9 @@
         "selector": [
          {
           "type": "PointSelector",
-          "x": 0.862378,
-          "y": -1.486368,
-          "z": -0.099229
+          "x": 1.248278,
+          "y": -0.476532,
+          "z": -0.427657
          }
         ]
        },
@@ -1108,12 +1108,14 @@
        "motivation": [
         "describing"
        ],
-       "body": {
-        "type": "TextualBody",
-        "value": "<h2>Introduction to the Skeleton</h2>",
-        "format": "text/html",
-        "language": "en"
-       },
+       "body": [
+        {
+         "type": "TextualBody",
+         "value": "<h2>Introduction to the Skeleton</h2>",
+         "format": "text/html",
+         "language": "en"
+        }
+       ],
        "target": {
         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
         "type": "Scene"
@@ -1131,12 +1133,14 @@
        "motivation": [
         "describing"
        ],
-       "body": {
-        "type": "TextualBody",
-        "value": "<h2>About the Skeleton</h2><p>This is a composite specimen, assembled from the remains of several Triceratops individuals. The bones are casts made from real bones and 3D prints. The skeleton is 21 feet long and 8.5 feet tall.</p>",
-        "format": "text/html",
-        "language": "en"
-       },
+       "body": [
+        {
+         "type": "TextualBody",
+         "value": "<h2>About the Skeleton</h2><p>This is a composite specimen, assembled from the remains of several Triceratops individuals. The bones are casts made from real bones and 3D prints. The skeleton is 21 feet long and 8.5 feet tall.</p>",
+         "format": "text/html",
+         "language": "en"
+        }
+       ],
        "target": {
         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
         "type": "Scene"
@@ -1144,6 +1148,10 @@
        "scope": [
         {
          "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/12",
+         "type": "Annotation"
+        },
+        {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/annotations/ll064WOo8byC",
          "type": "Annotation"
         }
        ]
@@ -1154,12 +1162,25 @@
        "motivation": [
         "describing"
        ],
-       "body": {
-        "type": "TextualBody",
-        "value": "<h2>Are These Fossils Real?</h2><p>This is a composite specimen, assembled from the remains of several Triceratops individuals. The bones are casts made from real bones and 3D prints. The skeleton is 21 feet long and 8.5 feet tall.</p>",
-        "format": "text/html",
-        "language": "en"
-       },
+       "body": [
+        {
+         "type": "TextualBody",
+         "value": "<h2>Are These Fossils Real?</h2><p>Did you know the Triceratops you see today in the David H. Koch Hall of Fossils – Deep Time at the Smithsonian National Museum of Natural History is not made of real fossils?</p><p><a href=\"https://3d-api.si.edu/content/document/3d_package:d8c623be-4ebc-11ea-b77f-2e728ce88125/articles/new-article-uTRGn3tMSDKh-0.html\">Read the article: Are These Fossils Real?</a></p>",
+         "format": "text/html",
+         "language": "en"
+        },
+        {
+         "id": "https://3d-api.si.edu/content/document/3d_package:d8c623be-4ebc-11ea-b77f-2e728ce88125/articles/new-article-uTRGn3tMSDKh-0.html",
+         "type": "Text",
+         "format": "text/html",
+         "language": "en",
+         "label": {
+          "en": [
+           "Are These Fossils Real?"
+          ]
+         }
+        }
+       ],
        "target": {
         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
         "type": "Scene"
@@ -1167,6 +1188,10 @@
        "scope": [
         {
          "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/13",
+         "type": "Annotation"
+        },
+        {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/annotations/ll064WOo8byC",
          "type": "Annotation"
         }
        ]
@@ -1177,12 +1202,14 @@
        "motivation": [
         "describing"
        ],
-       "body": {
-        "type": "TextualBody",
-        "value": "<h2>Skull</h2><p>As with most horned dinosaurs, the skull is large (7 feet long) compared to the body. It sat on a short neck and was held low to the ground, indicating Triceratops probably fed on low-growing plants.</p>",
-        "format": "text/html",
-        "language": "en"
-       },
+       "body": [
+        {
+         "type": "TextualBody",
+         "value": "<h2>Skull</h2><p>As with most horned dinosaurs, the skull is large (7 feet long) compared to the body. It sat on a short neck and was held low to the ground, indicating Triceratops probably fed on low-growing plants.</p>",
+         "format": "text/html",
+         "language": "en"
+        }
+       ],
        "target": {
         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
         "type": "Scene"
@@ -1190,6 +1217,10 @@
        "scope": [
         {
          "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/14",
+         "type": "Annotation"
+        },
+        {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/annotations/tqjzgacSelwY",
          "type": "Annotation"
         }
        ]
@@ -1200,12 +1231,14 @@
        "motivation": [
         "describing"
        ],
-       "body": {
-        "type": "TextualBody",
-        "value": "<h2>Horns</h2><p>Triceratops means \"three-horned face,\" and it had two long brow horns over the eyes and a smaller nose horn. Different species of horned dinosaurs had very different sizes and arrangements of horns.</p>",
-        "format": "text/html",
-        "language": "en"
-       },
+       "body": [
+        {
+         "type": "TextualBody",
+         "value": "<h2>Horns</h2><p>Triceratops means \"three-horned face,\" and it had two long brow horns over the eyes and a smaller nose horn. Different species of horned dinosaurs had very different sizes and arrangements of horns.</p>",
+         "format": "text/html",
+         "language": "en"
+        }
+       ],
        "target": {
         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
         "type": "Scene"
@@ -1213,6 +1246,10 @@
        "scope": [
         {
          "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/15",
+         "type": "Annotation"
+        },
+        {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/annotations/zCJUDh72bnj8",
          "type": "Annotation"
         }
        ]
@@ -1223,12 +1260,14 @@
        "motivation": [
         "describing"
        ],
-       "body": {
-        "type": "TextualBody",
-        "value": "<h2>Frill</h2><p>The bony frill was formed from two of the bones at the back of the skull and offered protection for the neck. In life, it may have been colorful and used for displays.</p>",
-        "format": "text/html",
-        "language": "en"
-       },
+       "body": [
+        {
+         "type": "TextualBody",
+         "value": "<h2>Frill</h2><p>The bony frill was formed from two of the bones at the back of the skull and offered protection for the neck. In life, it may have been colorful and used for displays.</p>",
+         "format": "text/html",
+         "language": "en"
+        }
+       ],
        "target": {
         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
         "type": "Scene"
@@ -1236,6 +1275,10 @@
        "scope": [
         {
          "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/16",
+         "type": "Annotation"
+        },
+        {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/annotations/TmVEppHX8kNr",
          "type": "Annotation"
         }
        ]
@@ -1246,12 +1289,14 @@
        "motivation": [
         "describing"
        ],
-       "body": {
-        "type": "TextualBody",
-        "value": "<h2>Teeth and Beak</h2><p>The large size and number of teeth, and their shape, indicate the animal was able to process large amounts of tough plant matter. The deep, narrow beak was good for plucking plants.</p>",
-        "format": "text/html",
-        "language": "en"
-       },
+       "body": [
+        {
+         "type": "TextualBody",
+         "value": "<h2>Teeth and Beak</h2><p>The large size and number of teeth, and their shape, indicate the animal was able to process large amounts of tough plant matter. The deep, narrow beak was good for plucking plants.</p>",
+         "format": "text/html",
+         "language": "en"
+        }
+       ],
        "target": {
         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
         "type": "Scene"
@@ -1259,6 +1304,10 @@
        "scope": [
         {
          "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/17",
+         "type": "Annotation"
+        },
+        {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/annotations/xbK7h8rDuNRT",
          "type": "Annotation"
         }
        ]
@@ -1269,12 +1318,14 @@
        "motivation": [
         "describing"
        ],
-       "body": {
-        "type": "TextualBody",
-        "value": "<h2>End of Tour</h2>",
-        "format": "text/html",
-        "language": "en"
-       },
+       "body": [
+        {
+         "type": "TextualBody",
+         "value": "<h2>End of Tour</h2>",
+         "format": "text/html",
+         "language": "en"
+        }
+       ],
        "target": {
         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
         "type": "Scene"

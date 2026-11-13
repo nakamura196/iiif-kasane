@@ -561,6 +561,8 @@ export const geoFeaturesNamedBy = (features: GeoFeature[], annotations: Annotati
 export interface SceneStoryAnnotation {
   anno: AnnotationV4;
   camera: DefaultCamera | null;
+  /** The notes of the Scene that the step's `scope` also names: the step selects them (opens their label). */
+  notes: string[];
 }
 
 const STORY_MOTIVATIONS = ['describing', 'commenting'];
@@ -573,14 +575,21 @@ const isSequencePage = (page: AnnotationPageV4): boolean =>
 // behavior `sequence` is explicitly a narrative: when the Scene has one, its Annotations are the
 // steps, with or without a Camera. Without one, only the Annotations that name a Camera are steps,
 // so that notes on a model do not become a tour unless they were given viewpoints.
+// A `scope` may also name notes of the Scene (non-painting Annotations that are not steps): the step
+// selects them, as a Voyager tour step opens its active annotation (svx `viewer/activeAnnotation`).
 export const sceneStoryAnnotationsOf = (scene: SceneV4 | undefined): SceneStoryAnnotation[] => {
   if (!scene) return [];
   const pages = scene.annotations ?? [];
   const sequence = pages.filter(isSequencePage);
   const all = [...flattenAllPages(scene.items), ...flattenAllPages(pages)];
   const cameras = cameraIndex(all);
+  const ids = new Set(all.map((a) => a.id));
   const steps = flattenAllPages(sequence.length > 0 ? sequence : pages)
     .filter((a) => !cameras.has(a.id) && motivationsOf(a).some((m) => STORY_MOTIVATIONS.includes(m)))
-    .map((anno) => ({ anno, camera: cameraFor(anno, cameras) ?? null }));
+    .map((anno) => {
+      const scope = [anno.scope ?? []].flat().map((s) => (typeof s === 'string' ? s : s?.id));
+      const notes = scope.filter((id): id is string => !!id && id !== anno.id && ids.has(id) && !cameras.has(id));
+      return { anno, camera: cameraFor(anno, cameras) ?? null, notes };
+    });
   return sequence.length > 0 ? steps : steps.filter((s) => s.camera);
 };
