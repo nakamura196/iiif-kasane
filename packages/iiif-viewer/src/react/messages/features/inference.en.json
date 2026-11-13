@@ -38,6 +38,18 @@
     "pointLabel": "Region {n}",
     "stage_encode": "Reading the image...",
     "stage_segment": "Tracing the shape...",
-    "stage_generate": "Writing..."
+    "stage_generate": "Writing...",
+    "batchModel": "Model",
+    "batchRun": "Run on all pages ({count})",
+    "batchStop": "Stop",
+    "batchProgress": "Reading {done} / {total} pages",
+    "batchDone": "Read {total} pages",
+    "batchStopped": "Stopped ({done} / {total} pages)",
+    "batchNothing": "Every page already has a result",
+    "batchFailed": "({count} pages could not be read)",
+    "batchNoModel": "Download a model in the Inference tab to run it on all pages from here.",
+    "batchTags": "Classes",
+    "batchTagsClear": "Show all",
+    "batchResume": "Continue ({count} pages left)"
   }
 }
