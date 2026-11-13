@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { StageInfo } from '../displays/ImageView';
-import { overlaps, pixelsPerUnit, visibleBoxOf } from './annotationMarks';
+import { numberSideOf, overlaps, pixelsPerUnit, visibleBoxOf } from './annotationMarks';
 
 // A 2000 x 1000 Canvas fitted into a 1000 x 500 box: the stage is the box, half a Canvas unit per pixel.
 const stage = (scale: number, tx = 0, ty = 0): StageInfo => ({
@@ -67,5 +67,13 @@ describe('annotationNumbers', () => {
   it('gives no numbers when there are too many', async () => {
     const { annotationNumbers, NUMBER_LIMIT } = await import('./annotationMarks');
     expect(annotationNumbers(Array.from({ length: NUMBER_LIMIT + 1 }, (_, i) => ({ id: String(i) })))).toBeNull();
+  });
+});
+
+describe('numberSideOf', () => {
+  it('puts the number above a tall box and to the left of a wide or square one', () => {
+    expect(numberSideOf(20, 300)).toBe('top');
+    expect(numberSideOf(300, 20)).toBe('left');
+    expect(numberSideOf(100, 100)).toBe('left');
   });
 });
