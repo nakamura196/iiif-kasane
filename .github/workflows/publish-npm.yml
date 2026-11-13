@@ -47,6 +47,10 @@ jobs:
       - name: Test the package
         run: npx vitest run packages/iiif-viewer
 
+      # The package alone (not the whole site): its own type check and the public API baseline.
+      - name: Check the public API
+        run: npm run typecheck:package
+
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
