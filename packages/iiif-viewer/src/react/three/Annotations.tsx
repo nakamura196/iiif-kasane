@@ -8,6 +8,7 @@ import AreaMarker from '../three/AreaMarker';
 import { useAtom } from 'jotai';
 import { annotationsAtom, visibleAnnotationsAtom } from '../atoms';
 import { selectedAnnotationIdAtom } from '../atoms';
+import { useTranslations } from '../env';
 import { useEffect } from 'react';
 import { Vector3, Mesh, Frustum, Matrix4, Raycaster, Box3, Sphere } from 'three';
 import { computeFocusCamera, runFocusFlight } from '../../core';
@@ -27,6 +28,7 @@ const CAMERA_MOVE_THRESHOLD = 0.01; // カメラ移動の閾値（スクロー�
 const IDLE_FRAMES_BEFORE_RAYCAST = 30; // 停止後このフレーム数待ってからRaycast（約0.5秒 @ 60fps）
 
 export default function Annotations({ model }: { model: GLTF }) {
+  const t = useTranslations('Viewer');
   const [openAnnotationId, setOpenAnnotationId] = useState<string | null>(null);
   const [selectedAnnotationId, setSelectedAnnotationId] = useAtom(selectedAnnotationIdAtom);
   const [annotations] = useAtom(annotationsAtom);
@@ -201,10 +203,34 @@ export default function Annotations({ model }: { model: GLTF }) {
     runFocusFlight({ camera, controls, gsap }, position, target);
   }, [annotations, camera, controls, focusRadius, focusCenter]);
 
+  // A click on a mark that has its own Camera (`scope`) flies there: that is the view its maker chose.
+  // A mark without one only opens its label, and the view moves from the label's button: framing the
+  // point by itself went right up to it (Lincoln's life mask, 2026-11-12), unlike Voyager, which stays.
+  // Notes picked elsewhere (the list) still fly, as before.
+  const stay = useRef(false);
+  const ownCamera = (a: (typeof annotations)[number] | undefined): boolean => {
+    const s = a?.data?.target?.selector;
+    const cam = s?.camPos as number[] | undefined;
+    const at = s?.value as number[] | undefined;
+    return !!cam && !!at && cam.some((v, i) => v !== at[i]);
+  };
+  const pick = (a: (typeof annotations)[number]) => {
+    if (a.id === selectedAnnotationId) {
+      // already selected (the effect will not run again): open it, and fly back to its Camera
+      setOpenAnnotationId(a.id);
+      if (ownCamera(a)) focusOnAnnotation(a.id);
+      return;
+    }
+    stay.current = !ownCamera(a);
+    setSelectedAnnotationId(a.id);
+  };
+  const zoom = { label: t('zoomToNote'), onClick: () => openAnnotationId && focusOnAnnotation(openAnnotationId) };
+
   useEffect(() => {
     if (selectedAnnotationId) {
       setOpenAnnotationId(selectedAnnotationId);
-      focusOnAnnotation(selectedAnnotationId);
+      if (stay.current) stay.current = false;
+      else focusOnAnnotation(selectedAnnotationId);
     }
   }, [selectedAnnotationId, focusOnAnnotation]);
 
@@ -225,9 +251,8 @@ export default function Annotations({ model }: { model: GLTF }) {
             annotation={annotation}
             label={label}
             isOpen={isOpen}
-            onClick={() => {
-              setSelectedAnnotationId(annotation.id);
-            }}
+            onClick={() => pick(annotation)}
+            action={isOpen ? zoom : undefined}
             isVisible={visibilityMap[annotation.id] ?? true}
           />
         ) : (
@@ -237,9 +262,7 @@ export default function Annotations({ model }: { model: GLTF }) {
             annotation={annotation}
             label={label}
             isOpen={isOpen}
-            onClick={() => {
-              setSelectedAnnotationId(annotation.id);
-            }}
+            onClick={() => pick(annotation)}
           />
         );
       })}

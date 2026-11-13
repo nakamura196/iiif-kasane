@@ -8,6 +8,7 @@ export default function AnnotationMarker({
   onClick,
   label,
   isVisible = true,
+  action,
 }: {
   annotation: Annotation;
   isOpen: boolean;
@@ -15,8 +16,12 @@ export default function AnnotationMarker({
   // Overrides the popup text, e.g. to list every annotation on a shared region.
   label?: string;
   isVisible?: boolean;
+  // a button in the popup
+  action?: { label: string; onClick: () => void };
 }) {
-  const content = label ?? annotation.data.body.label;
+  // a note without a title shows the start of its text (tags taken off; React escapes the rest)
+  const text = annotation.data.body.value?.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() ?? '';
+  const content = label ?? (annotation.data.body.label || (text.length > 80 ? `${text.slice(0, 80)}…` : text));
   const value = annotation.data.target.selector.value;
 
   return (
@@ -36,7 +41,7 @@ export default function AnnotationMarker({
         />
 
         {/* ポップアップ */}
-        {isOpen && <Popup content={content} />}
+        {isOpen && <Popup content={content} action={action} />}
       </div>
     </Html>
   );

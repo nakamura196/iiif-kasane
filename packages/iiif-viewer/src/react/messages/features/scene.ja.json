@@ -1,6 +1,7 @@
 {
   "Viewer": {
     "sceneNotLoaded": "この資料は 3D のモデルです。このサイトでは 3D の表示が読み込まれていません。",
-    "sceneNotLoadedHint": "サイトの作り手の方へ: import 'iiif-kasane/scene' を 1 行足すと表示されます。"
+    "sceneNotLoadedHint": "サイトの作り手の方へ: import 'iiif-kasane/scene' を 1 行足すと表示されます。",
+    "zoomToNote": "ここに寄る"
   }
 }

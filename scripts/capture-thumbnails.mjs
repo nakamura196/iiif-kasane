@@ -178,6 +178,8 @@ for (const t of targets) {
       await sleep(PREPARE_WAIT[t.id] ?? 3000);
     }
     await send('Runtime.evaluate', { expression: seekVideos(SEEK_AT[t.id]), awaitPromise: true }, sessionId);
+    // 手元の開発サーバで撮ると、Next.js の開発用の表示（左下の丸い札）が写るので消す
+    await send('Runtime.evaluate', { expression: "document.querySelectorAll('nextjs-portal').forEach((e) => e.remove())" }, sessionId);
     await sleep(500);
     // 撮る範囲。stage のときは右の欄の手前まで、縦は 16:10 に収まるよう中央を残す
     let clip = { x: 0, y: HEADER, width, height: HEIGHT, scale: 1 };

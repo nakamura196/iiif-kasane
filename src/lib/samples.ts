@@ -35,6 +35,15 @@ export const SAMPLES: Sample[] = [
     manifest: withBasePath('/manifests/sample-manifest-viewpoints.json'),
   },
   {
+    id: 'spacesuit-story', media: '3d',
+    title: { ja: '宇宙服の 3D ツアー', en: '3D tour of a spacesuit' },
+    note: {
+      ja: 'IIIF 3D 作業部会の例の宇宙服に、隠した視点（Camera）と順に進む注釈の頁（behavior: sequence）でツアーを書いた検証用の例。「次へ」で視点が全体・手袋・ヘルメット・背中と移ります。段の本文は仮のものです',
+      en: 'A test of a tour on the spacesuit from the IIIF 3D TSG examples, written with hidden Cameras and an annotation page with behavior "sequence". "Next" moves the view through the whole suit, the glove, the helmet and the back. The step texts are placeholders',
+    },
+    manifest: withBasePath('/manifests/sample-manifest-story-3d.json'), tab: 'story',
+  },
+  {
     id: 'video-transcript', media: 'video',
     title: { ja: '動画と時刻つき文字起こし', en: 'Video with timed transcript' },
     note: {

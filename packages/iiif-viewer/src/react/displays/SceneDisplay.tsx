@@ -1,6 +1,6 @@
 'use client';
 
-import { lazy, Suspense, useEffect, useMemo } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { authorizedUrl, chosenOption, paintedModelsOf, parseManifestV4, probeServiceOf, sceneOf } from '../../core';
 import {
@@ -14,6 +14,8 @@ import { useLocale, useTranslations } from '../env';
 import AuthPrompt from '../auth/AuthPrompt';
 import { useAuthStates } from '../auth/authStore';
 import ModelChoice from '../three/ModelChoice';
+import { StoryLayer } from '../overlays/StoryOverlay';
+import type { StageInfo } from './ImageView';
 import type { Display, DisplayProps } from './types';
 import type { PlacedModel } from '../three/Scene';
 
@@ -63,8 +65,25 @@ function SceneDisplay({ container, manifest, iiifContent, renderActions, selecte
   );
   const hasChoices = (paintedModels[0]?.options.length ?? 0) > 1;
 
+  // The caption of a story step in this Scene (Presentation 4.0 storytelling), as over an image. It only
+  // needs the size of the view: the 3D view does not move under it like a picture.
+  const box = useRef<HTMLDivElement>(null);
+  const [stage, setStage] = useState<StageInfo | undefined>(undefined);
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const measure = () => {
+      const { width, height } = el.getBoundingClientRect();
+      setStage({ scale: 1, tx: 0, ty: 0, stageW: width, stageH: height, boxW: width, boxH: height });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   return (
-    <div className="relative flex-1 min-h-0 min-w-0">
+    <div ref={box} className="relative flex-1 min-h-0 min-w-0">
       {glbUrl && (
         <Suspense fallback={<div className="p-4 text-sm text-[var(--ds-fg)]">{t('loading')}</div>}>
           {/* a new 3D view per Scene, so that the camera starts again from that Scene's view */}
@@ -72,6 +91,9 @@ function SceneDisplay({ container, manifest, iiifContent, renderActions, selecte
         </Suspense>
       )}
       <AuthPrompt />
+      <div className="absolute inset-0 z-10 pointer-events-none">
+        <StoryLayer container={container} canvasWidth={0} canvasHeight={0} stage={stage} />
+      </div>
       <div className="absolute bottom-4 left-4 z-10 flex items-end gap-2">
         <ModelChoice />
         {renderActions?.({ iiifContent, hasChoices, selectedIndex })}

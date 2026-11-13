@@ -9,9 +9,16 @@
 //  - 多言語: 本文の Choice か、language の違う TextualBody を並べたもの。UI の言語のものを選ぶ
 //  - 複数の Canvas: Canvas の順に、それぞれのステップをつなげる
 // Range が無いときは、見出しのあるステップと無いステップが混ざっていれば、見出しのあるステップを章の頭とみなす。
+//
+// 3D（Scene）では、Presentation 4.0 の Guided Viewing and Storytelling に従う（manifestParser.ts の
+// sceneStoryAnnotationsOf）。ステップは Scene の annotations にある describing / commenting の注釈で、
+// `scope` が指す Camera がそのステップの視点になる。behavior "sequence" の AnnotationPage があれば、
+// その頁の注釈がステップ。無ければ、Camera を指す注釈だけがステップになる。
 
 import type { ManifestV4 } from '../types/iiif';
-import { containersOf } from '../services/containers';
+import { containersOf, sceneOf } from '../services/containers';
+import { sceneStoryAnnotationsOf, type DefaultCamera } from '../services/manifestParser';
+import { readAnnotationBodies } from './annotationBody';
 import { labelIn } from '../services/paintedModels';
 import {
   embeddedCanvasAnnotations,
@@ -29,6 +36,8 @@ export interface StoryStep {
   canvasId: string;
   region: AnnotationRegion;
   bodies: AnnotationBodyItem[];
+  /** A step in a Scene: the Camera it is seen from (`scope`), or null to stay where the view is. */
+  camera?: DefaultCamera | null;
 }
 
 export interface StoryChapter {
@@ -194,12 +203,21 @@ export function storyOf(manifest: ManifestV4 | null | undefined, locale = 'en'):
   if (!manifest) return null;
   const steps: StoryStep[] = [];
   for (const c of containersOf(manifest)) {
+    if (c.kind === 'Scene') {
+      for (const { anno, camera } of sceneStoryAnnotationsOf(sceneOf(manifest, c.id))) {
+        const bodies = readAnnotationBodies(anno as unknown as Record<string, unknown>);
+        if (!bodies.some((b) => b.kind === 'text')) continue;
+        steps.push({ id: anno.id, canvasId: c.id, region: { type: 'canvas' }, bodies, camera });
+      }
+      continue;
+    }
     if (c.kind !== 'Canvas') continue;
     for (const a of embeddedCanvasAnnotations(manifest, c.id, c)) {
       if (isStep(a)) steps.push({ id: a.id, canvasId: c.id, region: a.region, bodies: a.bodies });
     }
   }
-  if (steps.length < 2 || !steps.some((s) => s.region.type !== 'canvas')) return null;
+  // a story moves the view: some step must point at a region of a Canvas, or at a Camera of a Scene
+  if (steps.length < 2 || !steps.some((s) => s.region.type !== 'canvas' || s.camera)) return null;
   const fromRanges = chaptersFromRanges(steps, rangesOf(manifest));
   return { steps, chapters: fromRanges.length > 0 ? fromRanges : chaptersFromHeadings(steps, locale) };
 }

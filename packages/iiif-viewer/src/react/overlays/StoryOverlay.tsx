@@ -130,8 +130,8 @@ function Strip({
   );
 }
 
-// Nothing is read until the story tab is open (this layer is on every image).
-function StoryLayer(props: OverlayProps) {
+// Nothing is read until the story tab is open (this layer is on every image, and over the 3D view).
+export function StoryLayer(props: OverlayProps) {
   const open = useAtomValue(storyOpenAtom);
   return open ? <StoryLayerOpen {...props} /> : null;
 }

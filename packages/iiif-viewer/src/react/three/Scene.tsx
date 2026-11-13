@@ -3,7 +3,7 @@
 import { startTransition, Suspense, useEffect, useImperativeHandle, useMemo, useRef, type Ref } from 'react';
 import { Clone, useAnimations, useGLTF, Bounds } from '@react-three/drei';
 import { useThree, type ThreeEvent } from '@react-three/fiber';
-import { Box3, Group, Matrix4, PerspectiveCamera, Points, PointsMaterial, Sphere, Vector3, type Object3D } from 'three';
+import { Box3, Group, Matrix4, PerspectiveCamera, type Camera, Points, PointsMaterial, Sphere, Vector3, type Object3D } from 'three';
 import gsap from 'gsap';
 import Annotations from '../three/Annotations';
 import ModelErrorBoundary from './ModelErrorBoundary';
@@ -12,6 +12,7 @@ import { manifestAtom, measuringAtom, modelAnimationAtom, modelChoicesAtom, mode
 import MeasureMarks, { useMeasure } from './MeasureTool';
 import { chosenOption, sceneSpatialScaleOf, upgradeUrl } from '../../core';
 import { defaultCameraOf, type DefaultCamera } from '../../core';
+import { storyCameraAtom, storyCameraDoneAtom } from '../overlays/storyState';
 import { runFocusFlight, type Vec3 } from '../../core';
 import { fitView, topView } from '../../core';
 import { ZOOM_MAX_FACTOR } from '../../core';
@@ -51,26 +52,29 @@ export interface ViewHandle {
   goTo: (cam: DefaultCamera) => void; // a Camera from the manifest
 }
 
+// Flies `camera` to `position`, looking at `target`, keeping the whole model (centre `c`, `radius`)
+// inside the clipping range at the new distance.
+function flyTo(camera: Camera, controls: unknown, c: Vec3, radius: number, position: Vec3, target: Vec3) {
+  if (camera instanceof PerspectiveCamera) {
+    const reach = Math.hypot(position[0] - c[0], position[1] - c[1], position[2] - c[2]) + radius;
+    camera.near = Math.max(reach / 10000, 0.01);
+    camera.far = Math.max(camera.far, reach * 2);
+    camera.updateProjectionMatrix();
+  }
+  const orbit = controls as { target: Vector3; update?: () => void; enabled?: boolean } | null;
+  runFocusFlight({ camera, controls: orbit, gsap }, position, target);
+}
+
 // Flies the camera for the view buttons. Lives inside the Canvas (needs the camera and
 // the OrbitControls) and next to the model (needs its bounding sphere).
 function ViewController({ handle, center, radius }: { handle: Ref<ViewHandle>; center: Vector3; radius: number }) {
   const { camera, controls, size } = useThree();
-  useImperativeHandle(handle, () => {
+  const views = useMemo((): ViewHandle => {
     const c: Vec3 = [center.x, center.y, center.z];
     // read at click time: the manifest's default Camera may have set the fov after mount
     const fov = () => (camera instanceof PerspectiveCamera ? camera.fov : 50);
     const aspect = size.height > 0 ? size.width / size.height : 1;
-    const fly = (position: Vec3, target: Vec3) => {
-      if (camera instanceof PerspectiveCamera) {
-        // keep the whole model inside the clipping range at the new distance
-        const reach = Math.hypot(position[0] - c[0], position[1] - c[1], position[2] - c[2]) + radius;
-        camera.near = Math.max(reach / 10000, 0.01);
-        camera.far = Math.max(camera.far, reach * 2);
-        camera.updateProjectionMatrix();
-      }
-      const orbit = controls as unknown as { target: Vector3; update?: () => void; enabled?: boolean } | null;
-      runFocusFlight({ camera, controls: orbit, gsap }, position, target);
-    };
+    const fly = (position: Vec3, target: Vec3) => flyTo(camera, controls, c, radius, position, target);
     const here: () => Vec3 = () => [camera.position.x, camera.position.y, camera.position.z];
     return {
       fit: () => {
@@ -84,6 +88,17 @@ function ViewController({ handle, center, radius }: { handle: Ref<ViewHandle>; c
       goTo: (cam) => fly(cam.position, cam.lookAt ?? c),
     };
   }, [camera, controls, size, center, radius]);
+  useImperativeHandle(handle, () => views, [views]);
+  // A story step in this Scene flies to its Camera (Presentation 4.0 `scope`). A request made before this
+  // 3D view existed (the step opened another Scene) is flown to once the model is here.
+  const request = useAtomValue(storyCameraAtom);
+  const sceneId = useAtomValue(sceneIdAtom);
+  const [done, setDone] = useAtom(storyCameraDoneAtom);
+  useEffect(() => {
+    if (!request || request.seq === done || request.sceneId !== sceneId) return;
+    setDone(request.seq);
+    views.goTo(request.camera);
+  }, [request, done, sceneId, views, setDone]);
   return null;
 }
 
