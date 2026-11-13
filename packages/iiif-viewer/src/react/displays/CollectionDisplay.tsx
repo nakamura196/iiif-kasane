@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAtomValue } from 'jotai';
 import {
   chronologyOf,
@@ -74,17 +74,26 @@ function EntryThumbnail({ entry, className }: { entry: CollectionEntry; classNam
   return need && fetched?.id !== entry.id ? <span ref={ref} aria-hidden className={className} /> : null;
 }
 
-/**
- * The entries of a Collection, from the JSON kept with the shown manifest when it is this one, else read by the
- * Collection's id (a host page may set manifestAtom itself).
- */
+/** The entries from the JSON kept with the shown manifest, when it is this one. null: nothing kept for it. */
+export function storedEntriesFor(
+  shown: { manifest: unknown; raw: unknown } | null,
+  manifest: unknown,
+): CollectionEntry[] | null {
+  return shown && shown.manifest === manifest ? collectionEntriesOf(shown.raw) : null;
+}
+
+/** The entries of the Collection read by its id (a host page may set manifestAtom itself). */
+export async function fetchedEntriesFor(manifest: { id: string }): Promise<CollectionEntry[]> {
+  const raw = await fetchManifest(manifest.id);
+  return raw ? collectionEntriesOf(raw) : [];
+}
+
+/** The entries of a Collection: the ones kept with the shown manifest, else read by the Collection's id. */
 export async function collectionEntriesFor(
   shown: { manifest: unknown; raw: unknown } | null,
   manifest: { id: string },
 ): Promise<CollectionEntry[]> {
-  if (shown && shown.manifest === manifest) return collectionEntriesOf(shown.raw);
-  const raw = await fetchManifest(manifest.id);
-  return raw ? collectionEntriesOf(raw) : [];
+  return storedEntriesFor(shown, manifest) ?? fetchedEntriesFor(manifest);
 }
 
 // A Collection (a manifest whose items are Manifests): choose one to open.
@@ -103,17 +112,25 @@ function CollectionDisplay(props: DisplayProps) {
   // the entries come from the Collection as served: kept with the shown one, or read by its id when a host page
   // put the manifest into the store itself (manifestAtom)
   const shown = useAtomValue(shownManifestAtom);
+  // the kept ones are worked out while rendering, so the first paint has them; only the fallback is asynchronous
+  const stored = useMemo(() => (isCollection ? storedEntriesFor(shown, manifest) : null), [isCollection, shown, manifest]);
+  const hasStored = stored !== null;
   const [read, setRead] = useState<{ manifest: unknown; entries: CollectionEntry[] } | null>(null);
   useEffect(() => {
-    if (!isCollection || !manifest.id) return;
+    if (!isCollection || hasStored || !manifest.id) return;
     let cancelled = false;
-    void collectionEntriesFor(shown, manifest).then((entries) => {
-      if (!cancelled) setRead({ manifest, entries });
-    });
+    fetchedEntriesFor(manifest)
+      .then((entries) => {
+        if (!cancelled) setRead({ manifest, entries });
+      })
+      .catch((e) => {
+        console.error('Error reading manifest:', e);
+        if (!cancelled) setRead({ manifest, entries: [] });
+      });
     return () => {
       cancelled = true;
     };
-  }, [isCollection, shown, manifest]);
+  }, [isCollection, hasStored, manifest]);
 
   // not a Collection: an empty Scene is a Canvas that the converter turned into a Scene (a rotated image,
   // a Choice, a missing image). The displays after this one decide how it looks (imageCanvas, then scene).
@@ -127,7 +144,7 @@ function CollectionDisplay(props: DisplayProps) {
     type: 'Manifest',
     label: c.label,
   }));
-  const readEntries = read?.manifest === manifest ? read.entries : [];
+  const readEntries = stored ?? (read?.manifest === manifest ? read.entries : []);
   const entries = readEntries.length > 0 ? readEntries : fromContainers;
 
   const openEntry = async (e: CollectionEntry) => {

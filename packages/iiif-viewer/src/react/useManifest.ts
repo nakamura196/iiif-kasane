@@ -64,6 +64,8 @@ export function beginLoad(store: Store): () => boolean {
 
 /** What showManifest derives from a manifest. Computed before anything in the store changes, because it can throw. */
 export interface PreparedShow {
+  /** The locale the labels were read with. */
+  locale: string;
   annotations: ReturnType<typeof parseManifestV4>['annotations'];
   hasGeo: boolean;
   paintedModels: ReturnType<typeof paintedModelsOf>;
@@ -73,10 +75,21 @@ export interface PreparedShow {
 export function prepareShow(manifest: ManifestV4, locale: string): PreparedShow {
   const { annotations, geoCanvasId, geoFeatures } = parseManifestV4(manifest, undefined, locale);
   return {
+    locale,
     annotations,
     hasGeo: !!geoCanvasId || geoFeatures.length > 0,
     paintedModels: paintedModelsOf(firstSceneOf(manifest)),
   };
+}
+
+/** prepareShow, or null (reported on the console) when the manifest cannot be parsed. */
+export function tryPrepareShow(manifest: ManifestV4, locale: string): PreparedShow | null {
+  try {
+    return prepareShow(manifest, locale);
+  } catch (e) {
+    console.error('Error reading manifest:', e);
+    return null;
+  }
 }
 
 /**
@@ -90,9 +103,8 @@ export function showManifest(
   store: Store,
   url: string,
   source: ManifestSource,
-  locale: string,
   origin: ShownOrigin,
-  prepared: PreparedShow = prepareShow(source.manifest, locale),
+  prepared: PreparedShow,
 ): void {
   const { manifest, raw } = source;
   const { annotations, hasGeo, paintedModels } = prepared;
@@ -102,6 +114,8 @@ export function showManifest(
   store.set(layerSettingsAtom, {});
   store.set(layerOrderAtom, {});
   store.set(layerPlaybackAtom, null);
+  // the Scene on display is the new manifest's: SceneDisplay sets it again when it mounts for it
+  store.set(sceneIdAtom, null);
   const seq = (store.get(shownManifestAtom)?.seq ?? 0) + 1;
   store.set(shownManifestAtom, { url, raw, manifest, seq, origin, hasGeo });
   store.set(manifestAtom, manifest);
@@ -155,15 +169,10 @@ export async function loadManifest(
   if (!isCurrent()) return 'stale';
   if (!source) return 'failed';
   // parsed before beforeShow, so a manifest that cannot be parsed changes nothing (no trail entry, no cleared focus)
-  let prepared: PreparedShow;
-  try {
-    prepared = prepareShow(source.manifest, locale());
-  } catch (e) {
-    console.error('Error reading manifest:', e);
-    return 'failed';
-  }
+  const prepared = tryPrepareShow(source.manifest, locale());
+  if (!prepared) return 'failed';
   beforeShow?.(source);
-  showManifest(store, url, source, locale(), origin, prepared);
+  showManifest(store, url, source, origin, prepared);
   return 'shown';
 }
 
@@ -176,6 +185,9 @@ export const isContentLoading = (store: Store): boolean => store.get(contentLoad
 
 /** Read the iiif-content given to the viewer and show it. Moves started meanwhile are dropped, not this load. */
 export async function loadContent(store: Store, url: string, locale: () => string): Promise<OpenResult> {
+  // The iiif-content is a new one whatever the load gives: the URL and the trail are set at once. When the
+  // manifest cannot be read or parsed, the viewer reports the failure for this new content (failedUrl in
+  // useManifest) rather than silently keeping the old one; only the shown manifest is left as it was.
   store.set(manifestUrlAtom, url);
   // the way taken through the old iiif-content does not lead back from the new one
   store.set(trailAtom, { owner: url, items: [] });

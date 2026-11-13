@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { collectionEntriesFor } from './CollectionDisplay';
+import { collectionEntriesFor, storedEntriesFor } from './CollectionDisplay';
 
 const collection = (id: string, entries: string[]) => ({
   '@context': 'http://iiif.io/api/presentation/3/context.json',
@@ -32,5 +32,15 @@ describe('collectionEntriesFor', () => {
     }));
     const entries = await collectionEntriesFor(null, { id });
     expect(entries.map((e) => e.id)).toEqual(['https://example.org/cd-host/a.json', 'https://example.org/cd-host/b.json']);
+  });
+});
+
+describe('storedEntriesFor', () => {
+  it('gives the entries at once (no promise) for the shown manifest, and null for another', () => {
+    const manifest = { id: 'https://example.org/cd-sync/c.json' };
+    const raw = collection(manifest.id, ['https://example.org/cd-sync/a.json']);
+    expect(storedEntriesFor({ manifest, raw }, manifest)?.map((e) => e.id)).toEqual(['https://example.org/cd-sync/a.json']);
+    expect(storedEntriesFor({ manifest, raw }, { id: manifest.id })).toBeNull();
+    expect(storedEntriesFor(null, manifest)).toBeNull();
   });
 });

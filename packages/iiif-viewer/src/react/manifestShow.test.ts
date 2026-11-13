@@ -1,9 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createStore } from 'jotai';
-import { annotationsAtom, sceneIdAtom, shownManifestAtom } from './atoms';
-import { loadContent, prepareShow, reparseAnnotations, showManifest } from './useManifest';
+import { annotationsAtom, manifestUrlAtom, sceneIdAtom, shownManifestAtom } from './atoms';
+import { loadContent, prepareShow, reparseAnnotations, showManifest, tryPrepareShow } from './useManifest';
 import { goBack, openManifest, pickedPageAtom, trailAtom, focusAtom } from './displays/structureState';
-import { manifestUrlAtom } from './atoms';
 import { convertToV4 } from '../core';
 
 // A Presentation 4 manifest with Scenes; each carries one note labelled after the Scene
@@ -16,7 +15,7 @@ const note = (scene: string, selector: object) => ({
       id: `${scene}/note/1`,
       type: 'Annotation',
       motivation: ['commenting'],
-      label: { ja: [`${scene} ノート`], en: [`${scene} note`] },
+      label: { ja: [`${scene} (ja)`], en: [`${scene} note`] },
       body: { type: 'TextualBody', value: scene, format: 'text/plain' },
       target: { type: 'SpecificResource', source: { id: scene, type: 'Scene' }, selector: [selector] },
     },
@@ -52,19 +51,31 @@ describe('reparseAnnotations (a new locale)', () => {
     const store = createStore();
     const id = url('two');
     const manifest = convertToV4(manifestJson(id));
-    showManifest(store, id, { raw: manifestJson(id), manifest }, 'ja', 'content');
-    expect(store.get(annotationsAtom)[0]?.title).toBe(`${id}/scene/1 ノート`);
+    showManifest(store, id, { raw: manifestJson(id), manifest }, 'content', prepareShow(manifest, 'ja'));
+    expect(store.get(annotationsAtom)[0]?.title).toBe(`${id}/scene/1 (ja)`);
     // SceneDisplay, showing Scene 2, did this
     store.set(sceneIdAtom, `${id}/scene/2`);
     reparseAnnotations(store, 'en');
     expect(store.get(annotationsAtom).map((a) => a.title)).toEqual([`${id}/scene/2 note`]);
   });
 
+  it('forgets the Scene id of the manifest shown before when another is shown', () => {
+    const store = createStore();
+    const a = url('a');
+    const b = url('b');
+    const ma = convertToV4(manifestJson(a));
+    showManifest(store, a, { raw: manifestJson(a), manifest: ma }, 'content', prepareShow(ma, 'ja'));
+    store.set(sceneIdAtom, `${a}/scene/2`);
+    const mb = convertToV4(manifestJson(b));
+    showManifest(store, b, { raw: manifestJson(b), manifest: mb }, 'content', prepareShow(mb, 'ja'));
+    expect(store.get(sceneIdAtom)).toBeNull();
+  });
+
   it('reads the first Scene when the Scene id is not one of this manifest (an image canvas is shown)', () => {
     const store = createStore();
     const id = url('img');
     const manifest = convertToV4(manifestJson(id));
-    showManifest(store, id, { raw: manifestJson(id), manifest }, 'ja', 'content');
+    showManifest(store, id, { raw: manifestJson(id), manifest }, 'content', prepareShow(manifest, 'ja'));
     store.set(sceneIdAtom, 'https://example.org/other/scene');
     reparseAnnotations(store, 'en');
     expect(store.get(annotationsAtom).map((a) => a.title)).toEqual([`${id}/scene/1 note`]);
@@ -108,6 +119,24 @@ describe('a manifest that cannot be parsed', () => {
     expect(goBack(store, 'en')).toBe(false);
     expect(store.get(trailAtom).items).toHaveLength(1);
     expect(store.get(shownManifestAtom)).toBeNull();
+  });
+
+  it('reports the failure for the new iiif-content: its URL is kept and the old trail is dropped', async () => {
+    const store = createStore();
+    const a = url('ca');
+    const bad = url('cbad');
+    stubFetch({ [a]: manifestJson(a), [bad]: broken(bad) });
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    await loadContent(store, a, () => 'en');
+    await expect(loadContent(store, bad, () => 'en')).resolves.toBe('failed');
+    expect(store.get(manifestUrlAtom)).toBe(bad);
+    expect(store.get(trailAtom)).toEqual({ owner: bad, items: [] });
+  });
+
+  it('tryPrepareShow gives null for it, and the prepared value (with its locale) for a good one', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(tryPrepareShow(convertToV4(broken(url('t'))), 'en')).toBeNull();
+    expect(tryPrepareShow(convertToV4(manifestJson(url('g'))), 'en')?.locale).toBe('en');
   });
 
   it('prepareShow throws for it (the guard has something to catch)', () => {
