@@ -45,7 +45,8 @@ import type { Panel, PanelContext } from './types';
 // Hits are listed and also marked on the image (using the same local-annotation mechanism as inference results).
 // Selecting a hit moves to its page and zooms to the match. If units (line, word) are given, they can be used to filter.
 
-export const CONTENT_SEARCH_SOURCE = 'content-search';
+import { CONTENT_SEARCH_SOURCE } from '../overlays/contentSearchSource';
+export { CONTENT_SEARCH_SOURCE };
 const SOURCE = CONTENT_SEARCH_SOURCE;
 const MAX_PAGES = 20;
 const MAX_MATCHES = 2000;
@@ -354,11 +355,11 @@ export function ContentSearchPanelBody(ctx: PanelContext) {
       return;
     }
     // fit all the regions of the hit (a phrase spans several words), not only the first
-    const box = hitUnionXywh(m.regions, m.canvasId);
-    // A hit of several words: the marks show each word, so no frame is drawn around the union
-    // (it would also cover the text between the words).
-    const several = m.regions.filter((r) => r.canvasId === m.canvasId && r.xywh).length > 1;
-    setRequest({ seq: nextSeq(), target: { canvasId: m.canvasId, ...(box ? { xywh: box } : {}) }, ...(several ? { highlight: false } : {}) });
+    const union = hitUnionXywh(m.regions, m.canvasId);
+    // A hit of several words: while the marks are shown they mark each word, so no frame is drawn around the union
+    // (it would also cover the text between the words). With the marks hidden the frame is the only sign of the hit.
+    const marked = showMarks && (union?.count ?? 0) > 1;
+    setRequest({ seq: nextSeq(), target: { canvasId: m.canvasId, ...(union ? { xywh: union.box } : {}) }, ...(marked ? { highlight: false } : {}) });
   };
 
   const clear = () => {

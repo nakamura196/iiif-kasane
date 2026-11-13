@@ -6,6 +6,7 @@ import {
   annotationSourcesOf,
   canvasTagFacets,
   containersOf,
+  annotationsOfSelection,
   focusBoxOf,
   matchesCanvasAnnotation,
   searchTerms,
@@ -220,12 +221,8 @@ export function CanvasAnnotationsPanelBody({ container, manifest }: PanelContext
     const m = new Map<string, number>();
     rows.forEach((r, i) => {
       if (r.kind !== 'item') return;
-      for (const a of r.group.annotations) {
-        m.set(a.id, i);
-        // a hit id scrolls to the first row of the hit
-        const key = selectionKeyOf(a);
-        if (!m.has(key)) m.set(key, i);
-      }
+      // keyed by what selection compares on: the first row (in list order) of a search hit's marks
+      for (const a of r.group.annotations) if (!m.has(selectionKeyOf(a))) m.set(selectionKeyOf(a), i);
     });
     return m;
   }, [rows]);
@@ -248,7 +245,11 @@ export function CanvasAnnotationsPanelBody({ container, manifest }: PanelContext
     // (a little past the start: a seek may land a hair before the asked position)
     if (a.time && !isSelected) seek(a.time.start + 0.01);
     if (focusOnSelect && !isSelected && container) {
-      const box = focusBoxOf(a.region, { width: container.width ?? 0, height: container.height ?? 0 });
+      // all the marks of a search hit (one annotation otherwise), so that every word of the hit is in view
+      const box = focusBoxOf(
+        annotationsOfSelection(all, selectionKeyOf(a)).map((m) => m.region),
+        { width: container.width ?? 0, height: container.height ?? 0 },
+      );
       // the chosen annotation is marked on the image already: no second box around the wider part shown
       if (box) setRequest({ seq: nextSeq(), target: { canvasId: container.id, xywh: box }, highlight: false });
     }

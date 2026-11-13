@@ -99,7 +99,7 @@ export function AnnotationOverlayView({ container, canvasWidth, canvasHeight, st
 
   // Annotations that share a region (Shared Region extension) are drawn as one box, in the order of the list.
   // A story shows only its current scene, so the chosen annotation matters to the list only then.
-  const storySelected = storyOpen ? (storyFrame && selected ? selected : '\u0000') : null;
+  const storySelected = storyOpen ? (storyFrame && selectedHit ? selectedHit : '\u0000') : null;
   const drawn = useMemo(() => {
     const shown = annotations
       .filter((a) => a.region.type !== 'canvas' && !a.layer) // layer annotations are drawn by the layer itself
@@ -113,8 +113,7 @@ export function AnnotationOverlayView({ container, canvasWidth, canvasHeight, st
     if (!selectedHit || !filtering) return [];
     // every mark of the selected hit stays, not only the one that was pressed
     const marks = annotationsOfSelection(annotations, selectedHit).filter((x) => x.region.type !== 'canvas' && !x.layer);
-    const shownIds = new Set(drawn.flatMap((g) => g.annotations.map((m) => m.id)));
-    return groupByRegion(marks.filter((m) => !shownIds.has(m.id)));
+    return groupByRegion(marks.filter((x) => !drawn.some((g) => g.annotations.some((m) => m.id === x.id))));
   }, [selectedHit, filtering, drawn, annotations]);
   const toggle = useCallback((id: string, isSel: boolean) => setSelected(isSel ? null : id), [setSelected]);
   const all = useMemo(

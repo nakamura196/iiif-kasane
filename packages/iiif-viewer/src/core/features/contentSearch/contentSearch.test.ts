@@ -251,7 +251,7 @@ describe('hitUnionXywh', () => {
     const { matches } = parseContentSearchResponse(fixture('search2-handmade.json'));
     const phrase = matches.find((m) => m.match === 'blue bird')!;
     // blue (200,300,40,18) and bird (60,320,38,18)
-    expect(hitUnionXywh(phrase.regions, c)).toEqual([60, 300, 180, 38]);
+    expect(hitUnionXywh(phrase.regions, c)).toEqual({ box: [60, 300, 180, 38], count: 2 });
     expect(hitUnionXywh(phrase.regions, 'https://example.org/book1/canvas/p1')).toBeUndefined();
     expect(hitUnionXywh([{ annotationId: 'a', canvasId: c }], c)).toBeUndefined();
   });

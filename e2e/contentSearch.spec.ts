@@ -100,8 +100,10 @@ test('Content Search 2.0: hit list, unit filtering, suggested terms, selecting g
   let still = 0;
   await expect
     .poll(async () => {
-      const boxes = JSON.stringify(await marks.evaluateAll((els) => els.map((e) => e.getBoundingClientRect().toJSON())));
-      still = boxes === last ? still + 1 : 0;
+      const rects = await marks.evaluateAll((els) => els.map((e) => e.getBoundingClientRect().toJSON()));
+      const boxes = JSON.stringify(rects);
+      // stable means: both marks are there and have not moved
+      still = rects.length === 2 && boxes === last ? still + 1 : 0;
       last = boxes;
       return still;
     }, { intervals: [100] })
@@ -120,6 +122,17 @@ test('Content Search 2.0: hit list, unit filtering, suggested terms, selecting g
   // ... and pressing it again selects the whole hit: the row of the hit is the current one
   await marks.nth(1).click();
   await expect(row).toHaveCount(1);
+});
+
+test('Content Search 2.0: with the marks hidden, a multi-word hit is still framed', async ({ page }) => {
+  await serveBook(page);
+  await page.goto(`/ja/viewer/?iiif-content=${encodeURIComponent(`${BASE}/manifest`)}&tab=contentSearch&q=bird`);
+  await expect(page.getByText('「bird」: 2 件（全 5 件）')).toBeVisible();
+  await page.getByLabel('画像に印を出す').uncheck();
+  await page.locator('mark', { hasText: 'blue bird' }).click();
+  await expect(page.getByText('2 / 2')).toBeVisible();
+  // without marks the frame is the only sign of the hit
+  await expect(page.getByTestId('region-highlight')).toBeVisible();
 });
 
 test('Content Search 1.0 (real MDZ): opening with ?q= has already searched', async ({ page }) => {

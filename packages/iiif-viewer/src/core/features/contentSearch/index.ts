@@ -423,13 +423,13 @@ export function contentSearchAnnotationPage(canvasId: string, matches: ContentSe
 }
 
 /**
- * The smallest box that contains every region of the hit on the given Canvas, or undefined when none has a box.
+ * The smallest box that contains every region of the hit on the given Canvas (with the number of regions), or undefined when none has a box.
  * A hit that spans several words has one region per word; the view must fit all of them.
  */
 export function hitUnionXywh(
   regions: ContentSearchRegion[],
   canvasId: string,
-): [number, number, number, number] | undefined {
+): { box: [number, number, number, number]; count: number } | undefined {
   const rings = regions.flatMap((r): [number, number][][] =>
     r.canvasId === canvasId && r.xywh
       ? [[[r.xywh[0], r.xywh[1]], [r.xywh[0] + r.xywh[2], r.xywh[1] + r.xywh[3]]]]
@@ -437,7 +437,7 @@ export function hitUnionXywh(
   );
   if (rings.length === 0) return undefined;
   const { x, y, w, h } = bboxOf(rings);
-  return [x, y, w, h];
+  return { box: [x, y, w, h], count: rings.length };
 }
 
 /** The fixed Text Granularity units, largest first. */

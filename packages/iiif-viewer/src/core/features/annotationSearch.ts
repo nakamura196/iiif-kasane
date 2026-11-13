@@ -1,11 +1,11 @@
-// Canvas 上の注釈の、手元での絞り込み（右パネルの検索欄）と、選んだ注釈へ画像を寄せるときの範囲。
-// 検索は注釈の見出し・本文（HTML は文字だけ）・タグ（キー: 値）・リンクのラベルと URL を対象にする。全角・半角と大文字・小文字は区別しない。
-// 文字のそろえ方と語の照合、タグの名前と数え方は 3D の一覧の絞り込み（core/annotationFilter.ts）も使う。
+// Local filtering of the annotations on a Canvas (the search box of the right panel), and the part of the image to move to when one is chosen.
+// The search covers the heading, the text (only the characters of HTML), the tags (key: value) and the label and URL of links. Full-width/half-width forms and letter case are not told apart.
+// How characters are normalised, how words are matched, and how tags are named and counted are shared with the filter of the 3D list (core/annotationFilter.ts).
 import type { AnnotationTag } from '../types/main';
 import { isTagBody, pickBodies, tagOfBody, type AnnotationBodyItem } from './annotationBody';
 import type { AnnotationRegion, CanvasAnnotation } from './annotations';
 
-/** Normalize for a loose match: NFKC (全角・半角) and lower case. */
+/** Normalize for a loose match: NFKC (full-width/half-width) and lower case. */
 export const normalizeSearchText = (s: string): string => s.normalize('NFKC').toLowerCase();
 
 /** HTML as the words a reader sees, for a search: tags become spaces, so words on either side stay apart. */
@@ -130,19 +130,30 @@ export const matchesCanvasAnnotation = (
 /**
  * The part of the Canvas to show when the viewer moves to an annotation (x, y, w, h in Canvas pixels).
  * Small regions get room around them, so that the place can be read from what is near.
+ * Given several regions (the marks of one search hit), it fits all of them.
  * The whole Canvas (or an unknown size) gives undefined: there is nothing to move to.
  */
 export const focusBoxOf = (
-  region: AnnotationRegion,
+  region: AnnotationRegion | AnnotationRegion[],
   canvas: { width: number; height: number },
 ): [number, number, number, number] | undefined => {
   const { width: cw, height: ch } = canvas;
   if (!(cw > 0) || !(ch > 0)) return undefined;
-  let box: { x: number; y: number; w: number; h: number };
-  if (region.type === 'rect') box = region;
-  else if (region.type === 'polygon') box = region.bbox;
-  else if (region.type === 'point') box = { x: region.x, y: region.y, w: 0, h: 0 };
-  else return undefined;
+  const boxes = (Array.isArray(region) ? region : [region]).flatMap((r) => {
+    if (r.type === 'rect') return [r];
+    if (r.type === 'polygon') return [r.bbox];
+    if (r.type === 'point') return [{ x: r.x, y: r.y, w: 0, h: 0 }];
+    return [];
+  });
+  if (boxes.length === 0) return undefined;
+  const x0 = Math.min(...boxes.map((b) => b.x));
+  const y0 = Math.min(...boxes.map((b) => b.y));
+  const box = {
+    x: x0,
+    y: y0,
+    w: Math.max(...boxes.map((b) => b.x + b.w)) - x0,
+    h: Math.max(...boxes.map((b) => b.y + b.h)) - y0,
+  };
   // at least 1/20 of the Canvas's shorter side, and three times the region itself
   const min = Math.min(cw, ch) / 20;
   const w = Math.min(cw, Math.max(box.w * 3, min));

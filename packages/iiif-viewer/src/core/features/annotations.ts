@@ -422,6 +422,8 @@ export const readCanvasAnnotations = (
   pages: unknown[],
   canvasSize?: { width?: number; height?: number },
   canvasIds?: ReadonlySet<string>,
+  /** Take `hitId` from the pages. Only for the pages the Content Search panel builds itself, never for JSON from outside. */
+  options?: { hitIds?: boolean },
 ): CanvasAnnotation[] => {
   const out: CanvasAnnotation[] = [];
   const seen = new Set<string>();
@@ -493,7 +495,7 @@ export const readCanvasAnnotations = (
           ? { time: { start: time.start, ...(time.end !== undefined ? { end: time.end } : {}), ...(instant ? { instant: true as const } : {}) } }
           : {}),
         ...(str(raw.textGranularity) ? { granularity: str(raw.textGranularity) } : {}),
-        ...(str(raw.hitId) ? { hitId: str(raw.hitId) } : {}),
+        ...(options?.hitIds && str(raw.hitId) ? { hitId: str(raw.hitId) } : {}),
         ...(regionIdOf(rawTarget) ? { regionId: regionIdOf(rawTarget) } : {}),
       });
     }

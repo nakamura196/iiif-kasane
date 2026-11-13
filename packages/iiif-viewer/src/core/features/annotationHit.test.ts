@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { focusBoxOf } from './annotationSearch';
 import { annotationsOfSelection, readCanvasAnnotations, selectedHitOf, selectionKeyOf } from './annotations';
-import { contentSearchAnnotationPage, hitUnionXywh } from './contentSearch';
+import { contentSearchAnnotationPage } from './contentSearch';
 
 const C = 'https://example.org/c/1';
 const page = (items: unknown[]) => ({ type: 'AnnotationPage', id: `${C}#p`, items });
@@ -22,16 +23,26 @@ describe('selection of the marks of a search hit', () => {
       { annotationId: 'w2', canvasId: C, xywh: [60, 320, 38, 18] as [number, number, number, number], text: 'bird' },
     ],
   };
-  const marks = readCanvasAnnotations(C, [contentSearchAnnotationPage(C, [hit])], { width: 1000, height: 800 });
+  const hitPage = contentSearchAnnotationPage(C, [hit]);
+  const marks = readCanvasAnnotations(C, [hitPage], { width: 1000, height: 800 }, undefined, { hitIds: true });
 
   it('reads the hit id of every mark', () => {
     expect(marks.map((a) => a.hitId)).toEqual(['hit/1', 'hit/1']);
+  });
+
+  it('ignores a hitId in pages that did not come from the Content Search panel', () => {
+    const outside = readCanvasAnnotations(C, [hitPage], { width: 1000, height: 800 });
+    expect(outside.map((a) => a.hitId)).toEqual([undefined, undefined]);
   });
 
   it('selects the whole hit from any one of its marks', () => {
     const second = marks[1].id;
     expect(selectedHitOf(second, marks)).toBe('hit/1');
     expect(annotationsOfSelection(marks, selectedHitOf(second, marks))).toHaveLength(2);
+    // the list moves to the whole hit too
+    expect(focusBoxOf(annotationsOfSelection(marks, 'hit/1').map((a) => a.region), { width: 1000, height: 800 })).toEqual(
+      focusBoxOf({ type: 'rect', x: 60, y: 300, w: 180, h: 38 }, { width: 1000, height: 800 }),
+    );
   });
 
   it('keeps all the marks of the selected hit even when others are filtered out', () => {
@@ -42,10 +53,6 @@ describe('selection of the marks of a search hit', () => {
   it('falls back to the selected id when no mark of it is on this Canvas', () => {
     expect(selectedHitOf('hit/9', marks)).toBe('hit/9');
     expect(selectedHitOf(null, marks)).toBeNull();
-  });
-
-  it('fits the union of the regions', () => {
-    expect(hitUnionXywh(hit.regions, C)).toEqual([60, 300, 180, 38]);
   });
 });
 
