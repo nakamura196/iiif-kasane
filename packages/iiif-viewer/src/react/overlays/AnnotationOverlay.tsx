@@ -4,8 +4,8 @@ import { useAtom, useAtomValue } from 'jotai';
 import { memo, useCallback, useDeferredValue, useLayoutEffect, useMemo, useRef } from 'react';
 import {
   bboxOf,
+  annotationsOfSelection,
   groupByRegion,
-  isHitAnnotation,
   labelIn,
   matchesCanvasAnnotation,
   pickBodies,
@@ -14,6 +14,8 @@ import {
   regionBoxPercent,
   sanitizeAnnotationHtml,
   searchTerms,
+  selectedHitOf,
+  selectionKeyOf,
   type CanvasAnnotation,
   type RegionGroup,
   type StyleDeclarations,
@@ -33,7 +35,7 @@ import { useCanvasAnnotations } from './useCanvasAnnotations';
 
 const plain = (html: string) => html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 
-// 領域の面積（小さい物を手前に置くための並べ替え用）
+// Area of the region (used for sorting so smaller ones go in front)
 const areaOf = (a: CanvasAnnotation): number => {
   const r = a.region;
   if (r.type === 'rect') return r.w * r.h;
@@ -64,8 +66,8 @@ function NumberBadge({ n, selected, left, top }: { n: number; selected: boolean;
   );
 }
 
-// 画像の上に、Canvas 上の注釈の領域を重ねる。位置は Canvas 座標の割合で置く（画像と同じ大きさの層の中）。
-// Canvas 全体への注釈は枠を描かない（右パネルにだけ出る）。
+// Overlay the regions of Canvas annotations on the image. Positions are fractions of Canvas coordinates (inside a layer the same size as the image).
+// Annotations on the whole Canvas get no frame (they appear only in the right panel).
 export function AnnotationOverlayView({ container, canvasWidth, canvasHeight, stage }: OverlayProps) {
   const locale = useLocale();
   const manifest = useAtomValue(manifestAtom);
@@ -73,14 +75,16 @@ export function AnnotationOverlayView({ container, canvasWidth, canvasHeight, st
   // the same numbers as the cards of the list (none when there are very many)
   const numbers = useMemo(() => annotationNumbers(annotations), [annotations]);
   const [selected, setSelected] = useAtom(selectedCanvasAnnotationAtom);
+  // what the selection stands for: the hit of the selected mark (all its marks are selected together), worked out once per render
+  const selectedHit = useMemo(() => selectedHitOf(selected, annotations), [selected, annotations]);
   // While a story is read, only the current scene may be framed (thin line, no fill), and only when asked.
   const storyOpen = useAtomValue(storyOpenAtom);
   const storyFrame = useAtomValue(storyFrameAtom);
   const granularity = useAtomValue(canvasAnnotationGranularityAtom);
-  // 右パネルの検索欄に文字があるか、タグを選んでいれば、当たった注釈の印だけを出す（選んでいる注釈は残す）
+  // If the right panel's search box has text or tags are selected, show markers only for matching annotations (the selected annotation stays)
   const query = useDeferredValue(useAtomValue(canvasAnnotationQueryAtom));
   const terms = useMemo(() => searchTerms(query), [query]);
-  // 右パネルで選んだタグ。今の単位の注釈に無いタグは、右パネルと同じく無視する
+  // Tags selected in the right panel. Tags absent from annotations of the current unit are ignored, as in the right panel
   const chosenTags = useAtomValue(canvasAnnotationTagsAtom);
   const tags = useMemo(
     () =>
@@ -99,17 +103,19 @@ export function AnnotationOverlayView({ container, canvasWidth, canvasHeight, st
   const drawn = useMemo(() => {
     const shown = annotations
       .filter((a) => a.region.type !== 'canvas' && !a.layer) // layer annotations are drawn by the layer itself
-      .filter((a) => storySelected === null || a.id === storySelected)
+      .filter((a) => storySelected === null || selectionKeyOf(a) === storySelected)
       .filter((a) => !granularity || a.granularity === granularity || a.motivations.includes('highlighting'))
       .filter((a) => !filtering || matchesCanvasAnnotation(a, terms, tags, locale));
     return groupByRegion(shown).sort((a, b) => areaOf(b.annotations[0]) - areaOf(a.annotations[0]));
   }, [annotations, storySelected, granularity, filtering, terms, tags, locale]);
   // the chosen one stays drawn when a search or a tag would hide it
   const chosen = useMemo(() => {
-    if (!selected || !filtering || drawn.some((g) => g.annotations.some((m) => m.id === selected))) return [];
-    const a = annotations.find((x) => x.id === selected && x.region.type !== 'canvas' && !x.layer);
-    return a ? groupByRegion([a]) : [];
-  }, [selected, filtering, drawn, annotations]);
+    if (!selectedHit || !filtering) return [];
+    // every mark of the selected hit stays, not only the one that was pressed
+    const marks = annotationsOfSelection(annotations, selectedHit).filter((x) => x.region.type !== 'canvas' && !x.layer);
+    const shownIds = new Set(drawn.flatMap((g) => g.annotations.map((m) => m.id)));
+    return groupByRegion(marks.filter((m) => !shownIds.has(m.id)));
+  }, [selectedHit, filtering, drawn, annotations]);
   const toggle = useCallback((id: string, isSel: boolean) => setSelected(isSel ? null : id), [setSelected]);
   const all = useMemo(
     () => [...drawn, ...chosen].map((g) => ({ group: g, box: boxOfRegion(g.annotations[0]) })),
@@ -117,13 +123,13 @@ export function AnnotationOverlayView({ container, canvasWidth, canvasHeight, st
   );
   if (all.length === 0 || !(canvasWidth > 0) || !(canvasHeight > 0)) return null;
 
-  // 画面に見えている分だけ描く。少なければ押せる印、多ければ 1 枚の canvas にまとめる。
-  // 押せる印は拡大のたびに全部描き直しになる（線の太さが拡大率で決まるため）。2 万件で 1 段 190ms かかった。
+  // Draw only what is visible. Few: clickable markers; many: a single canvas.
+  // Clickable markers are fully redrawn on every zoom (stroke width depends on the zoom level). It took 190ms per step with 20,000 items.
   const view = visibleBoxOf(stage, canvasWidth, canvasHeight, 0.2);
   const onScreen = all.filter((d) => d.box && overlaps(d.box, view));
   const asCanvas = !!stage && onScreen.length > DOM_MARK_LIMIT;
   const isSelected = (g: RegionGroup<CanvasAnnotation>) =>
-    selected !== null && g.annotations.some((m) => m.id === selected || isHitAnnotation(m.id, selected));
+    selectedHit !== null && g.annotations.some((m) => selectionKeyOf(m) === selectedHit);
   // On the canvas, the chosen mark is still drawn as a mark one can press (and on top of the others).
   const marks = asCanvas ? onScreen.filter((d) => isSelected(d.group)) : onScreen;
 
@@ -139,7 +145,7 @@ export function AnnotationOverlayView({ container, canvasWidth, canvasHeight, st
           canvasWidth={canvasWidth}
           canvasHeight={canvasHeight}
           styleOf={styleOf}
-          onPick={(a) => setSelected(a.id)}
+          onPick={(a) => setSelected(selectionKeyOf(a))}
         />
       ) : null}
       {marks.map(({ group: g }) => (
@@ -194,9 +200,9 @@ const Mark = memo(function Mark({
   const r = a.region;
   const toggle = (e: { stopPropagation: () => void }) => {
     e.stopPropagation();
-    onToggle(a.id, isSel);
+    onToggle(selectionKeyOf(a), isSel);
   };
-  // 見た目の指定（許可した性質だけ）。選択中は既定の強調を優先する。
+  // Style overrides (allowed properties only). While selected, the default highlight takes precedence.
   const st: StyleDeclarations = isSel ? {} : styleOf(a).target;
   const common = {
     title: g.annotations.map((m) => titleOf(m, locale)).filter(Boolean).join(' / ') || undefined,
@@ -336,9 +342,9 @@ type Drawn = { group: RegionGroup<CanvasAnnotation>; box: Box | null };
 // How far (screen pixels) a press may move and still pick a mark; further is a drag of the image.
 const CLICK_SLOP = 4;
 
-// 印が多いときの描き方。見えている範囲だけを、画面の画素の細かさで 1 枚の canvas に描く。
-// 拡大・移動のたびに描き直すが、2 万件でも数ミリ秒で済む（DOM の印は 1 つずつ描き直しになる）。
-// 押した所にある印（いちばん小さい物）を選ぶ。ドラッグは今までどおり画像の移動になる。
+// Rendering when there are many markers: draw only the visible range onto a single canvas at screen pixel resolution.
+// It is redrawn on every zoom and pan, but takes only a few milliseconds even for 20,000 items (DOM markers are redrawn one by one).
+// Select the marker under the click (the smallest one). Dragging still pans the image as before.
 function AnnotationCanvas({
   drawn,
   view,
