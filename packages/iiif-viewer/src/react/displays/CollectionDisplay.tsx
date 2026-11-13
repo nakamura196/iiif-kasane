@@ -84,13 +84,8 @@ export function storedEntriesFor(
 
 /** The entries of the Collection read by its id (a host page may set manifestAtom itself). [] when it cannot be read. */
 export async function fetchedEntriesFor(manifest: { id: string }): Promise<CollectionEntry[]> {
-  try {
-    const raw = await fetchManifest(manifest.id);
-    return raw ? collectionEntriesOf(raw) : [];
-  } catch (e) {
-    console.error('Error reading manifest:', e);
-    return [];
-  }
+  const raw = await fetchManifest(manifest.id);
+  return raw ? collectionEntriesOf(raw) : [];
 }
 
 // A Collection (a manifest whose items are Manifests): choose one to open.

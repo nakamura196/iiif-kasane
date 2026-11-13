@@ -3,7 +3,8 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { authorizedUrl, chosenOption, probeServiceOf } from '../../core';
-import { readScene } from './readScene';
+import { tryPrepareShow } from '../useManifest';
+import { notesSceneAtom } from '../internalState';
 import {
   annotationsAtom,
   modelChoicesAtom,
@@ -30,6 +31,7 @@ function SceneDisplay({ container, manifest, iiifContent, shownUrl, renderAction
   const setPaintedModels = useSetAtom(paintedModelsAtom);
   const setAnnotations = useSetAtom(annotationsAtom);
   const setSceneId = useSetAtom(sceneIdAtom);
+  const setNotesScene = useSetAtom(notesSceneAtom);
   const setSelectedAnnotation = useSetAtom(selectedAnnotationIdAtom);
   const modelChoices = useAtomValue(modelChoicesAtom);
 
@@ -37,13 +39,14 @@ function SceneDisplay({ container, manifest, iiifContent, shownUrl, renderAction
   // its notes, and (through sceneIdAtom) its default Camera and Camera buttons.
   const sceneId = container.id;
   // a Scene that cannot be parsed shows a notice instead of taking the viewer down
-  const read = useMemo(() => readScene(manifest, sceneId, locale), [manifest, sceneId, locale]);
+  const read = useMemo(() => tryPrepareShow(manifest, locale, sceneId), [manifest, sceneId, locale]);
   useEffect(() => {
     setSceneId(sceneId);
     setPaintedModels(read?.paintedModels ?? []);
     setAnnotations(read?.annotations ?? []);
+    setNotesScene(sceneId);
     setSelectedAnnotation(null);
-  }, [read, sceneId, setSceneId, setPaintedModels, setAnnotations, setSelectedAnnotation]);
+  }, [read, sceneId, setSceneId, setPaintedModels, setAnnotations, setNotesScene, setSelectedAnnotation]);
 
   // The first painted model is the main one (framing, annotation occlusion);
   // the others are drawn alongside. A Choice shows its chosen (default: first) Model.

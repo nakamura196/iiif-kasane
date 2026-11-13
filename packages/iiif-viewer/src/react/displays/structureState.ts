@@ -13,13 +13,21 @@ import {
   sequencesOf,
   viewingOf,
   type CanvasTarget,
-  type CompareItem,
   type ContainerInfo,
   type ManifestV4,
   type SequenceInfo,
   type ViewingInfo,
 } from '../../core';
-import { manifestUrlAtom, pickedPageAtom, shownManifestAtom, type ShownOrigin } from '../atoms';
+import { manifestUrlAtom, shownManifestAtom, type ShownOrigin } from '../atoms';
+import {
+  compareAtom,
+  compareMultiAtom,
+  focusAtom,
+  pickedPageAtom,
+  resetViewState,
+  sequenceIdAtom,
+  type CompareMulti,
+} from '../internalState';
 import {
   isContentLoading,
   loadManifest,
@@ -43,32 +51,12 @@ export interface NavRequest {
 
 export const navRequestAtom = atom<NavRequest | null>(null);
 
-/** The region / time highlighted now (the result of a move). Cleared when the page changes. */
-export const focusAtom = atom<NavRequest | null>(null);
-
-/** 0540: when a content state points to several Canvases, the containers shown side by side (the first is selected). */
-export const compareAtom = atom<number[]>([]);
-
-/**
- * 0540: when a content state points to Canvases of different manifests, what is shown side by side.
- * anchor is the Canvas index in the open manifest (moving away ends it). failed lists manifests that could not be read.
- */
-export interface CompareMulti {
-  anchor: number;
-  items: CompareItem[];
-  failed: string[];
-}
-export const compareMultiAtom = atom<CompareMulti | null>(null);
-
-/** The alternative page order chosen (the id of a sequence Range). null: the original order. */
-export const sequenceIdAtom = atom<string | null>(null);
+export { focusAtom, compareAtom, compareMultiAtom, sequenceIdAtom, type CompareMulti };
 
 export { trailAtom, type OpenResult, type TrailItem };
 
 /** How an opened manifest counts: part of the iiif-content (its content state), or a move from what was shown. */
 type OpenOrigin = Exclude<ShownOrigin, 'back'>;
-
-export { pickedPageAtom };
 
 let seqCounter = 0;
 export const nextSeq = (): number => ++seqCounter;
@@ -101,14 +89,6 @@ export function usePageOrder(manifest: ManifestV4 | null | undefined, containers
 
 type Store = ReturnType<typeof createStore>;
 
-// the first load shows a manifest through showManifest too; a move also leaves the sequence, focus and compare
-function leaveViewState(store: Store) {
-  store.set(sequenceIdAtom, null);
-  store.set(focusAtom, null);
-  store.set(compareAtom, []);
-  store.set(compareMultiAtom, null);
-}
-
 /**
  * Open the manifest (or Collection) at the URL in the viewer of this store. With push, "back" returns
  * to what is shown now. Only the latest request is shown: when another open, a back or a new
@@ -135,7 +115,7 @@ export async function openManifest(
       store.set(trailAtom, (t) => ({ owner, items: t.owner === owner ? [...t.items, item] : [item] }));
     }
     // before the new manifest is shown, so what is set for it afterwards (a content state's region) stays
-    leaveViewState(store);
+    resetViewState(store);
   });
 }
 
@@ -157,7 +137,7 @@ export function goBack(store: Store, locale: string): boolean {
       continue;
     }
     store.set(trailAtom, { owner, items: rest.slice(0, -1) });
-    leaveViewState(store);
+    resetViewState(store);
     showManifest(store, prev.url, { raw: prev.raw, manifest: prev.manifest }, 'back', prepared);
     store.set(pickedPageAtom, { shown: store.get(shownManifestAtom)?.seq ?? 0, index: prev.index });
     return true;

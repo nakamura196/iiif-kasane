@@ -13,7 +13,8 @@ import {
 } from 'react';
 import { Provider, createStore, useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { containersOf, type ContainerInfo, type ManifestV4 } from '../core';
-import { manifestAtom, modelChoicesAtom, pickedIndex, pickedPageAtom, shownManifestAtom } from './atoms';
+import { manifestAtom, modelChoicesAtom, shownManifestAtom } from './atoms';
+import { pickedIndex, pickedPageAtom } from './internalState';
 import { navRequestAtom, nextSeq } from './displays/structureState';
 import { ViewerEnv, type ResolvedTheme } from './env';
 import {

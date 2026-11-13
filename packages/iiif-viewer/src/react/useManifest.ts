@@ -3,12 +3,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { atom, useStore, type createStore } from 'jotai';
 import {
-  containersOf,
   convertToV4,
   fetchManifest,
-  firstSceneOf,
   paintedModelsOf,
   parseManifestV4,
+  sceneOf,
   type ManifestV4,
 } from '../core';
 import {
@@ -20,12 +19,13 @@ import {
   manifestUrlAtom,
   modelChoicesAtom,
   paintedModelsAtom,
-  pickedPageAtom,
-  pickedIndex,
+  selectedAnnotationIdAtom,
+  sceneIdAtom,
   shownManifestAtom,
   type ShownOrigin,
 } from './atoms';
 import { useLocale } from './env';
+import { notesSceneAtom, resetViewState, shownSeqAtom } from './internalState';
 
 type Store = ReturnType<typeof createStore>;
 
@@ -71,20 +71,44 @@ export interface PreparedShow {
   paintedModels: ReturnType<typeof paintedModelsOf>;
 }
 
-/** Parse a manifest for showing. Throws when the manifest's v4 form cannot be parsed (nothing is changed). */
-export function prepareShow(manifest: ManifestV4, locale: string): PreparedShow {
-  const { annotations, geoCanvasId, geoFeatures } = parseManifestV4(manifest, undefined, locale);
+/**
+ * Parse a manifest for showing: the notes and painted models of the Scene `sceneId` (default: the first Scene).
+ * Throws when the manifest's v4 form cannot be parsed (nothing is changed).
+ */
+export function prepareShow(manifest: ManifestV4, locale: string, sceneId?: string): PreparedShow {
+  const { annotations, geoCanvasId, geoFeatures } = parseManifestV4(manifest, sceneId, locale);
   return {
     annotations,
     hasGeo: !!geoCanvasId || geoFeatures.length > 0,
-    paintedModels: paintedModelsOf(firstSceneOf(manifest)),
+    paintedModels: paintedModelsOf(sceneOf(manifest, sceneId)),
   };
 }
 
+/** Model choices and layer settings go back to their start (each manifest shown, and when the shown one is cleared). */
+function resetModelState(store: Store): void {
+  store.set(modelChoicesAtom, {});
+  store.set(layerSettingsAtom, {});
+  store.set(layerOrderAtom, {});
+  store.set(layerPlaybackAtom, null);
+}
+
+/** Leave everything of the manifest shown: used when the new iiif-content cannot be shown. */
+function clearShown(store: Store): void {
+  store.set(shownManifestAtom, null);
+  store.set(manifestAtom, null);
+  store.set(annotationsAtom, []);
+  store.set(notesSceneAtom, null);
+  store.set(paintedModelsAtom, []);
+  store.set(sceneIdAtom, null);
+  store.set(selectedAnnotationIdAtom, null);
+  resetModelState(store);
+  resetViewState(store);
+}
+
 /** prepareShow, or null (reported on the console) when the manifest cannot be parsed. */
-export function tryPrepareShow(manifest: ManifestV4, locale: string): PreparedShow | null {
+export function tryPrepareShow(manifest: ManifestV4, locale: string, sceneId?: string): PreparedShow | null {
   try {
-    return prepareShow(manifest, locale);
+    return prepareShow(manifest, locale, sceneId);
   } catch (e) {
     console.error('Error reading manifest:', e);
     return null;
@@ -109,32 +133,27 @@ export function showManifest(
   const { annotations, hasGeo, paintedModels } = prepared;
   beginLoad(store);
   store.set(paintedModelsAtom, paintedModels);
-  store.set(modelChoicesAtom, {});
-  store.set(layerSettingsAtom, {});
-  store.set(layerOrderAtom, {});
-  store.set(layerPlaybackAtom, null);
-  const seq = (store.get(shownManifestAtom)?.seq ?? 0) + 1;
+  resetModelState(store);
+  // shownSeqAtom only grows, also over a failed load that cleared what was shown
+  const seq = store.get(shownSeqAtom) + 1;
+  store.set(shownSeqAtom, seq);
   store.set(shownManifestAtom, { url, raw, manifest, seq, origin, hasGeo });
   store.set(manifestAtom, manifest);
   store.set(annotationsAtom, annotations);
+  store.set(notesSceneAtom, null);
 }
 
 /**
- * A new locale: read the annotations' labels again from what is shown. When the page on display is a Scene,
- * SceneDisplay owns the annotations (it reads that Scene again for the locale), so nothing is done here.
- * Otherwise (an image or AV page) the annotations are the first Scene's, as showManifest put them.
+ * A new locale: read the annotations' labels again, from the Scene they were read from (notesSceneAtom: the one
+ * SceneDisplay shows or showed last, else the first). One place decides which Scene the notes belong to, so
+ * this holds for every display (image, AV, a Scene drawn as an image, or 3D) and after leaving a Scene page.
+ * SceneDisplay reads its own Scene again for the locale too; both give the same notes.
  */
 export function reparseAnnotations(store: Store, locale: string): void {
   const shown = store.get(shownManifestAtom);
   if (!shown) return;
-  const containers = containersOf(shown.manifest);
-  const here = containers[pickedIndex(store.get(pickedPageAtom), shown.seq, containers.length)];
-  if (here?.kind === 'Scene') return;
-  try {
-    store.set(annotationsAtom, parseManifestV4(shown.manifest, undefined, locale).annotations);
-  } catch (e) {
-    console.error('Error reading manifest:', e);
-  }
+  const prepared = tryPrepareShow(shown.manifest, locale, store.get(notesSceneAtom) ?? undefined);
+  if (prepared) store.set(annotationsAtom, prepared.annotations);
 }
 
 /** Result of loading a manifest: shown, could not be read, or dropped because a later request replaced it. */
@@ -186,7 +205,7 @@ export const isContentLoading = (store: Store): boolean => store.get(contentLoad
 export async function loadContent(store: Store, url: string, locale: () => string): Promise<OpenResult> {
   // The iiif-content is a new one whatever the load gives: the URL and the trail are set at once. When the
   // manifest cannot be read or parsed, the viewer reports the failure for this new content (failedUrl in
-  // useManifest) rather than silently keeping the old one; only the shown manifest is left as it was.
+  // useManifest) rather than silently keeping the old one. What was shown is cleared with it (see below).
   store.set(manifestUrlAtom, url);
   // the way taken through the old iiif-content does not lead back from the new one
   store.set(trailAtom, { owner: url, items: [] });
@@ -198,13 +217,8 @@ export async function loadContent(store: Store, url: string, locale: () => strin
   try {
     // done before it is shown: what is shown (a content state Annotation) may open its manifest right away
     const result = await loadManifest(store, url, locale, 'content', done);
-    if (result === 'failed') {
-      // nothing of the old iiif-content stays under the new URL: only the failure is shown
-      store.set(shownManifestAtom, null);
-      store.set(manifestAtom, null);
-      store.set(annotationsAtom, []);
-      store.set(paintedModelsAtom, []);
-    }
+    // nothing of the old iiif-content stays under the new URL: only the failure is shown
+    if (result === 'failed') clearShown(store);
     return result;
   } finally {
     done();
