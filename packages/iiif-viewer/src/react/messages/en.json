@@ -56,6 +56,8 @@
     "pauseAnimation": "Pause",
     "fitAll": "Fit",
     "topView": "Top",
+    "grid": "Grid",
+    "gridHint": "Show a floor grid (one cell is a power of ten in the model's units)",
     "cameras": "Views from the manifest",
     "camera": "View",
     "loadingManifest": "Loading manifest...",

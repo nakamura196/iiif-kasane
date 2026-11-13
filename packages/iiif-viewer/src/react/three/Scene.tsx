@@ -8,13 +8,14 @@ import gsap from 'gsap';
 import Annotations from '../three/Annotations';
 import ModelErrorBoundary from './ModelErrorBoundary';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
-import { manifestAtom, measuringAtom, modelAnimationAtom, modelChoicesAtom, modelRadiusAtom, paintedModelsAtom, sceneIdAtom, showAnnotationsAtom } from '../atoms';
+import { manifestAtom, measuringAtom, modelAnimationAtom, modelChoicesAtom, modelRadiusAtom, paintedModelsAtom, sceneIdAtom, showAnnotationsAtom, showGridAtom } from '../atoms';
 import MeasureMarks, { useMeasure } from './MeasureTool';
 import { chosenOption, sceneSpatialScaleOf, upgradeUrl } from '../../core';
 import { defaultCameraOf, type DefaultCamera } from '../../core';
 import { runFocusFlight, type Vec3 } from '../../core';
 import { fitView, topView } from '../../core';
 import { ZOOM_MAX_FACTOR } from '../../core';
+import { useTheme } from '../env';
 
 // Place the camera where the manifest's default Camera says (Presentation 4.0:
 // the first Camera painted into the Scene). Without `lookAt`, look at the model's center.
@@ -85,6 +86,28 @@ function ViewController({ handle, center, radius }: { handle: Ref<ViewHandle>; c
     };
   }, [camera, controls, size, center, radius]);
   return null;
+}
+
+// A floor grid under the model, sized to it: one cell is a power of ten in the model's units
+// (1 cm, 10 cm, 1 m ... whatever the model uses), laid at the bottom of its bounding box.
+function floorGridLayout(box: Box3, radius: number) {
+  const r = radius > 0 && Number.isFinite(radius) ? radius : 1;
+  const cell = 10 ** Math.floor(Math.log10(r));
+  const divisions = Math.max(2, Math.ceil((3 * r) / cell));
+  const center = box.getCenter(new Vector3());
+  return { size: divisions * cell, divisions, position: [center.x, box.min.y, center.z] as Vec3 };
+}
+
+function FloorGrid({ box, radius }: { box: Box3; radius: number }) {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
+  const { size, divisions, position } = useMemo(() => floorGridLayout(box, radius), [box, radius]);
+  return (
+    <gridHelper
+      args={[size, divisions, isDark ? 0x374151 : 0x9ca3af, isDark ? 0x1f2937 : 0xe5e7eb]}
+      position={position}
+    />
+  );
 }
 
 // A glTF point cloud without a material is drawn by three.js one pixel per point,
@@ -203,10 +226,15 @@ export default function Scene({
   const cam = useMemo(() => defaultCameraOf(manifest, sceneId), [manifest, sceneId]);
   // The main model's transform (e.g. a RotateTransform that stands a scan upright).
   const mainMatrix = useMatrix4(paintedModels[0] ? chosenOption(paintedModels[0], choices).matrix : undefined);
+  const box = useMemo(() => {
+    const b = new Box3().setFromObject(model.scene);
+    return mainMatrix ? b.applyMatrix4(mainMatrix) : b;
+  }, [model, mainMatrix]);
   const sphere = useMemo(() => {
     const s = new Box3().setFromObject(model.scene).getBoundingSphere(new Sphere());
     return mainMatrix ? s.applyMatrix4(mainMatrix) : s;
   }, [model, mainMatrix]);
+  const showGrid = useAtomValue(showGridAtom);
   const setModelRadius = useSetAtom(modelRadiusAtom);
   useEffect(() => {
     setModelRadius(sphere.radius);
@@ -249,6 +277,7 @@ export default function Scene({
           {body}
         </Bounds>
       )}
+      {showGrid && <FloorGrid box={box} radius={sphere.radius} />}
       {viewRef && <ViewController handle={viewRef} center={sphere.center} radius={sphere.radius} />}
       {extraModels.map((m, i) => (
         // a model beside the main one that fails to load is left out; the rest stays
