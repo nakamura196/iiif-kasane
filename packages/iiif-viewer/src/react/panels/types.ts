@@ -10,6 +10,8 @@ export interface PanelContext {
   annotationCount?: number;
   /** Number of annotation pages made in the browser (inference results etc.), not counting search marks. */
   localAnnotationCount?: number;
+  /** Number of annotation pages made in the browser and shown on this container's image, not counting search marks. */
+  containerLocalAnnotationCount?: number;
 }
 
 export interface Panel {

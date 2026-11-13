@@ -410,9 +410,10 @@ export const canvasAnnotationsPanel: Panel = {
   id: 'canvasAnnotations',
 
   order: 80,
-  // 書かれている注釈か、取りに行く参照のどちらかがあるときだけ出す
-  available: ({ container, manifest }) => {
+  // 書かれている注釈か、取りに行く参照か、このページの画像に重ねている手元の注釈（推論の結果など）があるときだけ出す
+  available: ({ container, manifest, containerLocalAnnotationCount }) => {
     if (container?.kind !== 'Canvas') return false;
+    if ((containerLocalAnnotationCount ?? 0) > 0) return true;
     if (annotationSourcesOf(rawCanvasOf(manifest, container.id)).references.length > 0) return true;
     return embeddedCanvasAnnotations(manifest, container.id, container).length > 0;
   },
