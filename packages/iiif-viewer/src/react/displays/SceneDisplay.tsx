@@ -1,10 +1,11 @@
 'use client';
 
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { useAtomValue, useSetAtom } from 'jotai';
+import { useAtomValue, useStore, type createStore } from 'jotai';
 import { authorizedUrl, chosenOption, probeServiceOf } from '../../core';
-import { tryPrepareShow } from '../useManifest';
-import { modelChoicesAtom, paintedModelsAtom, sceneIdAtom } from '../atoms';
+import { tryPrepareShow, type PreparedShow } from '../useManifest';
+import { annotationsAtom, paintedModelsAtom, sceneIdAtom, selectedAnnotationIdAtom, modelChoicesAtom } from '../atoms';
+import { sceneDisplayAtom } from '../internalState';
 import { useLocale, useTranslations } from '../env';
 import AuthPrompt from '../auth/AuthPrompt';
 import { useAuthStates } from '../auth/authStore';
@@ -17,21 +18,37 @@ import type { PlacedModel } from '../three/Scene';
 // three.js and react-three-fiber are only fetched when a Scene is shown.
 const CanvasComponent = lazy(() => import('../three/Canvas'));
 
+const EMPTY: PreparedShow['paintedModels'] = [];
+
+/** What the display of a Scene puts in the store: its Scene id, painted models and notes (a new Scene or locale clears the selection). */
+export function writeSceneState(store: ReturnType<typeof createStore>, sceneId: string, read: PreparedShow | null): void {
+  store.set(sceneIdAtom, sceneId);
+  store.set(paintedModelsAtom, read?.paintedModels ?? []);
+  store.set(annotationsAtom, read?.annotations ?? []);
+  store.set(selectedAnnotationIdAtom, null);
+}
+
 function SceneDisplay({ container, manifest, iiifContent, shownUrl, renderActions, selectedIndex }: DisplayProps) {
   const t = useTranslations('Viewer');
   const locale = useLocale();
-  const paintedModels = useAtomValue(paintedModelsAtom);
   const modelChoices = useAtomValue(modelChoicesAtom);
+  const store = useStore();
 
-  // The notes and painted models of this Scene are set by useShownNotes (in the provider). Here the Scene is only checked, to show a notice for a Scene that cannot be parsed
-  // (the read is remembered, so it is not parsed again).
+  // The 3D display owns the notes, painted models and Scene id of the Scene it draws, read from its own manifest
+  // (the one shown by the viewer, or one a host set in manifestAtom). The read is remembered per manifest, locale
+  // and Scene, so the parse made before showing is reused. A Scene that cannot be parsed shows a notice.
   const sceneId = container.id;
-  // its default Camera and Camera buttons (the 3D parts below) read the Scene id
-  const setSceneId = useSetAtom(sceneIdAtom);
+  const read = useMemo(() => tryPrepareShow(manifest, locale, sceneId), [manifest, sceneId, locale]);
+  const broken = read === null;
   useEffect(() => {
-    setSceneId(sceneId);
-  }, [sceneId, setSceneId]);
-  const broken = useMemo(() => tryPrepareShow(manifest, locale, sceneId) === null, [manifest, sceneId, locale]);
+    writeSceneState(store, sceneId, read);
+  }, [store, sceneId, read]);
+  useEffect(() => {
+    store.set(sceneDisplayAtom, { mounted: true, sceneId });
+    return () => store.set(sceneDisplayAtom, (d) => ({ ...d, mounted: false }));
+  }, [store, sceneId]);
+  // the models come from this render's read, not from the atom: no frame draws the Scene left behind
+  const paintedModels = read?.paintedModels ?? EMPTY;
 
   // The first painted model is the main one (framing, annotation occlusion);
   // the others are drawn alongside. A Choice shows its chosen (default: first) Model.

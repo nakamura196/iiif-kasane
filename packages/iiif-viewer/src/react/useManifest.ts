@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { atom, useAtomValue, useStore, type createStore } from 'jotai';
+import { atom, useStore, type createStore } from 'jotai';
 import {
   convertToV4,
   fetchManifest,
@@ -19,12 +19,13 @@ import {
   manifestUrlAtom,
   modelChoicesAtom,
   paintedModelsAtom,
+  sceneIdAtom,
   selectedAnnotationIdAtom,
   shownManifestAtom,
   type ShownOrigin,
 } from './atoms';
 import { useLocale } from './env';
-import { backFailedAtom, resetViewState, shownSeqAtom } from './internalState';
+import { resetViewState, sceneDisplayAtom, shownSeqAtom } from './internalState';
 
 type Store = ReturnType<typeof createStore>;
 
@@ -124,7 +125,9 @@ function clearShown(store: Store): void {
   store.set(manifestAtom, null);
   resetShownState(store);
   resetViewState(store);
-  store.set(backFailedAtom, false);
+  store.set(annotationsAtom, []);
+  store.set(paintedModelsAtom, []);
+  store.set(sceneIdAtom, null);
 }
 
 /**
@@ -146,49 +149,29 @@ export function showManifest(
   const { hasGeo } = prepared;
   beginLoad(store);
   resetShownState(store);
-  store.set(backFailedAtom, false);
   // shownSeqAtom only grows, also over a failed load that cleared what was shown
   const seq = store.get(shownSeqAtom) + 1;
   store.set(shownSeqAtom, seq);
   store.set(shownManifestAtom, { url, raw, manifest, seq, origin, hasGeo });
   store.set(manifestAtom, manifest);
-  // the first Scene's notes and models go in with the manifest (no frame shows the new Scene with the old
-  // manifest's models); useShownNotes only follows a change of the Scene on display or of the locale
+  // the first Scene's notes and models go in with the manifest (no frame shows the new manifest with the old
+  // one's models); a SceneDisplay then reads its own Scene
   store.set(annotationsAtom, prepared.annotations);
   store.set(paintedModelsAtom, prepared.paintedModels);
 }
 
 /**
- * Set the notes (annotationsAtom) and painted models for the Scene on display (else the first Scene) and the
- * locale. Acts only on the manifest the viewer itself showed (shownManifestAtom): a manifest a host set in
- * manifestAtom is the host's, with its own notes, and is left alone.
+ * A new locale while no SceneDisplay is mounted (an image, AV or other page): read the notes again, from the
+ * Scene the last SceneDisplay read if the shown manifest has it, else the first Scene. Only for a manifest the
+ * viewer itself showed: one a host set in manifestAtom has the host's own notes. (A mounted SceneDisplay reads
+ * its Scene again for the locale itself.)
  */
-export function writeShownNotes(store: Store, manifest: ManifestV4 | null, locale: string, sceneId?: string): void {
-  if (!manifest || store.get(shownManifestAtom)?.manifest !== manifest) return;
-  const read = tryPrepareShow(manifest, locale, sceneId);
-  store.set(annotationsAtom, read?.annotations ?? []);
-  store.set(paintedModelsAtom, read?.paintedModels ?? []);
-}
-
-/**
- * Follow the Scene on display and the locale (`sceneId`: the Scene drawn by the 3D display, else undefined):
- * the notes and painted models are read again for it. A host that writes annotationsAtom itself keeps its
- * value while the viewer shows nothing (see writeShownNotes).
- */
-export function useShownNotes(sceneId?: string): void {
-  const store = useStore();
-  const manifest = useAtomValue(manifestAtom);
-  const locale = useLocale();
-  useEffect(() => {
-    writeShownNotes(store, manifest, locale, sceneId);
-  }, [store, manifest, locale, sceneId]);
-  // moving to another Scene: a selection of the one left does not apply (a show resets it in showManifest)
-  const lastScene = useRef(sceneId);
-  useEffect(() => {
-    if (lastScene.current === sceneId) return;
-    lastScene.current = sceneId;
-    store.set(selectedAnnotationIdAtom, null);
-  }, [store, sceneId]);
+export function reparseNotes(store: Store, locale: string): void {
+  const { mounted, sceneId } = store.get(sceneDisplayAtom);
+  const manifest = store.get(manifestAtom);
+  if (mounted || !manifest || store.get(shownManifestAtom)?.manifest !== manifest) return;
+  const read = tryPrepareShow(manifest, locale, sceneId ?? undefined);
+  if (read) store.set(annotationsAtom, read.annotations);
 }
 
 /** Result of loading a manifest: shown, could not be read, or dropped because a later request replaced it. */
@@ -277,7 +260,7 @@ export function useLocaleRef(): { readonly current: string } {
 }
 
 /** Load the manifest given to the viewer (iiif-content) into the current jotai store. */
-export function useManifest(iiifContent: string | null, sceneId?: string): { failed: boolean } {
+export function useManifest(iiifContent: string | null): { failed: boolean } {
   // the url that could not be read; compared with the current one so that no state is reset in the effect
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const store = useStore();
@@ -297,7 +280,14 @@ export function useManifest(iiifContent: string | null, sceneId?: string): { fai
     };
   }, [iiifContent, store, localeRef]);
 
-  useShownNotes(sceneId);
+  // a new locale: the notes' labels are read again (see reparseNotes)
+  const locale = useLocale();
+  const parsedLocale = useRef(locale);
+  useEffect(() => {
+    if (parsedLocale.current === locale) return;
+    parsedLocale.current = locale;
+    reparseNotes(store, locale);
+  }, [locale, store]);
 
   return { failed: iiifContent !== null && failedUrl === iiifContent };
 }

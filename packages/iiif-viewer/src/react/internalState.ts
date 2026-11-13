@@ -1,7 +1,7 @@
 // State shared inside the viewer that is not part of the public API (atoms.ts is exported as a whole).
 
 import { atom, type createStore } from 'jotai';
-import type { CompareItem, ContainerInfo } from '../core';
+import type { CompareItem } from '../core';
 import type { NavRequest } from './displays/structureState';
 
 /**
@@ -52,6 +52,8 @@ export function resetViewState(store: ReturnType<typeof createStore>): void {
   store.set(compareMultiAtom, null);
 }
 
-/** A Scene that paints a model: the 3D display draws it (any other Scene is a 2D page). */
-export const drawsModel = (c: Pick<ContainerInfo, 'kind' | 'painting'>): boolean =>
-  c.kind === 'Scene' && c.painting.some((p) => p.options.some((o) => o.kind === 'Model'));
+/**
+ * Whether a SceneDisplay is mounted, and the Scene it read last. While one is mounted it owns the notes and
+ * models of its Scene; otherwise a new locale reads that last Scene again (useManifest).
+ */
+export const sceneDisplayAtom = atom<{ mounted: boolean; sceneId: string | null }>({ mounted: false, sceneId: null });
