@@ -130,3 +130,21 @@ describe('collectManifestAnnotations', () => {
     expect(manifestHasCanvasAnnotations({ items: [{ id: C1, type: 'Canvas' }] })).toBe(false);
   });
 });
+
+describe('annotationPlainText and tags', () => {
+  const read = (items: unknown[]) => readCanvasAnnotations(C1, [page(items)], {}, new Set([C1]));
+  it('leaves out tagging bodies (by purpose, or by the sole motivation)', () => {
+    const [byPurpose, byMotivation, text] = read([
+      anno('t1', 'block_fig', `${C1}#xywh=0,0,10,10`, { purpose: 'tagging' }),
+      { ...anno('t2', 'block_fig', `${C1}#xywh=0,0,10,10`), motivation: 'tagging' },
+      { ...anno('s1', 'はといひければ', `${C1}#xywh=0,0,10,10`), motivation: 'supplementing' },
+    ]);
+    expect(annotationPlainText(byPurpose)).toBe('');
+    expect(annotationPlainText(byMotivation)).toBe('');
+    expect(annotationPlainText(text)).toBe('はといひければ');
+  });
+  it('does not match a class name in search', () => {
+    const annotations = read([anno('t1', 'block_fig', `${C1}#xywh=0,0,10,10`, { purpose: 'tagging' })]);
+    expect(searchLocalAnnotations([{ canvasId: C1, annotations }], 'fig')).toEqual([]);
+  });
+});
