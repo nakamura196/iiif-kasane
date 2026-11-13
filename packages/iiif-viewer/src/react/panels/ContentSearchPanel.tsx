@@ -7,6 +7,7 @@ import {
   collectManifestAnnotations,
   containersOf,
   contentSearchAnnotationPage,
+  hitUnionXywh,
   fetchContentSearchTerms,
   findContentSearchService,
   findSceneAnnotation,
@@ -352,7 +353,8 @@ export function ContentSearchPanelBody(ctx: PanelContext) {
       setRequest({ seq: nextSeq(), target: { canvasId: m.canvasId, t: m.time } });
       return;
     }
-    const box = m.regions.find((r) => r.canvasId === m.canvasId && r.xywh)?.xywh;
+    // fit all the regions of the hit (a phrase spans several words), not only the first
+    const box = hitUnionXywh(m.regions, m.canvasId);
     setRequest({ seq: nextSeq(), target: { canvasId: m.canvasId, ...(box ? { xywh: box } : {}) } });
   };
 

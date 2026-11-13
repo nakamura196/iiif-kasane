@@ -5,6 +5,7 @@ import { memo, useCallback, useDeferredValue, useLayoutEffect, useMemo, useRef }
 import {
   bboxOf,
   groupByRegion,
+  isHitAnnotation,
   labelIn,
   matchesCanvasAnnotation,
   pickBodies,
@@ -122,7 +123,7 @@ export function AnnotationOverlayView({ container, canvasWidth, canvasHeight, st
   const onScreen = all.filter((d) => d.box && overlaps(d.box, view));
   const asCanvas = !!stage && onScreen.length > DOM_MARK_LIMIT;
   const isSelected = (g: RegionGroup<CanvasAnnotation>) =>
-    selected !== null && g.annotations.some((m) => m.id === selected);
+    selected !== null && g.annotations.some((m) => m.id === selected || isHitAnnotation(m.id, selected));
   // On the canvas, the chosen mark is still drawn as a mark one can press (and on top of the others).
   const marks = asCanvas ? onScreen.filter((d) => isSelected(d.group)) : onScreen;
 

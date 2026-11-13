@@ -419,6 +419,36 @@ export function contentSearchAnnotationPage(canvasId: string, matches: ContentSe
   };
 }
 
+/**
+ * The smallest box that contains every region of the hit on the given Canvas, or undefined when none has a box.
+ * A hit that spans several words has one region per word; the view must fit all of them.
+ */
+export function hitUnionXywh(
+  regions: ContentSearchRegion[],
+  canvasId: string,
+): [number, number, number, number] | undefined {
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  for (const r of regions) {
+    if (r.canvasId !== canvasId || !r.xywh) continue;
+    const [x, y, w, h] = r.xywh;
+    x0 = Math.min(x0, x);
+    y0 = Math.min(y0, y);
+    x1 = Math.max(x1, x + w);
+    y1 = Math.max(y1, y + h);
+  }
+  return x0 === Infinity ? undefined : [x0, y0, x1 - x0, y1 - y0];
+}
+
+/**
+ * Whether an annotation drawn for a search hit belongs to the given hit id.
+ * contentSearchAnnotationPage names the first region after the hit and the others `<hit>#<n>`.
+ */
+export const isHitAnnotation = (annotationId: string, hitId: string): boolean =>
+  annotationId === hitId || (annotationId.startsWith(`${hitId}#`) && /^\d+$/.test(annotationId.slice(hitId.length + 1)));
+
 /** Text Granularity の決まった単位。大きい順。 */
 export const TEXT_GRANULARITIES = ['page', 'block', 'paragraph', 'line', 'word', 'glyph'] as const;
 

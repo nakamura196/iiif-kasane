@@ -90,10 +90,25 @@ test('Content Search 2.0: 当たりの一覧・単位の絞り込み・候補語
   // 1 ページ目の画像に、行の当たりの印
   await expect(page.locator(`[data-overlay="annotations"] [data-annotation-id="${BASE}/annotation/line-1"]`)).toBeVisible();
 
-  // 2 語にまたがる当たりを押すと 2 ページ目に移り、印が 2 つ出る
+  // 2 語にまたがる当たりを押すと 2 ページ目に移り、当たり全体（2 語）が画面に収まって印が 2 つ出る。
+  // 寄せるアニメーションが終わってから確かめる（途中の画面では印が 2 つ見えて、時間に依存するため）。
   await page.locator('mark', { hasText: 'blue bird' }).click();
   await expect(page.getByText('2 / 2')).toBeVisible();
-  await expect(page.locator(`[data-overlay="annotations"] [data-annotation-id^="${BASE}/annotation/word-12"]`)).toHaveCount(2);
+  const marks = page.locator(`[data-overlay="annotations"] [data-annotation-id^="${BASE}/annotation/word-12"]`);
+  // the two marks stay put for 600 ms (the zoom has settled)
+  let last = '';
+  let still = 0;
+  await expect
+    .poll(async () => {
+      const boxes = JSON.stringify(await marks.evaluateAll((els) => els.map((e) => e.getBoundingClientRect().toJSON())));
+      still = boxes === last ? still + 1 : 0;
+      last = boxes;
+      return still;
+    }, { intervals: [100] })
+    .toBeGreaterThanOrEqual(6);
+  await expect(marks).toHaveCount(2);
+  // both marks are fully inside the visible area (toBeInViewport honours the clipping of the stage)
+  for (let i = 0; i < 2; i++) await expect(marks.nth(i)).toBeInViewport({ ratio: 0.99 });
 });
 
 test('Content Search 1.0（MDZ の実物）: ?q= で開くと探してある', async ({ page }) => {
