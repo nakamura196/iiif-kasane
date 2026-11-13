@@ -6,7 +6,7 @@
 // ここで区分を選ぶと、画像の上の印と注釈タブの一覧も同じ区分に絞られる。
 import { useEffect, useMemo, useState } from 'react';
 import { atom, useAtom, useAtomValue, useStore } from 'jotai';
-import { kindFacets, pageMarksOf, passesChoice, presentChoices, type ContainerInfo, type ManifestV4, type PageMark } from '../../core';
+import { DEFAULT_KIND, kindFacets, pageMarksOf, passesChoice, presentChoices, type ContainerInfo, type ManifestV4, type PageMark } from '../../core';
 import { showAnnotationsAtom } from '../atoms';
 import { FilterChips } from '../annotation/FilterChips';
 import { ShowMarksToggle } from '../annotation/ShowMarksToggle';
@@ -51,7 +51,7 @@ const shownMarksAtom = atom((get) => {
 });
 
 /** The kinds in the shown model's results (read text, classified regions …), with how many marks each has. */
-const shownKindsAtom = atom((get) => kindFacets(get(shownMarksAtom).map((m) => m.kind)));
+const shownKindsAtom = atom((get) => kindFacets(get(shownMarksAtom).map((m) => m.kind ?? DEFAULT_KIND)));
 
 /** The chosen kinds that the shown results have (as in the annotations tab, other kinds are ignored). */
 const shownChosenKindsAtom = atom((get) => presentChoices(get(canvasAnnotationKindsAtom), get(shownKindsAtom)));
@@ -64,7 +64,7 @@ const shownChosenGranularityAtom = atom((get) => {
   const g = get(canvasAnnotationGranularityAtom);
   if (!g) return null;
   const kinds = get(shownChosenKindsAtom);
-  return get(shownMarksAtom).some((m) => m.granularity === g && passesChoice(m.kind, kinds)) ? g : null;
+  return get(shownMarksAtom).some((m) => m.granularity === g && passesChoice(m.kind ?? DEFAULT_KIND, kinds)) ? g : null;
 });
 
 /**
@@ -77,7 +77,7 @@ const shownTagsAtom = atom((get) => {
   const kinds = get(shownChosenKindsAtom);
   const granularity = get(shownChosenGranularityAtom);
   for (const m of get(shownMarksAtom)) {
-    if (!passesChoice(m.kind, kinds) || (granularity && m.granularity !== granularity)) continue;
+    if (!passesChoice(m.kind ?? DEFAULT_KIND, kinds) || (granularity && m.granularity !== granularity)) continue;
     if (!m.tag) continue;
     const e = counts.get(m.tag) ?? { count: 0, color: m.color };
     e.count++;
@@ -219,7 +219,7 @@ export const thumbMarksShown = (
     ? []
     : marks.filter(
         (m) =>
-          passesChoice(m.kind, o.kinds) &&
+          passesChoice(m.kind ?? DEFAULT_KIND, o.kinds) &&
           (!o.granularity || m.granularity === o.granularity) &&
           (o.tags.length === 0 || (!!m.tag && o.tags.includes(m.tag))),
       );

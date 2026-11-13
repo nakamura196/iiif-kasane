@@ -18,8 +18,11 @@ export interface PageMark {
   tag?: string;
   /** Whether the annotation has text (a read line): drawn with a light fill. */
   text: boolean;
-  /** The kind of the annotation (its motivation, see annotationKindOf), for filtering by kind. */
-  kind: string;
+  /**
+   * The kind of the annotation (its motivation, see annotationKindOf), for filtering by kind. pageMarksOf always sets
+   * it; it is optional so that marks made elsewhere before kinds existed still type-check.
+   */
+  kind?: string;
   /** Text Granularity extension: the unit of text (line, word …), when the annotation says. */
   granularity?: string;
 }
