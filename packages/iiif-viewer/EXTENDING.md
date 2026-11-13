@@ -1,42 +1,35 @@
-# 機能の足し方（並行で作業するときの決まり）
+# Adding features (rules for parallel work)
 
-機能は「1 機能 1 担当 1 組のファイル」で足す。ほかの機能のファイルは書き換えない。
+Add a feature as "one feature, one owner, one set of files". Do not edit the files of other features.
 
-| 足すもの | 書くファイル（新規） | 共有ファイルで触る所 |
+| What you add | Files to write (new) | What to touch in shared files |
 | --- | --- | --- |
-| 表示（ページ送り・合成など） | `src/react/displays/<名前>Display.tsx`（型は `displays/types.ts`） | `displays/registry.ts` に 1 行（当たる順が意味を持つため） |
-| 右パネルのタブ | `src/react/panels/<名前>Panel.tsx`（型は `panels/types.ts`。並びは `order`） | 無し |
-| 画像の上に重ねる表示 | `src/react/overlays/<名前>Overlay.tsx`（型は `overlays/types.ts`。重ね順は `order`） | 無し |
-| 読み取り（React に依存しない） | `src/core/features/<機能>.ts` と `<機能>.test.ts`、または `<機能>/index.ts` のフォルダ | 無し |
-| 文言 | `src/react/messages/features/<機能>.{ja,en}.json` | 無し |
-| 推論のモデル（ブラウザ内の OCR など） | `src/react/inference/models/<名前>.ts`（型は `models/types.ts`。重い処理は `load()` の先の `<名前>.run.ts`）。React に依存しない前処理・後処理は `src/core/features/inference/` | `models/registry.ts` に 1 行（手順は `docs/adding-inference-model.md`） |
+| A display (paging, composites, etc.) | `src/react/displays/<Name>Display.tsx` (types in `displays/types.ts`) | One line in `displays/registry.ts` (the order of matching matters) |
+| A side panel tab | `src/react/panels/<Name>Panel.tsx` (types in `panels/types.ts`; position by `order`) | None |
+| An overlay on the image | `src/react/overlays/<Name>Overlay.tsx` (types in `overlays/types.ts`; stacking by `order`) | None |
+| Reading data (no React) | `src/core/features/<feature>.ts` and `<feature>.test.ts`, or a folder `<feature>/index.ts` | None |
+| UI text | `src/react/messages/features/<feature>.{ja,en}.json` | None |
+| An inference model (in-browser OCR, etc.) | `src/react/inference/models/<name>.ts` (types in `models/types.ts`; heavy work in `<name>.run.ts`, loaded by `load()`). Pre- and post-processing without React go in `src/core/features/inference/` | One line in `models/registry.ts` (steps in `docs/adding-inference-model.md`) |
 
-「無し」のものは、ファイルを置けば一覧に入る。一覧は `scripts/gen-registries.mjs` が
-`*.generated.ts` として作る（git には入れない）。開発サーバ・テスト・ビルドが自動で走らせるので、
-ふつうは意識しなくてよい。エディタで「`registry.generated` が無い」と出たら `npm run gen`。
+For "None", putting the file in place adds it to the list. `scripts/gen-registries.mjs` writes the lists as `*.generated.ts` (not in git). The dev server, tests and build run it automatically, so you usually do not need to think about it. If your editor says `registry.generated` is missing, run `npm run gen`.
 
-- `core/features/` の中で、機能の内側だけで使う補助ファイルは、名前を `_` で始める（一覧に入らない）
-- タブの `order` は 10 刻みで付けてある（資料情報 10 … 注釈 90）。間に入れたいときは 15 などを使う。
-  付けなければ最後に並ぶ
-- サイトの `?tab=` の許可一覧（`src/lib/viewerTabs.ts`）もタブから作るので、書き換えなくてよい
+- Inside `core/features/`, helper files used only within one feature start with `_` (they are not added to the list).
+- Tab `order` values are spaced by 10 (About 10 … Annotations 90). To place a tab in between, use 15 and so on. Without `order`, a tab goes last.
+- The site's allowed `?tab=` values (`src/lib/viewerTabs.ts`) are also built from the tabs, so you do not need to edit them.
 
-機能の枠（用意済み）: `image`（画像・深いズーム・重ね表示）、`structure`（ページ送り・目次）、`temporal`（時間の指定・複数メディア）、`about`（来歴・権利・リンク）、`annotations`（Canvas 上の注釈）。
+Feature areas already set up: `image` (images, deep zoom, overlays), `structure` (paging, table of contents), `temporal` (time ranges, multiple media), `about` (provenance, rights, links), `annotations` (annotations on a Canvas).
 
-## 操作をどこに置くか
+## Where to put controls
 
-- **応用的な操作は、右パネルのタブとして足すのを基本とする**（例: レイヤーの表示・不透明度・重ね順、注釈の絞り込み、目次）。
-  画像の領域を狭めない。`available` で、使える Canvas のときだけタブが出る。埋め込み（`<iiif-viewer>`）でも同じ場所にある
-- 画像の上の帯に置くのは、その Canvas を見るのに欠かせない最小限の切り替えだけ（Choice の候補選び、ページ送り）
-- 同じものを帯とタブの両方で操作するときは、同じ状態（`atoms.ts`）を読み書きし、食い違わないようにする
-  （例: Choice の候補選びは、レイヤーの表示・非表示として持つ）
+- **Put advanced controls in a side panel tab by default** (e.g. layer visibility, opacity and order; annotation filters; the table of contents). Do not shrink the image area. With `available`, the tab appears only for Canvases where it applies. The embed (`<iiif-viewer>`) has it in the same place.
+- The strip above the image holds only the minimum needed to view that Canvas (choosing a Choice option, paging).
+- When the strip and a tab control the same thing, both read and write the same state (`atoms.ts`) so they never disagree (e.g. a Choice option is kept as layer visibility).
 
-## 守ること
+## Rules
 
-- `core/containers.ts`・`Viewer.tsx`・`ViewerProvider.tsx`・`CanvasView.tsx`・`Info.tsx`・`messages/ja.json`・`messages/en.json` は書き換えない。足りないときは、担当に頼む（または別 PR で先に直す）
-- `core` は React・Next.js・DOM に依存しない。テストを同じ場所に置く
-- 再生位置は `usePlayback()`、画面の状態は Viewer ごとの jotai store（`atoms.ts`）。グローバルな変数を作らない
-- 資料の読み込み・表示中の Canvas・store は `ViewerProvider` が持つ。`Viewer` は「`ViewerProvider`＋既定のレイアウト」。
-  部品から表示中の Canvas を読むときは `useViewer()`（Provider の外でも動かしたい部品は `useOptionalViewer()`）
-- 画面の外（`document.body` など）に出す部品は、`class="iiif-viewer"` の要素で包む。配布用の `style.css` は、
-  ビューアの見た目をその中だけに効かせているため（使う側のページの `.hidden` などとぶつからないように）
-- 表示とパネルは、`ContainerInfo`（`core/services/containers.ts`）を入力にする
+- Do not edit `core/containers.ts`, `Viewer.tsx`, `ViewerProvider.tsx`, `CanvasView.tsx`, `Info.tsx`, `messages/ja.json` or `messages/en.json`. If something is missing there, ask the maintainer (or fix it first in a separate PR).
+- `core` does not depend on React, Next.js or the DOM. Keep tests next to the code.
+- The playback position comes from `usePlayback()`; screen state lives in each Viewer's jotai store (`atoms.ts`). Do not create global variables.
+- `ViewerProvider` owns loading the manifest, the shown Canvas and the store. `Viewer` is "`ViewerProvider` + the default layout". To read the shown Canvas from a part, use `useViewer()` (or `useOptionalViewer()` for parts that also work outside a Provider).
+- Wrap parts rendered outside the viewer (in `document.body`, for example) in an element with `class="iiif-viewer"`. The distributed `style.css` applies the viewer's styles only inside it, so they do not clash with the host page (its `.hidden`, for example).
+- Displays and panels take `ContainerInfo` (`core/services/containers.ts`) as input.

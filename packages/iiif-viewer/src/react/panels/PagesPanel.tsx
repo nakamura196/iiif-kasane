@@ -6,6 +6,7 @@ import { containersOf, labelIn, pageMediaOf, pageThumbnailUrl, type MediaKind } 
 import { manifestAtom } from '../atoms';
 import { navRequestAtom, nextSeq, usePageOrder } from '../displays/structureState';
 import { useLocale, useTranslations } from '../env';
+import { PageThumbMarks, PagesBatchBar } from './PagesBatch';
 import type { Panel, PanelContext } from './types';
 
 // The viewer remembers the chosen layout per browser (a convenience only; it works without storage).
@@ -96,6 +97,7 @@ function PagesView({ container, manifest }: PanelContext) {
   const setRequest = useSetAtom(navRequestAtom);
   const containers = useMemo(() => containersOf(m), [m]);
   const { order } = usePageOrder(m, containers);
+  const pages = useMemo(() => order.map((i) => containers[i]).filter((c) => !!c), [order, containers]);
   const [broken, setBroken] = useState<Record<string, boolean>>({});
   const list = useRef<HTMLOListElement>(null);
   const [layout, setLayoutState] = useState<Layout>('list');
@@ -164,6 +166,7 @@ function PagesView({ container, manifest }: PanelContext) {
           </svg>,
         )}
       </div>
+      {grid ? <PagesBatchBar pages={pages} manifest={m} /> : null}
       <ol
         ref={list}
         className={grid ? 'p-2 grid gap-2' : 'p-2 space-y-1'}
@@ -208,6 +211,7 @@ function PagesView({ container, manifest }: PanelContext) {
                       return <MediaIcon kind={media} label={t(MEDIA_LABEL_KEYS[media])} size={grid ? 40 : 28} />;
                     })()
                   )}
+                  {grid && thumb && !broken[c.id] ? <PageThumbMarks page={c} /> : null}
                 </span>
                 {grid ? (
                   <span className="min-w-0 flex gap-1 text-xs">

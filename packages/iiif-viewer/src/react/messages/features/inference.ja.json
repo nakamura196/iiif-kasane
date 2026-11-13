@@ -38,6 +38,18 @@
     "pointLabel": "領域 {n}",
     "stage_encode": "画像を読み取っています...",
     "stage_segment": "形をなぞっています...",
-    "stage_generate": "文章を作っています..."
+    "stage_generate": "文章を作っています...",
+    "batchModel": "モデル",
+    "batchRun": "全ページに実行（{count} ページ）",
+    "batchStop": "停止",
+    "batchProgress": "読み取り中 {done} / {total} ページ",
+    "batchDone": "{total} ページを読み取りました",
+    "batchStopped": "止めました（{done} / {total} ページ）",
+    "batchNothing": "どのページにも、もう結果があります",
+    "batchFailed": "（読めなかったページ {count}）",
+    "batchNoModel": "推論タブでモデルをダウンロードすると、ここから全ページにかけられます。",
+    "batchTags": "区分",
+    "batchTagsClear": "すべて表示",
+    "batchResume": "続きを実行（残り {count} ページ）"
   }
 }

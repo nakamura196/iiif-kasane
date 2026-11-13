@@ -1,46 +1,55 @@
 @AGENTS.md
 
-# Kasane で作業するときの決まり
+# Rules for working on Kasane
 
-機能の足し方（ファイルの置き場所・並行作業の決まり）は `packages/iiif-viewer/EXTENDING.md` にある。
+How to add a feature (where files go, rules for parallel work) is in `packages/iiif-viewer/EXTENDING.md`.
 
-## コミット・PR・Issue は英語で書く（日本語も可）
+## Write in English
 
-2026-10-17 から、コミットメッセージ・PR のタイトルと本文・Issue は英語で書く。
-公開リポジトリなので、日本語を読まない人も経緯を追えるようにするため。
-外部の貢献者は日本語でもよい（`CONTRIBUTING.md` にそう書いてある）が、ここで作業するときは英語で書く。
+This is a public repository with users and contributors outside Japan. Write in English so that people who do not read Japanese can follow the history and join the work.
 
-- コミットの 1 行目は命令形の短い英語（例: `Fix caption timing for multi-video canvases`）。詳しくは `CONTRIBUTING.md`
-- PR の本文は、利用者から見て何が変わるかを先に、作りはその後に書く
-- 過去のコミットと閉じた PR は訳し直さない（履歴を書き換えるとリンクが切れる）
-- 画面に出る文言は、これまでどおり日英の両方を用意する（この決まりとは別）
+- Commit messages, PR titles and descriptions, and issues (since 2026-10-17). Outside contributors may write in Japanese (`CONTRIBUTING.md` says so), but write in English when you work here.
+- Developer documents: this file, `EXTENDING.md`, the READMEs, `docs/` (since 2026-11-13).
+- New code comments. Existing Japanese comments are translated when you touch that file; do not translate many files at once in an unrelated PR (large diffs collide with parallel PRs).
+- The first line of a commit is a short imperative sentence (e.g. `Fix caption timing for multi-video canvases`). See `CONTRIBUTING.md`.
+- A PR description says first what changes for users, then how it is built.
+- Do not rewrite past commits or closed PRs (rewriting history breaks links).
+- Text shown in the UI keeps both Japanese and English versions, as before (a separate rule).
 
-## 新しい機能を足したら、紹介の場所に載せるかを必ず検討する（標準の作業）
+### Japanese goes in its own files
 
-機能を作っただけでは、サイトを訪れた人は気づかない。新しい機能・目に見える改善を足したときは、
-PR を出す前に次の 3 つを 1 つずつ検討し、**載せるか・載せないかと、その理由を PR の本文に書く**。
-載せないと決めるのはかまわない（小さな修正・内部の作り替えなど）。検討を飛ばさない。
+Do not mix Japanese and English in one file. Japanese text goes only in files whose name marks the language: `*.ja.json`, `*.ja.md` (e.g. `README.ja.md`, `messages/ja.json`, `messages/features/<feature>.ja.json`). Every other file is in English. This keeps the rule simple and makes the remaining Japanese easy to find:
 
-1. **ユースケース** — `src/lib/usecases.ts` に 1 件足す。実在の資料を、その機能が効く開き方（`tab=` など）で開く。
-   サムネイルは `scripts/capture-thumbnails.mjs` で撮る（`public/thumbnails/usecases/<id>.webp`）
-2. **お知らせ** — `content/news/<id>.md` を 1 つ置く（日英の見出しと 2〜3 文の本文、
-   「試す」の行き先、関連するユースケースの id。書き方は `content/news/README.md`）。1 件 1 ファイルなので、
-   並行する PR どうしがぶつからない。トップには新しい 5 件が出て、`/news` に一覧、
-   `/news/<id>` に詳細ページができる
-3. **サンプル** — 機能を試せる短いマニフェストがあるなら `src/lib/samples.ts`（IIIF Cookbook のレシピなど）
+    git grep -l -P '[\p{Hiragana}\p{Katakana}]' -- ':!*.ja.*' ':!**/ja.json'
 
-あわせて、使い方の動画（ユースケースの `video`）が要るかも一言添える。作るかどうかは本人が決める。
+The English file links to its Japanese counterpart (as `README.md` links to `README.ja.md`). Files that still mix the two languages (news items, use cases, samples, older notes, code comments) are moved over step by step.
 
-## ページを足したら、引数なしで開いたときの画面（入口）を確かめる（標準の作業）
+## Review and a reproduction test before merging (standard step)
 
-`/georef` などをマニフェストなしで開くと入口の画面になる。ここは機能の確認から漏れやすく、
-PR #180 では見出しが画面の上にはみ出す崩れと、存在しない動画の参照（書き出しの検査で CI が落ちた）が見つかった。
+Since 2026-11-13 Kasane has outside users: the `iiif-kasane` npm package and sites that embed the viewer. A bug breaks their sites, not only kasane.ldas.jp. This rule came from #334 (images of a Manifest opened from a Collection did not show), which an outside user reported.
 
-ページを足した・入口を変えたときは、PR を出す前に次を走らせる。ページの一覧は `src/app/[locale]/` から
-自動で拾うので、テストを書き足す必要はない（`[id]` のような動的なページは対象外）。
+- Run `/code-review` on a PR that changes code before merging it. Use `high` for small changes. Before a large change or an npm release, use `ultra` (several agents review in the cloud; the maintainer starts it).
+- For each finding, write in the PR description or a comment whether it was fixed, and why if not.
+- A bug fix comes with a reproduction test that was confirmed to fail before the fix.
+- The public API (Web Component attributes, exported types such as `ViewerState` and `DisplayProps`, URL parameters) only grows. Renaming or removing needs the maintainer's agreement. If it must change, say so in the release notes.
 
-    npx next dev -p <番号>   # 別の端末で。worktree では 3838 を避ける
-    E2E_BASE_URL=http://localhost:<番号> npx playwright test e2e/entryPages.spec.ts
+## When you add a feature, decide whether to feature it (standard step)
 
-日英 × パソコン幅・スマートフォン幅で、JS のエラー、サイト内のファイルの読み込み失敗、
-見出しのはみ出し、横スクロールを見る。テストが通っても、新しいページは一度は画面を目で見る。
+Visitors do not notice a feature just because it exists. When you add a feature or a visible improvement, check each of these three before opening the PR, and **write in the PR description whether you added it and why**. Deciding not to is fine (small fixes, internal rework); skipping the check is not.
+
+1. **Use case**: add one entry to `src/lib/usecases.ts`. It opens a real item in the way the feature shows best (`tab=` etc.). Take the thumbnail with `scripts/capture-thumbnails.mjs` (`public/thumbnails/usecases/<id>.webp`).
+2. **News**: add one file `content/news/<id>.md` (a title in Japanese and English, a body of 2–3 sentences, where "Try it" goes, and related use case ids; see `content/news/README.md`). One item per file, so parallel PRs do not collide. The newest 5 appear on the top page, all of them at `/news`, and each at `/news/<id>`.
+3. **Sample**: if a short manifest shows the feature, add it to `src/lib/samples.ts` (an IIIF Cookbook recipe, for example).
+
+Also say whether a how-to video (a use case's `video`) would help. The maintainer decides whether to make one.
+
+## When you add a page, check how it looks without arguments (standard step)
+
+Opening `/georef` and similar pages without a manifest shows their entry screen. Feature checks easily miss it: in PR #180 a heading ran off the top of the screen, and a reference to a video that did not exist broke the export check in CI.
+
+When you add a page or change an entry screen, run this before opening the PR. The page list is read from `src/app/[locale]/`, so no test needs to be added (dynamic pages such as `[id]` are not covered).
+
+    npx next dev -p <port>   # in another terminal; in a worktree, avoid 3838
+    E2E_BASE_URL=http://localhost:<port> npx playwright test e2e/entryPages.spec.ts
+
+It checks Japanese and English at desktop and phone widths for JS errors, failed loads of site files, headings that run off the screen, and horizontal scrolling. Even when the test passes, look at a new page on screen once.
