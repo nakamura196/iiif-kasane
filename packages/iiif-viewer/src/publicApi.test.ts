@@ -7,26 +7,33 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import ts from 'typescript';
 
 const repo = resolve(__dirname, '../../..');
 const read = (file: string) => readFileSync(resolve(repo, file), 'utf8');
-// Drop // and /* */ comments so a commented-out line does not count. (A "//" right after ":" is kept: URLs.)
-const code = (file: string) =>
-  read(file)
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/(^|[^:'"`\\])\/\/.*$/gm, '$1');
-const quoted = (s: string) => [...s.matchAll(/['"]([^'"]+)['"]/g)].map((m) => m[1]);
+const parse = (file: string) => ts.createSourceFile(file, read(file), ts.ScriptTarget.Latest, true, file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+// Walk the syntax tree (not the text): comments and string contents such as 'image/*' do not confuse it.
+const walk = (node: ts.Node, fn: (n: ts.Node) => void) => {
+  fn(node);
+  ts.forEachChild(node, (c) => walk(c, fn));
+};
+const str = (n: ts.Node | undefined) => (n && ts.isStringLiteralLike(n) ? n.text : undefined);
 const sorted = (a: string[]) => a.slice().sort();
 
 // The element module needs a browser (HTMLElement, customElements, a CSS import), which the unit tests do
-// not have, so its source text is read instead.
+// not have, so its syntax tree is read instead.
 describe('<iiif-kasane> tag', () => {
-  const element = code('packages/iiif-viewer/src/element/index.ts');
+  const element = parse('packages/iiif-viewer/src/element/index.ts');
 
   it('observes the documented attributes', () => {
-    const m = /observedAttributes\s*=\s*\[([^\]]*)\]/.exec(element);
-    expect(m, 'observedAttributes not found in element/index.ts').not.toBeNull();
-    expect(sorted(quoted(m![1])), 'Attributes changed. Removing one needs the maintainer; add a new one here on purpose').toEqual([
+    let observed: string[] | undefined;
+    walk(element, (n) => {
+      if (ts.isPropertyDeclaration(n) && n.name.getText() === 'observedAttributes' && n.initializer && ts.isArrayLiteralExpression(n.initializer)) {
+        observed = n.initializer.elements.map((e) => str(e) ?? '?');
+      }
+    });
+    expect(observed, 'observedAttributes not found in element/index.ts').toBeDefined();
+    expect(sorted(observed!), 'Attributes changed. Removing one needs the maintainer; add a new one here on purpose').toEqual([
       'iiif-content',
       'locale',
       'options',
@@ -34,17 +41,30 @@ describe('<iiif-kasane> tag', () => {
     ]);
   });
 
-  it('reads these keys of the options attribute', () => {
-    const m = /const\s*\{([^}]*)\}\s*=\s*json\s+as/.exec(element);
-    expect(m, 'the destructuring of the parsed options JSON was not found in parseOptions').not.toBeNull();
-    const keys = m![1].split(',').map((k) => k.trim().split(':')[0].trim()).filter(Boolean);
-    expect(sorted(keys), 'Keys of the options attribute changed').toEqual(['environment', 'pager', 'panelOpen', 'tab']);
+  it('reads these keys of the options attribute, and passes them to the viewer', () => {
+    // keys parseOptions takes out of the JSON
+    const parsedKeys: string[] = [];
+    // keys the element uses from parseOptions(...) results (these are what reach <Viewer>)
+    const usedKeys = new Set<string>();
+    walk(element, (n) => {
+      if (ts.isVariableDeclaration(n) && ts.isObjectBindingPattern(n.name) && n.initializer && ts.isAsExpression(n.initializer)) {
+        n.name.elements.forEach((e) => parsedKeys.push(e.propertyName?.getText() ?? e.name.getText()));
+      }
+      if (ts.isPropertyAccessExpression(n) && ts.isCallExpression(n.expression) && n.expression.expression.getText() === 'parseOptions') {
+        usedKeys.add(n.name.text);
+      }
+    });
+    const expected = ['environment', 'pager', 'panelOpen', 'tab'];
+    expect(sorted(parsedKeys), 'Keys parsed from the options attribute changed').toEqual(expected);
+    expect(sorted([...usedKeys]), 'Keys of the options attribute no longer all reach the viewer').toEqual(expected);
   });
 
   it('defines both tag names (<iiif-viewer> is the pre-0.3.0 name and stays)', () => {
-    for (const tag of ['iiif-kasane', 'iiif-viewer']) {
-      expect(element, `<${tag}> is no longer defined`).toMatch(new RegExp(`customElements\\s*\\.\\s*define\\(\\s*['"]${tag}['"]`));
-    }
+    const defined: string[] = [];
+    walk(element, (n) => {
+      if (ts.isCallExpression(n) && n.expression.getText() === 'customElements.define') defined.push(str(n.arguments[0]) ?? '?');
+    });
+    for (const tag of ['iiif-kasane', 'iiif-viewer']) expect(defined, `<${tag}> is no longer defined`).toContain(tag);
   });
 });
 
@@ -84,10 +104,19 @@ const PARAMS: Record<string, string[]> = {
 describe('site URL parameters', () => {
   for (const [file, names] of Object.entries(PARAMS)) {
     it(`${file} still reads ${names.join(', ')}`, () => {
-      const source = code(file);
-      const reads = (n: string) =>
-        new RegExp(`\\.(get|getAll|has)\\(\\s*['"]${n}['"]\\s*\\)|\\bnum\\(\\s*params\\s*,\\s*['"]${n}['"]`).test(source);
-      const missing = names.filter((n) => !reads(n));
+      const read = new Set<string>();
+      walk(parse(file), (n) => {
+        if (!ts.isCallExpression(n)) return;
+        const f = n.expression;
+        if (ts.isPropertyAccessExpression(f) && ['get', 'getAll', 'has'].includes(f.name.text)) {
+          const v = str(n.arguments[0]);
+          if (v) read.add(v);
+        } else if (ts.isIdentifier(f) && f.text === 'num') {
+          const v = str(n.arguments[1]);
+          if (v) read.add(v);
+        }
+      });
+      const missing = names.filter((n) => !read.has(n));
       expect(missing, `No longer read in ${file}: ${missing.join(', ')}`).toEqual([]);
     });
   }
