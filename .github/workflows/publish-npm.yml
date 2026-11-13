@@ -48,7 +48,7 @@ jobs:
 
       # The package alone (not the whole site): its own type check and the public API baseline.
       - name: Check the public API
-        run: node scripts/gen-registries.mjs && npm run typecheck:package
+        run: npm run typecheck:package
 
       - name: Publish
         run: npm publish -w iiif-kasane

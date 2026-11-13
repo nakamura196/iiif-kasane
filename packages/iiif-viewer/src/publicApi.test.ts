@@ -1,7 +1,7 @@
 // Guards the public contract of the npm package `iiif-kasane` (project rule: the public API only grows;
 // removals and renames need the maintainer's OK).
-// Pinned here: the tag's attributes and `options` keys, the package.json `exports` map, and the URL
-// parameters of the site. The exported names and types are pinned by the baseline
+// Pinned here: the tag (attributes, `options` keys, accepted values), the package.json `exports` map, and the
+// URL parameters the package reads (the site's own are in src/siteUrlParams.test.ts). The exported names and types are pinned by the baseline
 // packages/iiif-viewer/api/public-api.txt (scripts/api-surface.mjs; `npm run typecheck` compares, `npm run
 // api:update` rewrites it).
 import { describe, expect, it } from 'vitest';
@@ -59,6 +59,26 @@ describe('<iiif-kasane> tag', () => {
     expect(sorted([...usedKeys]), 'Keys of the options attribute no longer all reach the viewer').toEqual(expected);
   });
 
+  it('accepts these values (narrowing them breaks pages that use the tag)', () => {
+    let tabs: string[] | undefined;
+    const themes = new Set<string>();
+    const typeofChecks = new Set<string>();
+    walk(element, (n) => {
+      if (ts.isVariableDeclaration(n) && n.name.getText() === 'TABS' && n.initializer && ts.isArrayLiteralExpression(n.initializer)) {
+        tabs = n.initializer.elements.map((e) => str(e) ?? '?');
+      }
+      if (ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken) {
+        if (n.left.getText() === 'themeAttr' && str(n.right)) themes.add(str(n.right)!);
+        if (ts.isTypeOfExpression(n.left) && str(n.right)) typeofChecks.add(`${n.left.expression.getText()}:${str(n.right)}`);
+      }
+    });
+    expect(sorted(tabs ?? []), 'Tabs accepted in options.tab changed').toEqual(['annotations', 'metadata']);
+    expect(sorted([...themes]), 'Values accepted in the theme attribute changed').toEqual(['auto', 'dark', 'light']);
+    for (const c of ['panelOpen:boolean', 'pager:boolean', 'environment:string']) {
+      expect([...typeofChecks], `The check "${c}" for the options value is gone`).toContain(c);
+    }
+  });
+
   it('defines both tag names (<iiif-viewer> is the pre-0.3.0 name and stays)', () => {
     const defined: string[] = [];
     walk(element, (n) => {
@@ -82,11 +102,12 @@ describe('package.json exports', () => {
   });
 });
 
-// URL parameters of the site. They are read in several places, not through one table, so they cannot be
-// listed at runtime. Each file below must still contain a read of each name: `.get('x')`, `.getAll('x')`,
-// `.has('x')`, or num(params, 'x') in georefView. Known limit: a name that is also read with `.has`
-// elsewhere in the same file (puzzle, grid, b) is not caught if only its `.get` goes. A parameter moved to
-// another file: update the file here.
+// URL parameters that the package itself reads (the site's own pages are checked in src/siteUrlParams.test.ts,
+// because the publish workflow runs only this folder). They are read in several places, not through one
+// table, so they cannot be listed at runtime. Each file must still contain a read of each name:
+// `.get('x')`, `.getAll('x')`, `.has('x')` on a receiver whose name contains "params" (params, searchParams,
+// new URLSearchParams(...)), or num(params, 'x') in georefView. Known limit: a name also read with `.has`
+// elsewhere in the same file is not caught if only its `.get` goes. A parameter moved: update the file here.
 const PARAMS: Record<string, string[]> = {
   'packages/iiif-viewer/src/core/contentState.ts': ['iiif-content', 'manifest', 'curation'],
   'packages/iiif-viewer/src/react/ContainerList.tsx': ['canvas', 'pos'],
@@ -94,21 +115,16 @@ const PARAMS: Record<string, string[]> = {
     'u', 'mapZoom', 'mapLat', 'mapLng', 'lat', 'lng', 'zoom', 'centerX', 'centerY', 'rotation',
     'autoRotateOnSelect', 'clustering', 'annotations', 'license', 'search', 'id', 'canvas',
   ],
-  'src/components/page/ViewerContent.tsx': ['tab', 'puzzle', 'grid'],
-  'src/lib/puzzleLink.ts': ['puzzle', 'grid'],
-  'src/components/page/CompareContent.tsx': ['a', 'b', 'mode', 'opacity', 'blend', 'align', 'aligned', 'dir', 'canvas', 'zoom', 'src'],
-  'src/lib/browse.ts': ['u', 'group', 'layout', 'limit', 'lock'],
-  'src/components/search/useSearchState.ts': ['u', 'collection', 'curation', 'iiif-content', 'q', 'f'],
 };
 
-describe('site URL parameters', () => {
+describe('URL parameters read by the package', () => {
   for (const [file, names] of Object.entries(PARAMS)) {
     it(`${file} still reads ${names.join(', ')}`, () => {
       const read = new Set<string>();
       walk(parse(file), (n) => {
         if (!ts.isCallExpression(n)) return;
         const f = n.expression;
-        if (ts.isPropertyAccessExpression(f) && ['get', 'getAll', 'has'].includes(f.name.text)) {
+        if (ts.isPropertyAccessExpression(f) && ['get', 'getAll', 'has'].includes(f.name.text) && /params/i.test(f.expression.getText())) {
           const v = str(n.arguments[0]);
           if (v) read.add(v);
         } else if (ts.isIdentifier(f) && f.text === 'num') {

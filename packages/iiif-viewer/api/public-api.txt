@@ -221,7 +221,7 @@ export [value] annotationFilterAtom: PrimitiveAtom<AnnotationFilter> & WithIniti
 export [value] annotationsAtom: PrimitiveAtom<Annotation[]> & WithInitialValue<Annotation[]>
 export [value] annotationsAtom3: PrimitiveAtom<Annotation3[]> & WithInitialValue<Annotation3[]>
 export [value] canPlayPuzzle: ({ container }: PanelContext) => boolean
-export [value] canvasLayersAtom: PrimitiveAtom<{ canvasId: string; items: LayerItem[]; } | null> & WithInitialValue<{ canvasId: string; items: LayerItem[]; } | null>
+export [value] canvasLayersAtom: PrimitiveAtom<null | { canvasId: string; items: LayerItem[]; }> & WithInitialValue<null | { canvasId: string; items: LayerItem[]; }>
 export [value] choiceCompareAtom: PrimitiveAtom<{ mode: ChoiceCompareMode; b: Record<string, number>; opacity: number; }> & WithInitialValue<{ mode: ChoiceCompareMode; b: Record<string, number>; opacity: number; }>
 export [value] compareClipOf: (mode: CompareMode, split: number, lens: LensPoint, direction?: SwipeDirection) => string
 export [value] infoPanelAtom: PrimitiveAtom<InfoPanelContent | null> & WithInitialValue<InfoPanelContent | null>
@@ -231,25 +231,25 @@ export [value] layerPlaybackOptionsAtom: PrimitiveAtom<{ seconds: number; loop: 
 export [value] layerSettingsAtom: PrimitiveAtom<Record<string, LayerSetting>> & WithInitialValue<Record<string, LayerSetting>>
 export [value] lensRingPositionOf: (lens: LensPoint | null | undefined) => { left: string; top: string; }
 export [value] manifestAtom: PrimitiveAtom<ManifestV4 | null> & WithInitialValue<ManifestV4 | null>
-export [value] manifestUrlAtom: PrimitiveAtom<string | null> & WithInitialValue<string | null>
+export [value] manifestUrlAtom: PrimitiveAtom<null | string> & WithInitialValue<null | string>
 export [value] measuringAtom: PrimitiveAtom<boolean> & WithInitialValue<boolean>
 export [value] modelAnimationAtom: PrimitiveAtom<{ clips: number; playing: boolean; }> & WithInitialValue<{ clips: number; playing: boolean; }>
 export [value] modelChoicesAtom: PrimitiveAtom<Record<string, number>> & WithInitialValue<Record<string, number>>
-export [value] modelRadiusAtom: PrimitiveAtom<number | null> & WithInitialValue<number | null>
+export [value] modelRadiusAtom: PrimitiveAtom<null | number> & WithInitialValue<null | number>
 export [value] paintedModelsAtom: PrimitiveAtom<PaintedModel[]> & WithInitialValue<PaintedModel[]>
 export [value] pointInBox: (box: HTMLElement, e: { clientX: number; clientY: number; }) => LensPoint
 export [value] registerDisplay: (display: Display) => void
 export [value] rightsPanel: Panel
-export [value] sceneIdAtom: PrimitiveAtom<string | null> & WithInitialValue<string | null>
-export [value] selectedAnnotationIdAtom: PrimitiveAtom<string | null> & WithInitialValue<string | null>
+export [value] sceneIdAtom: PrimitiveAtom<null | string> & WithInitialValue<null | string>
+export [value] selectedAnnotationIdAtom: PrimitiveAtom<null | string> & WithInitialValue<null | string>
 export [value] showAnnotationsAtom: PrimitiveAtom<boolean> & WithInitialValue<boolean>
 export [value] showGridAtom: PrimitiveAtom<boolean> & WithInitialValue<boolean>
 export [value] shownManifestAtom: PrimitiveAtom<ShownManifest | null> & WithInitialValue<ShownManifest | null>
 export [value] useAuthStates: (probes: (AuthProbeRef | undefined)[], locale: string) => (AuthState | undefined)[]
-export [value] useCanvasImages: (iiifContent: string | null, canvasId: string | undefined) => CanvasImages | undefined
+export [value] useCanvasImages: (iiifContent: null | string, canvasId: string | undefined) => CanvasImages | undefined
 export [value] useCompareSources: (urls: string[], locale: string) => Found & { ready: boolean; }
 export [value] useLocale: () => string
-export [value] useManifest: (iiifContent: string | null) => { failed: boolean; }
+export [value] useManifest: (iiifContent: null | string) => { failed: boolean; }
 export [value] useOptionalViewer: () => ViewerState | null
 export [value] useSceneEnvironment: () => string | undefined
 export [value] useTheme: () => { resolvedTheme: ResolvedTheme; }
@@ -1728,18 +1728,18 @@ export [value] activeItemsAt: (timeline: Timeline, t: number) => TimelineItem[]
 export [value] alignmentOf: (alignment: Alignment, a: string | undefined, b: string | undefined) => AlignTransform | null | undefined
 export [value] annotationListSearchText: (a: Annotation) => string
 export [value] annotationPlainText: (a: CanvasAnnotation) => string
-export [value] annotationSearchText: (a: Pick<CanvasAnnotation, "title" | "bodies" | "resources">) => string
+export [value] annotationSearchText: (a: Pick<CanvasAnnotation, "bodies" | "resources" | "title">) => string
 export [value] annotationSourcesOf: (canvas: Json | undefined) => CanvasAnnotationSources
 export [value] annotationStyles: (anno: AnnotationStyleSource, external?: Record<string, StyleRules | undefined> | undefined) => AnnotationStyles
 export [value] annotationTitleOf: (anno: Json) => unknown
-export [value] annotationsOfSelection: <T extends { id: string; hitId?: string; }>(annotations: T[], selectedHit: string | null) => T[]
-export [value] annotationsParams: (on: boolean) => Partial<Record<"id" | "annotations" | "search" | "canvas" | "rotation" | "license" | "mapZoom" | "mapLat" | "mapLng" | "zoom" | "centerX" | "centerY" | "autoRotateOnSelect" | "clustering", string | null>>
-export [value] applyGeorefPatch: (search: string, patch: Partial<Record<"id" | "annotations" | "search" | "canvas" | "rotation" | "license" | "mapZoom" | "mapLat" | "mapLng" | "zoom" | "centerX" | "centerY" | "autoRotateOnSelect" | "clustering", string | null>>) => string
+export [value] annotationsOfSelection: <T extends { id: string; hitId?: string; }>(annotations: T[], selectedHit: null | string) => T[]
+export [value] annotationsParams: (on: boolean) => Partial<Record<"annotations" | "autoRotateOnSelect" | "canvas" | "centerX" | "centerY" | "clustering" | "id" | "license" | "mapLat" | "mapLng" | "mapZoom" | "rotation" | "search" | "zoom", null | string>>
+export [value] applyGeorefPatch: (search: string, patch: Partial<Record<"annotations" | "autoRotateOnSelect" | "canvas" | "centerX" | "centerY" | "clustering" | "id" | "license" | "mapLat" | "mapLng" | "mapZoom" | "rotation" | "search" | "zoom", null | string>>) => string
 export [value] applyMatrix: (m: M4, p: [number, number, number]) => [number, number, number]
 export [value] articleBodiesOf: (bodies: AnnotationBodyItem[]) => AnnotationBodyItem[]
-export [value] articleSandbox: (url: string, pageOrigin: string) => string | null
-export [value] authorizedUrl: (url: string, state: { phase: string; location?: AuthSubstitute | undefined; substitute?: AuthSubstitute | undefined; } | undefined) => string | null
-export [value] autoRotateOnSelectParams: (on: boolean) => Partial<Record<"id" | "annotations" | "search" | "canvas" | "rotation" | "license" | "mapZoom" | "mapLat" | "mapLng" | "zoom" | "centerX" | "centerY" | "autoRotateOnSelect" | "clustering", string | null>>
+export [value] articleSandbox: (url: string, pageOrigin: string) => null | string
+export [value] authorizedUrl: (url: string, state: undefined | { phase: string; location?: AuthSubstitute | undefined; substitute?: AuthSubstitute | undefined; }) => null | string
+export [value] autoRotateOnSelectParams: (on: boolean) => Partial<Record<"annotations" | "autoRotateOnSelect" | "canvas" | "centerX" | "centerY" | "clustering" | "id" | "license" | "mapLat" | "mapLng" | "mapZoom" | "rotation" | "search" | "zoom", null | string>>
 export [value] bboxOf: (rings: Point[][]) => Box
 export [value] bgrTensor: (px: Uint8ClampedArray<ArrayBufferLike>, w: number, h: number, mean: number[], std: number[]) => Float32Array<ArrayBufferLike>
 export [value] bodySearchParts: (b: AnnotationBodyItem, assumeHtml?: boolean) => string[]
@@ -1750,7 +1750,7 @@ export [value] canvasAnnotationTags: (a: Pick<CanvasAnnotation, "bodies">, local
 export [value] canvasBehaviorsOf: (manifest: unknown) => Map<string, string[]>
 export [value] canvasIdsOf: (manifest: unknown) => Set<string>
 export [value] canvasImagesOf: (canvas: unknown) => CanvasImages
-export [value] canvasParamTarget: (value: string | null | undefined, containers: ContainerInfo[]) => (CanvasTarget & { index: number; }) | null
+export [value] canvasParamTarget: (value: null | string | undefined, containers: ContainerInfo[]) => (CanvasTarget & { index: number; }) | null
 export [value] canvasRectToLayer: (p: Placement, rect: ImageRegion) => ImageRegion
 export [value] canvasTagFacets: (groups: { annotations: Pick<CanvasAnnotation, "bodies">[]; }[], locale: string) => Facet[]
 export [value] canvasThumbnail: (canvas: Json, region?: Region | undefined, size?: number) => string | undefined
@@ -1764,10 +1764,10 @@ export [value] chosenUrl: (model: PaintedModel, choices: Record<string, number>)
 export [value] chronologyOf: (entries: CollectionEntry[]) => Chronology
 export [value] clampZoom: (z: number) => number
 export [value] classColorOf: (out: InferenceOutput, label: string | undefined) => string | undefined
-export [value] clusterExpansionScale: (cluster: PointCluster, unitPx: number, box: { w: number; h: number; }, current: number, max: number, radius: number) => number | null
+export [value] clusterExpansionScale: (cluster: PointCluster, unitPx: number, box: { w: number; h: number; }, current: number, max: number, radius: number) => null | number
 export [value] clusterLevelScale: (scale: number) => number
 export [value] clusterPoints: (points: ClusterPoint[], pxPerUnit: number, radius: number) => PointCluster[]
-export [value] clusteringParams: (on: boolean) => Partial<Record<"id" | "annotations" | "search" | "canvas" | "rotation" | "license" | "mapZoom" | "mapLat" | "mapLng" | "zoom" | "centerX" | "centerY" | "autoRotateOnSelect" | "clustering", string | null>>
+export [value] clusteringParams: (on: boolean) => Partial<Record<"annotations" | "autoRotateOnSelect" | "canvas" | "centerX" | "centerY" | "clustering" | "id" | "license" | "mapLat" | "mapLng" | "mapZoom" | "rotation" | "search" | "zoom", null | string>>
 export [value] collectManifestAnnotations: (manifest: unknown, fetchJson: (url: string) => Promise<unknown>, { maxFetches, maxFollow, concurrency, signal, onProgress }?: CollectOptions) => Promise<CollectedAnnotations>
 export [value] collectionEntriesOf: (raw: unknown) => CollectionEntry[]
 export [value] collectionReader: SearchReader
@@ -1777,7 +1777,7 @@ export [value] computeFocusCamera: (input: FocusInput) => FocusResult
 export [value] containersOf: (manifest: ManifestV4 | null | undefined) => ContainerInfo[]
 export [value] contentParam: (manifestUrl: string) => string
 export [value] contentSearchAnnotationPage: (canvasId: string, matches: ContentSearchMatch[]) => Record<string, unknown>
-export [value] contentSearchTargetOf: (target: unknown) => { canvasId: string; xywh?: [number, number, number, number] | undefined; point?: [number, number, number] | undefined; } | undefined
+export [value] contentSearchTargetOf: (target: unknown) => undefined | { canvasId: string; xywh?: [number, number, number, number] | undefined; point?: [number, number, number] | undefined; }
 export [value] contentSearchUrl: (service: { id: string; }, q: string) => string
 export [value] contentStateOf: (json: unknown) => ContentStateTargets | null
 export [value] convertToV4: (manifest: unknown) => ManifestV4
@@ -1790,16 +1790,16 @@ export [value] curationMemberAt: (manifest: unknown, pos: number) => CanvasTarge
 export [value] curationReader: SearchReader
 export [value] curationSelectionsOf: (json: unknown) => CurationSelection[]
 export [value] curationToManifest: (curation: unknown, manifests: Map<string, unknown>, pos?: number) => Json | null
-export [value] decodeContentState: (value: string | null | undefined) => string | null
+export [value] decodeContentState: (value: null | string | undefined) => null | string
 export [value] decodeCtc: (prob: Float32Array<ArrayBufferLike>, T: number, C: number, chars: string[]) => { text: string; score: number; }
 export [value] decodeParseq: (logits: ArrayLike<number>, positions: number, chars: string[]) => string
-export [value] defaultCameraOf: (manifest: ManifestV4 | null | undefined, sceneId?: string | null | undefined) => DefaultCamera | null
-export [value] defaultChoiceIndex: (options: readonly Pick<MediaOption, "kind" | "format">[], canPlay: (format: string) => string) => number
+export [value] defaultCameraOf: (manifest: ManifestV4 | null | undefined, sceneId?: null | string | undefined) => DefaultCamera | null
+export [value] defaultChoiceIndex: (options: readonly Pick<MediaOption, "format" | "kind">[], canPlay: (format: string) => string) => number
 export [value] defaultVisible: (item: LayerItem) => boolean
 export [value] detailWidthOf: (layers: ImageLayer[]) => number | undefined
 export [value] discoveryReader: SearchReader
 export [value] distanceBetween: (a: readonly number[], b: readonly number[]) => number
-export [value] embeddedCanvasAnnotations: (manifest: ManifestV4 | null | undefined, canvasId: string, size?: { width?: number | undefined; height?: number | undefined; } | undefined) => CanvasAnnotation[]
+export [value] embeddedCanvasAnnotations: (manifest: ManifestV4 | null | undefined, canvasId: string, size?: undefined | { width?: number | undefined; height?: number | undefined; }) => CanvasAnnotation[]
 export [value] encodeContentState: (manifestUrl: string) => string
 export [value] facetsOf: (items: SearchItem[], query: string, selection: FacetSelection) => SearchFacet[]
 export [value] fallbackStyleOf: (anno: AnnotationStyleSource, order: string[]) => AnnotationStyles | null
@@ -1840,7 +1840,7 @@ export [value] hasAnnotationBody: (d: { text?: string | undefined; label?: strin
 export [value] hasChronology: (entries: CollectionEntry[]) => boolean
 export [value] hasToc: (manifest: unknown) => boolean
 export [value] highlightParts: (text: string, q: string) => { text: string; hit: boolean; }[]
-export [value] hitUnionXywh: (regions: ContentSearchRegion[], canvasId: string) => { box: [number, number, number, number]; count: number; } | undefined
+export [value] hitUnionXywh: (regions: ContentSearchRegion[], canvasId: string) => undefined | { box: [number, number, number, number]; count: number; }
 export [value] htmlSearchText: (html: string) => string
 export [value] htmlToText: (html: unknown) => string
 export [value] imageChoiceOf: (images: CanvasImages | undefined) => CanvasPainting | undefined
@@ -1848,9 +1848,9 @@ export [value] imageInfoUrl: (service: ImageServiceRef) => string
 export [value] imageLayerCount: (painting: PaintingContent[]) => number
 export [value] imageOfBody: (b: AnnotationBodyItem, locale: string) => AnnotationImage
 export [value] imageRegionOfBox: (box: ImageRegion, target: ImageRegion, imageWidth: number, imageHeight: number) => ImageRegion | null
-export [value] imageRequestUrl: (service: ImageServiceRef, region: ImageRegion | "full", outWidth: number, outHeight?: number | undefined) => string
-export [value] imageToCanvasOf: (layer: { target?: { x: number; y: number; w: number; h: number; } | undefined; regionSpec?: string | undefined; rotation: number; mirror: boolean; }, canvas: { width?: number | undefined; height?: number | undefined; }, imageWidth: number, imageHeight: number) => ImageToCanvas | null
-export [value] imageViewParams: (v: GeorefImageView) => Partial<Record<"id" | "annotations" | "search" | "canvas" | "rotation" | "license" | "mapZoom" | "mapLat" | "mapLng" | "zoom" | "centerX" | "centerY" | "autoRotateOnSelect" | "clustering", string | null>>
+export [value] imageRequestUrl: (service: ImageServiceRef, region: "full" | ImageRegion, outWidth: number, outHeight?: number | undefined) => string
+export [value] imageToCanvasOf: (layer: { target?: undefined | { x: number; y: number; w: number; h: number; }; regionSpec?: string | undefined; rotation: number; mirror: boolean; }, canvas: { width?: number | undefined; height?: number | undefined; }, imageWidth: number, imageHeight: number) => ImageToCanvas | null
+export [value] imageViewParams: (v: GeorefImageView) => Partial<Record<"annotations" | "autoRotateOnSelect" | "canvas" | "centerX" | "centerY" | "clustering" | "id" | "license" | "mapLat" | "mapLng" | "mapZoom" | "rotation" | "search" | "zoom", null | string>>
 export [value] imageViewToStage: (v: GeorefImageView, stage: StageGeometry, canvasWidth: number, canvasHeight: number, rotation?: number) => StageView
 export [value] infoCandidateOf: (json: unknown, url: string) => CompareCandidate | null
 export [value] inlineSharedServices: <T>(manifest: T) => T
@@ -1879,15 +1879,15 @@ export [value] kotenLines: (boxes: ArrayLike<number>, scores: ArrayLike<number>,
 export [value] labelIn: (label: unknown, locale: string) => string
 export [value] labelStrings: (label: unknown) => string[]
 export [value] languageMapOf: (label: unknown) => LanguageMap | undefined
-export [value] largestPart: (mask: ArrayLike<number>, w: number, h: number) => { mask: Uint8Array<ArrayBufferLike>; size: number; } | null
+export [value] largestPart: (mask: ArrayLike<number>, w: number, h: number) => null | { mask: Uint8Array<ArrayBufferLike>; size: number; }
 export [value] layerItemsOf: (paintings: CanvasPainting[]) => LayerItem[]
 export [value] layerOpacity: (item: LayerItem, settings: Record<string, LayerSetting>) => number
 export [value] layerThumbnailUrl: (layer: ImageLayer, height?: number) => string
 export [value] loadSearchSource: (ctx: Omit<ReadContext, "onPartial"> & { onPartial?: ((partial: SearchSource) => void) | undefined; }, readers?: SearchReader[]) => Promise<SearchSource>
-export [value] localNorthUpRotation: (pairs: GeorefPair[], index: number) => number | null
+export [value] localNorthUpRotation: (pairs: GeorefPair[], index: number) => null | number
 export [value] localizedString: (label: unknown, locale: string) => string
 export [value] mainTextBody: (bodies: AnnotationBodyItem[]) => AnnotationBodyItem | undefined
-export [value] manifestFromParams: (params: URLSearchParams) => string | null
+export [value] manifestFromParams: (params: URLSearchParams) => null | string
 export [value] manifestHasCanvasAnnotations: (manifest: unknown) => boolean
 export [value] manifestHasSearchableText: (manifest: ManifestV4 | null | undefined) => boolean
 export [value] manifestItemsOf: (manifest: unknown) => Json[]
@@ -1895,19 +1895,19 @@ export [value] manifestThumbnail: (manifest: Json, size?: number) => string | un
 export [value] manifestThumbnailOf: (raw: unknown, height?: number) => string | undefined
 export [value] mapBoundsOf: (places: MapPlace[]) => [number, number, number, number] | undefined
 export [value] mapPlacesOf: (resource: unknown, locale: string) => MapPlace[]
-export [value] mapViewParams: (v: GeorefMapView) => Partial<Record<"id" | "annotations" | "search" | "canvas" | "rotation" | "license" | "mapZoom" | "mapLat" | "mapLng" | "zoom" | "centerX" | "centerY" | "autoRotateOnSelect" | "clustering", string | null>>
+export [value] mapViewParams: (v: GeorefMapView) => Partial<Record<"annotations" | "autoRotateOnSelect" | "canvas" | "centerX" | "centerY" | "clustering" | "id" | "license" | "mapLat" | "mapLng" | "mapZoom" | "rotation" | "search" | "zoom", null | string>>
 export [value] maskToPolygon: (mask: ArrayLike<number>, w: number, h: number, eps?: number) => XY[] | null
 export [value] matchTarget: (targets: (CanvasTarget & { manifestUrl?: string | undefined; })[], containers: ContainerInfo[]) => (CanvasTarget & { index: number; }) | null
 export [value] matchTargets: (targets: (CanvasTarget & { manifestUrl?: string | undefined; })[], containers: ContainerInfo[]) => (CanvasTarget & { index: number; })[]
-export [value] matchesCanvasAnnotation: (a: Pick<CanvasAnnotation, "title" | "bodies" | "resources">, terms: string[], tags: string[], locale: string) => boolean
+export [value] matchesCanvasAnnotation: (a: Pick<CanvasAnnotation, "bodies" | "resources" | "title">, terms: string[], tags: string[], locale: string) => boolean
 export [value] matchesQuery: (item: SearchItem, query: string) => boolean
 export [value] matchesSearchTerms: (text: string, terms: string[]) => boolean
 export [value] mediaTimeAt: (item: TimelineItem, t: number) => number
 export [value] memberManifestUrlsOf: (raw: unknown) => string[]
-export [value] mergedScheme: (info: ImageInfo, scheme: { width: number; height: number; }) => { width: number; height: number; } | null
+export [value] mergedScheme: (info: ImageInfo, scheme: { width: number; height: number; }) => null | { width: number; height: number; }
 export [value] metadataRecordOf: (metadata: unknown, locale: string) => Record<string, string[]>
 export [value] moveLayer: (ids: string[], id: string, to: number) => string[]
-export [value] navDateKey: (iso: string | undefined) => { year: number; key: number; } | null
+export [value] navDateKey: (iso: string | undefined) => null | { year: number; key: number; }
 export [value] navDateText: (iso: string, locale: string) => string
 export [value] navigableTree: (nodes: TocNode[]) => TocNode[]
 export [value] ndlDetTensor: (square: Uint8ClampedArray<ArrayBufferLike>, side: number) => Float32Array<ArrayBufferLike>
@@ -1916,21 +1916,21 @@ export [value] ndlOcrLines: (labels: ArrayLike<number>, boxes: ArrayLike<number>
 export [value] ndlOcrRegions: (labels: ArrayLike<number>, boxes: ArrayLike<number>, scores: ArrayLike<number>, charCount: ArrayLike<number>, W: number, H: number) => { x: number; y: number; w: number; h: number; score: number; label: string; }[]
 export [value] ndlParseqTensor: (px: Uint8ClampedArray<ArrayBufferLike>, w: number, h: number, width: number) => Float32Array<ArrayBufferLike>
 export [value] nextPageOf: (page: unknown) => string | undefined
-export [value] nextPlaybackStep: (step: number, count: number, loop: boolean) => number | null
+export [value] nextPlaybackStep: (step: number, count: number, loop: boolean) => null | number
 export [value] nextZoomDistance: (current: number, zoomIn: boolean, factor: number, limits: ZoomLimits) => number
 export [value] niceInterval: (pixelsPerUnit: number, targetPx?: number) => number
 export [value] nms: (boxes: ArrayLike<number>, scores: ArrayLike<number>, o: NmsOptions) => number[]
 export [value] normalizeAngle: (degrees: number) => number
 export [value] normalizeSearchText: (s: string) => string
-export [value] northUpRotation: (pairs: GeorefPair[]) => number | null
-export [value] openingStep: (story: Story, index: number, selected: string | null) => number | null
+export [value] northUpRotation: (pairs: GeorefPair[]) => null | number
+export [value] openingStep: (story: Story, index: number, selected: null | string) => null | number
 export [value] orderLayers: (items: LayerItem[], order: string[] | undefined) => LayerItem[]
 export [value] orderOf: (containers: ContainerInfo[], sequence?: SequenceInfo | null | undefined) => number[]
 export [value] otherBodies: (bodies: AnnotationBodyItem[]) => AnnotationBodyItem[]
 export [value] overlayCorners: (points: ControlPoint[], width: number, height: number) => LngLat[] | null
 export [value] pageMarksOf: (page: Record<string, unknown> | undefined) => PageMark[]
-export [value] pageMediaOf: (c: Pick<ContainerInfo, "kind" | "painting">) => MediaKind | "empty"
-export [value] pagePlaceholderOf: (c: Pick<ContainerInfo, "kind" | "painting">) => ContainerKind | "empty"
+export [value] pageMediaOf: (c: Pick<ContainerInfo, "kind" | "painting">) => "empty" | MediaKind
+export [value] pagePlaceholderOf: (c: Pick<ContainerInfo, "kind" | "painting">) => "empty" | ContainerKind
 export [value] pageThumbnailUrl: (container: ContainerInfo, rawCanvas?: unknown, height?: number) => string | undefined
 export [value] paintedModelsOf: (scene: SceneV4 | undefined) => PaintedModel[]
 export [value] paintsImage: (p: CanvasPainting) => boolean
@@ -1941,12 +1941,12 @@ export [value] parseAlignment: (json: unknown) => Alignment
 export [value] parseAnnotationCss: (css: unknown) => StyleRules
 export [value] parseAutocompleteResponse: (response: unknown, locale?: string) => ContentSearchTerm[]
 export [value] parseContentSearchResponse: (response: unknown) => ContentSearchPage
-export [value] parseContentState: (value: string | null | undefined) => ContentStateTargets | null
+export [value] parseContentState: (value: null | string | undefined) => ContentStateTargets | null
 export [value] parseDroppedText: (text: string) => ContentStateTargets | null
-export [value] parseFragment: (fragment: string | null | undefined) => Fragment
+export [value] parseFragment: (fragment: null | string | undefined) => Fragment
 export [value] parseImageInfo: (json: unknown) => ImageInfo | null
-export [value] parseImageXywh: (value: string, canvas?: { width?: number | undefined; height?: number | undefined; } | undefined) => ImageRegion | undefined
-export [value] parseManifestV4: (manifest: ManifestV4, sceneId?: string | null | undefined, locale?: string) => ParsedManifest
+export [value] parseImageXywh: (value: string, canvas?: undefined | { width?: number | undefined; height?: number | undefined; }) => ImageRegion | undefined
+export [value] parseManifestV4: (manifest: ManifestV4, sceneId?: null | string | undefined, locale?: string) => ParsedManifest
 export [value] parseProbeResult: (json: unknown, locale?: string) => AuthProbeResult | null
 export [value] parseRegionFragment: (input: string) => Region | null
 export [value] parseRotation: (value: unknown) => { rotation: number; mirror: boolean; }
@@ -1954,7 +1954,7 @@ export [value] parseStyleClasses: (value: unknown) => string[]
 export [value] parseTimeFragment: (input: string) => TimeRange | null
 export [value] parseTokenMessage: (data: unknown, messageId: string, locale?: string) => AuthTokenMessage | null
 export [value] parseVtt: (text: string) => VttCue[]
-export [value] parseVttTime: (s: string) => number | null
+export [value] parseVttTime: (s: string) => null | number
 export [value] parseXywh: (fragment: string, canvasW?: number | undefined, canvasH?: number | undefined) => Box | null
 export [value] parseqTensor: (px: Uint8ClampedArray<ArrayBufferLike>, w: number, h: number, W: number, H: number) => Float32Array<ArrayBufferLike>
 export [value] pathPoints: (d: string) => Point[][]
@@ -1985,8 +1985,8 @@ export [value] rawCanvasOf: (manifest: unknown, canvasId: string) => Json | unde
 export [value] rawContainerOf: (manifest: unknown, id: string) => Json | undefined
 export [value] readAnnotationBodies: (anno: Json) => AnnotationBodyItem[]
 export [value] readAnnotationResources: (bodies: AnnotationBodyItem[], seeAlso?: unknown) => AnnotationResource[]
-export [value] readCanvasAnnotations: (canvasId: string, pages: unknown[], canvasSize?: { width?: number | undefined; height?: number | undefined; } | undefined, canvasIds?: ReadonlySet<string> | undefined, options?: { hitIds?: boolean | undefined; } | undefined) => CanvasAnnotation[]
-export [value] readGeorefParams: (params: URLSearchParams, manifestFromOther: string | null) => GeorefUrlState
+export [value] readCanvasAnnotations: (canvasId: string, pages: unknown[], canvasSize?: undefined | { width?: number | undefined; height?: number | undefined; }, canvasIds?: ReadonlySet<string> | undefined, options?: undefined | { hitIds?: boolean | undefined; }) => CanvasAnnotation[]
+export [value] readGeorefParams: (params: URLSearchParams, manifestFromOther: null | string) => GeorefUrlState
 export [value] readStylesheetField: (value: unknown) => { styleRules?: StyleRules | undefined; stylesheetUrl?: string | undefined; }
 export [value] readerFor: (json: unknown, readers?: SearchReader[]) => SearchReader | undefined
 export [value] readingOrder: <T extends LineDetection>(lines: T[]) => ReadingOrderResult<T>
@@ -2010,12 +2010,12 @@ export [value] rgbTensor: (px: Uint8ClampedArray<ArrayBufferLike>, w: number, h:
 export [value] rotateLeft: (px: Uint8ClampedArray<ArrayBufferLike>, w: number, h: number) => Uint8ClampedArray<ArrayBufferLike>
 export [value] rotatedBounds: (w: number, h: number, degrees: number) => { w: number; h: number; }
 export [value] rotationFromCss: (css: string, styleClass: string | undefined) => number | undefined
-export [value] rotationParams: (rotation: number) => Partial<Record<"id" | "annotations" | "search" | "canvas" | "rotation" | "license" | "mapZoom" | "mapLat" | "mapLng" | "zoom" | "centerX" | "centerY" | "autoRotateOnSelect" | "clustering", string | null>>
+export [value] rotationParams: (rotation: number) => Partial<Record<"annotations" | "autoRotateOnSelect" | "canvas" | "centerX" | "centerY" | "clustering" | "id" | "license" | "mapLat" | "mapLng" | "mapZoom" | "rotation" | "search" | "zoom", null | string>>
 export [value] rulerGeometry: (physdim: Physdim, unit: DisplayUnit, canvas: { w: number; h: number; }, stage: { scale: number; tx: number; ty: number; stageW: number; stageH: number; boxW: number; boxH: number; }) => RulerGeometry
 export [value] runContentSearch: (service: { id: string; }, q: string, fetchJson: ContentSearchFetch, { maxPages, maxMatches, signal, onPage }?: RunContentSearchOptions) => Promise<ContentSearchResult>
 export [value] runFocusFlight: (deps: FocusFlightDeps, position: Vec3, target: Vec3) => void
 export [value] safeAboutUrl: (raw: string) => string
-export [value] safeAnnotationUrl: (raw: string) => string | null
+export [value] safeAnnotationUrl: (raw: string) => null | string
 export [value] sam2BoxInput: (b: Sam2Box, crop: Sam2Box) => number[]
 export [value] sam2Crop: (b: Sam2Box, w: number, h: number, context?: number, min?: number) => Sam2Box
 export [value] sam2MaskToCrop: (logits: ArrayLike<number>, cw: number, ch: number, m?: number) => Uint8Array<ArrayBufferLike>
@@ -2028,21 +2028,21 @@ export [value] sanitizeAnnotationHtml: (html: string) => string
 export [value] sanitizeDeclaration: (property: string, value: string) => [string, string] | null
 export [value] sanitizeTemporalHtml: (html: string) => string
 export [value] sceneCamerasInScene: (scene: SceneV4 | undefined) => SceneCamera[]
-export [value] sceneCamerasOf: (manifest: ManifestV4 | null | undefined, sceneId?: string | null | undefined) => SceneCamera[]
-export [value] sceneOf: (manifest: ManifestV4 | null | undefined, sceneId?: string | null | undefined) => SceneV4 | undefined
-export [value] sceneSpatialScaleOf: (manifest: ManifestV4 | null | undefined, sceneId?: string | null | undefined) => SpatialScale | undefined
+export [value] sceneCamerasOf: (manifest: ManifestV4 | null | undefined, sceneId?: null | string | undefined) => SceneCamera[]
+export [value] sceneOf: (manifest: ManifestV4 | null | undefined, sceneId?: null | string | undefined) => SceneV4 | undefined
+export [value] sceneSpatialScaleOf: (manifest: ManifestV4 | null | undefined, sceneId?: null | string | undefined) => SpatialScale | undefined
 export [value] sceneStoryAnnotationsOf: (scene: SceneV4 | undefined) => SceneStoryAnnotation[]
-export [value] scrollOf: (story: Story, size: { width?: number | undefined; height?: number | undefined; } | undefined) => StoryScroll | null
+export [value] scrollOf: (story: Story, size: undefined | { width?: number | undefined; height?: number | undefined; }) => StoryScroll | null
 export [value] searchLocalAnnotations: (sources: LocalSearchSource[], q: string, maxMatches?: number) => ContentSearchMatch[]
 export [value] searchSceneAnnotations: (annotations: Annotation[], sceneId: string, q: string, maxMatches?: number) => ContentSearchMatch[]
 export [value] searchTerms: (query: string) => string[]
 export [value] searchTranscripts: (sources: TranscriptSource[], q: string, maxMatches?: number) => ContentSearchMatch[]
-export [value] selectedHitOf: (selected: string | null, annotations: { id: string; hitId?: string | undefined; }[]) => string | null
+export [value] selectedHitOf: (selected: null | string, annotations: { id: string; hitId?: string | undefined; }[]) => null | string
 export [value] selectionKeyOf: (a: { id: string; hitId?: string | undefined; }) => string
 export [value] sequencesOf: (manifest: unknown) => SequenceInfo[]
 export [value] serviceFromImageUrl: (url: string) => string | undefined
 export [value] shufflePuzzle: (n: number, random?: () => number) => PuzzleBoard
-export [value] sideTabParams: (tab: GeorefSideTab) => Partial<Record<"id" | "annotations" | "search" | "canvas" | "rotation" | "license" | "mapZoom" | "mapLat" | "mapLng" | "zoom" | "centerX" | "centerY" | "autoRotateOnSelect" | "clustering", string | null>>
+export [value] sideTabParams: (tab: GeorefSideTab) => Partial<Record<"annotations" | "autoRotateOnSelect" | "canvas" | "centerX" | "centerY" | "clustering" | "id" | "license" | "mapLat" | "mapLng" | "mapZoom" | "rotation" | "search" | "zoom", null | string>>
 export [value] simplifyRing: (ring: XY[], eps: number) => XY[]
 export [value] singleImageUrl: (service: ImageServiceRef, info: ImageInfo, neededWidth: number) => string
 export [value] sizeParam: (w: number, h: number, size: number) => string
@@ -2053,9 +2053,9 @@ export [value] splitId: (id: string) => { id: string; fragment: Fragment; }
 export [value] stageToImageView: (view: StageView, stage: StageGeometry, canvasWidth: number, canvasHeight: number) => GeorefImageView
 export [value] startOf: (manifest: unknown, containers: ContainerInfo[]) => StartInfo | null
 export [value] stepArrows: (direction: ViewingDirection) => StepArrows
-export [value] stepAt: (scroll: StoryScroll, x: number) => number | null
-export [value] stepInName: (url: string) => number | null
-export [value] stepTarget: (step: StoryStep, canvasSize?: { width?: number | undefined; height?: number | undefined; } | undefined) => CanvasTarget
+export [value] stepAt: (scroll: StoryScroll, x: number) => null | number
+export [value] stepInName: (url: string) => null | number
+export [value] stepTarget: (step: StoryStep, canvasSize?: undefined | { width?: number | undefined; height?: number | undefined; }) => CanvasTarget
 export [value] stepText: (step: StoryStep, locale: string) => { heading?: string | undefined; bodies: AnnotationBodyItem[]; }
 export [value] storyBodies: (step: StoryStep, locale: string) => AnnotationBodyItem[]
 export [value] storyOf: (manifest: ManifestV4 | null | undefined, locale?: string) => Story | null
@@ -2069,10 +2069,10 @@ export [value] targetRegionOf: (target: unknown) => Region | null
 export [value] targetTimeOf: (target: unknown) => TimeRange | null
 export [value] thumbnailOf: (image: AnnotationImage, size?: number) => string
 export [value] thumbnailUrlOf: (thumbnail: unknown, height?: number) => string | undefined
-export [value] tileSchemeOf: (info: ImageInfo) => { width: number; height: number; scaleFactors: number[]; } | null
+export [value] tileSchemeOf: (info: ImageInfo) => null | { width: number; height: number; scaleFactors: number[]; }
 export [value] tilesCovering: (service: ImageServiceRef, info: ImageInfo, scheme: { width: number; height: number; }, scaleFactor: number, visible: ImageRegion, limit?: number, keyPrefix?: string) => Tile[]
 export [value] tilesFor: (view: MapView, width: number, height: number, template: string) => MapTile[]
-export [value] tilesForRegion: (service: ImageServiceRef, info: ImageInfo, scheme: { width: number; height: number; scaleFactors: number[]; }, region: ImageRegion, longSide: number, limit?: number) => { scaleFactor: number; tiles: Tile[]; } | null
+export [value] tilesForRegion: (service: ImageServiceRef, info: ImageInfo, scheme: { width: number; height: number; scaleFactors: number[]; }, region: ImageRegion, longSide: number, limit?: number) => null | { scaleFactor: number; tiles: Tile[]; }
 export [value] tilesForView: (service: ImageServiceRef, info: ImageInfo, scheme: { width: number; height: number; scaleFactors: number[]; }, screenPxPerSourcePx: number, visible: ImageRegion, limit?: number) => Tile[]
 export [value] timedCaptionsOf: (container: unknown) => TimedCaptions[]
 export [value] timedTextsOf: (container: unknown) => TimedText[]
@@ -2090,7 +2090,7 @@ export [value] transformMatrixOf: (transform: unknown) => M4 | undefined
 export [value] unitFactor: (from: SourceUnit, to: DisplayUnit) => number
 export [value] unproject: ([x, y]: [number, number]) => LngLat
 export [value] upgradeToV3: (json: unknown) => unknown
-export [value] upgradeUrl: (model: PaintedModel, choices: Record<string, number>) => string | null
+export [value] upgradeUrl: (model: PaintedModel, choices: Record<string, number>) => null | string
 export [value] valuesIn: (map: unknown, locale: string) => string[]
 export [value] viewingOf: (manifest: unknown) => ViewingInfo
 export [value] warpAt: (w: AlignWarp, x: number, y: number) => [number, number]
@@ -2103,7 +2103,7 @@ export [value] yoloDecode: (data: ArrayLike<number>, channels: number, n: number
 export [value] yoloPlace: (sx: number, sy: number, sw: number, sh: number, size: number) => YoloPlacement
 export [value] yoloTensor: (px: Uint8ClampedArray<ArrayBufferLike>, size: number) => Float32Array<ArrayBufferLike>
 export [value] yoloTiles: (w: number, h: number, size: number, overlap?: number) => YoloPlacement[]
-export [value] youTubeIdOf: (url: string) => string | null
+export [value] youTubeIdOf: (url: string) => null | string
 export [value] youTubeStartOf: (url: string) => number
 export [value] zoomAround: (view: MapView, delta: number, px: [number, number], width: number, height: number) => MapView
 export [value] zoomLimitsFor: (radius: number) => ZoomLimits
@@ -2127,7 +2127,7 @@ export [type] interface ViewHandle {
     top: () => void;
     goTo: (cam: DefaultCamera) => void;
 }
-export [value] resolveSceneEnvironment: (option: string | null | undefined) => SceneEnvironmentKind
+export [value] resolveSceneEnvironment: (option: null | string | undefined) => SceneEnvironmentKind
 export [value] sceneDisplay: Display
 
 // ===== referenced types (not exported by name, reachable from the declarations above) =====
