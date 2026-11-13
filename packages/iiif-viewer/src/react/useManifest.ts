@@ -100,6 +100,35 @@ export async function loadManifest(
   return 'shown';
 }
 
+// The load of the iiif-content in flight (a token), or null. While it is in flight, opening an entry is
+// dropped: the new iiif-content always wins over a move inside what was shown before.
+const contentLoadAtom = atom<object | null>(null);
+
+/** True while the iiif-content given to the viewer is being read. */
+export const isContentLoading = (store: Store): boolean => store.get(contentLoadAtom) !== null;
+
+/** Read the iiif-content given to the viewer and show it. Moves started meanwhile are dropped, not this load. */
+export async function loadContent(store: Store, url: string, locale: () => string): Promise<'shown' | 'failed' | 'stale'> {
+  store.set(manifestUrlAtom, url);
+  const token = {};
+  store.set(contentLoadAtom, token);
+  const done = () => {
+    if (store.get(contentLoadAtom) === token) store.set(contentLoadAtom, null);
+  };
+  try {
+    // done before it is shown: what is shown (a content state Annotation) may open its manifest right away
+    return await loadManifest(store, url, locale, done);
+  } finally {
+    done();
+  }
+}
+
+/** Stop waiting for the iiif-content load in flight (the viewer got another iiif-content, or was removed). */
+export function cancelContentLoad(store: Store): void {
+  store.set(contentLoadAtom, null);
+  beginLoad(store);
+}
+
 /** The locale, read when called (not a dependency of effects). */
 export function useLocaleRef(): { readonly current: string } {
   const locale = useLocale();
@@ -121,15 +150,14 @@ export function useManifest(iiifContent: string | null): { failed: boolean } {
   // only a new iiif-content reads again (a new locale must not send the reader back to the top of a Collection)
   useEffect(() => {
     if (!iiifContent) return;
-    store.set(manifestUrlAtom, iiifContent);
     let cancelled = false;
-    void loadManifest(store, iiifContent, () => localeRef.current).then((result) => {
+    void loadContent(store, iiifContent, () => localeRef.current).then((result) => {
       if (!cancelled && result === 'failed') setFailedUrl(iiifContent);
     });
     return () => {
       cancelled = true;
       // a load (or a move inside a Collection) still in flight is for the old iiif-content
-      beginLoad(store);
+      cancelContentLoad(store);
     };
   }, [iiifContent, store, localeRef]);
 

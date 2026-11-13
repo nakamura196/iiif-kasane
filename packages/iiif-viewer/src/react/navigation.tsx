@@ -45,3 +45,16 @@ export const targetKey = (target: ViewerTarget | undefined): string =>
   target
     ? `${target.canvasId ?? ''}#${target.xywh?.join(',') ?? ''}#${target.highlight === false ? 0 : 1}#${target.t ?? ''}#${target.play ? 1 : 0}`
     : '';
+
+/**
+ * Whether the host page's `target` is applied now. It is applied once per shown manifest and target value,
+ * except to a manifest shown again by going back with the same target: the reader returns to the page they were on.
+ */
+export function shouldApplyTarget(
+  last: { manifestId: string; key: string } | null,
+  now: { manifestId: string; key: string; restored: boolean },
+): boolean {
+  if (last && last.manifestId === now.manifestId && last.key === now.key) return false;
+  if (now.restored && last?.key === now.key) return false;
+  return true;
+}

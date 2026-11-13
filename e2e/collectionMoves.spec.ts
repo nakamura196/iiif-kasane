@@ -78,19 +78,24 @@ const collection = {
 
 const cors = { 'access-control-allow-origin': '*' };
 
-async function serve(page: Page, delays: Record<string, number> = {}) {
+/** Serve the data. A manifest named in `held` is answered only when the test calls its release function. */
+async function serve(page: Page, held: Record<string, Promise<void>> = {}) {
   await page.route(`${BASE}/**`, async (route) => {
     const url = route.request().url();
     if (url.endsWith('/collection.json')) return route.fulfill({ json: collection, headers: cors });
     const m = /\/([ab])\.json$/.exec(url);
     if (m) {
-      if (delays[m[1]]) await new Promise((r) => setTimeout(r, delays[m[1]]));
+      await held[m[1]];
       return route.fulfill({ json: manifests[m[1]], headers: cors });
     }
     if (url.endsWith('.png')) return route.fulfill({ body: PNG, contentType: 'image/png', headers: cors });
     return route.fulfill({ status: 404, headers: cors });
   });
 }
+
+// let the page handle what has arrived (parse, state updates, render) before asserting that nothing changed
+const settle = (page: Page) =>
+  page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))));
 
 const open = (page: Page) => page.goto(`/en/viewer/?iiif-content=${encodeURIComponent(`${BASE}/collection.json`)}`);
 const pager = (page: Page) => page.getByRole('group', { name: 'Page navigation' });
@@ -111,8 +116,18 @@ test('an entry opened after another starts at its first page', async ({ page }) 
   await expect(pager(page)).toContainText('1 / 4');
 });
 
+test('the page arguments of the URL are not applied to an entry opened from the Collection', async ({ page }) => {
+  await serve(page);
+  // ?canvas=3 points into what the URL opens (the Collection), not into its entries
+  await page.goto(`/en/viewer/?iiif-content=${encodeURIComponent(`${BASE}/collection.json`)}&canvas=3`);
+  await page.getByRole('button', { name: /Alpha/ }).click();
+  await expect(pager(page)).toContainText('/ 3');
+  await expect(pager(page)).toContainText('1 / 3');
+});
+
 test('of two entries clicked quickly, the last one is shown even when the first answers later', async ({ page }) => {
-  await serve(page, { a: 1500 });
+  let releaseAlpha = () => {};
+  await serve(page, { a: new Promise<void>((r) => (releaseAlpha = r)) });
   await open(page);
   const alpha = page.getByRole('button', { name: /Alpha/ });
   const beta = page.getByRole('button', { name: /Beta/ });
@@ -120,8 +135,11 @@ test('of two entries clicked quickly, the last one is shown even when the first 
   await alpha.click();
   await beta.click();
   await expect(pager(page)).toContainText('1 / 4');
-  // the late answer for Alpha has arrived by now; Beta must still be shown
-  await page.waitForTimeout(2500);
+  // now Alpha answers, after Beta is shown; Beta must stay
+  const alphaAnswer = page.waitForResponse((r) => r.url() === `${BASE}/a.json`);
+  releaseAlpha();
+  await (await alphaAnswer).finished();
+  await settle(page);
   await expect(pager(page)).toContainText('1 / 4');
 });
 
@@ -184,7 +202,8 @@ test('changing the locale of <iiif-kasane> keeps the opened entry and its page',
   const ja = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../packages/iiif-viewer/src/react/messages/features/structure.ja.json'), 'utf8'));
   const jaPager = page.getByRole('group', { name: ja.Structure.pager });
   await expect(jaPager).toBeVisible();
-  // give a reload (the bug) time to come back to the top of the Collection
-  await page.waitForTimeout(1500);
+  // a reload (the bug) would read the Collection from the cache and show its entries again
+  await settle(page);
   await expect(jaPager).toContainText('2 / 4');
+  await expect(page.getByRole('button', { name: /Alpha/ })).toHaveCount(0);
 });

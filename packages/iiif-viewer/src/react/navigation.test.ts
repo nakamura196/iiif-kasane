@@ -2,7 +2,7 @@ import { createElement, type FunctionComponent } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { ViewerEnv } from './env';
-import { CanvasNavigationContext, indexOfCanvas, targetKey } from './navigation';
+import { CanvasNavigationContext, indexOfCanvas, shouldApplyTarget, targetKey } from './navigation';
 import AnnotationBody from './annotation/AnnotationBody';
 
 describe('indexOfCanvas', () => {
@@ -59,5 +59,21 @@ describe('annotation link body', () => {
     const html = render('https://example.org/x', new Map());
     expect(html).toContain('<a ');
     expect(html).toContain('target="_blank"');
+  });
+});
+
+describe('shouldApplyTarget', () => {
+  const key = 'https://e/c1';
+  it('applies a target once per manifest and value', () => {
+    expect(shouldApplyTarget(null, { manifestId: 'a', key, restored: false })).toBe(true);
+    expect(shouldApplyTarget({ manifestId: 'a', key }, { manifestId: 'a', key, restored: false })).toBe(false);
+    expect(shouldApplyTarget({ manifestId: 'a', key }, { manifestId: 'b', key, restored: false })).toBe(true);
+  });
+  it('leaves a manifest shown again by going back on the page the reader was on', () => {
+    // target X, open another manifest, go back: the restored page stays
+    expect(shouldApplyTarget({ manifestId: 'b', key }, { manifestId: 'a', key, restored: true })).toBe(false);
+  });
+  it('still applies a new target from the host to a restored manifest', () => {
+    expect(shouldApplyTarget({ manifestId: 'b', key }, { manifestId: 'a', key: 'https://e/c2', restored: true })).toBe(true);
   });
 });

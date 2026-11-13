@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createStore } from 'jotai';
 import { manifestAtom, manifestUrlAtom, shownManifestAtom } from '../atoms';
-import { loadManifest } from '../useManifest';
+import { loadContent } from '../useManifest';
 import { compareAtom, focusAtom, goBack, openManifest, pickedPageAtom, trailAtom } from './structureState';
 
-// Moves inside a Collection (openManifest) and the first load (loadManifest), checked on a jotai store alone.
+// Moves inside a Collection (openManifest) and the first load (loadContent), checked on a jotai store alone.
 // fetch is replaced, and each test decides the order of the answers.
 
 const manifestJson = (id: string) => ({
@@ -67,7 +67,7 @@ describe('openManifest', () => {
   it('is dropped when a new iiif-content starts loading meanwhile', async () => {
     const store = createStore();
     const entry = openManifest(store, url('entry'), true, locale);
-    const top = loadManifest(store, url('other-top'), locale);
+    const top = loadContent(store, url('other-top'), locale);
     await answer(url('other-top'));
     await answer(url('entry'));
     expect(await top).toBe('shown');
@@ -75,21 +75,20 @@ describe('openManifest', () => {
     expect(store.get(shownManifestAtom)?.url).toBe(url('other-top'));
   });
 
-  it('does not let a slow first load replace an entry opened after it', async () => {
+  it('lets a new iiif-content still being read win over an entry opened meanwhile', async () => {
     const store = createStore();
-    const top = loadManifest(store, url('top'), locale);
+    const top = loadContent(store, url('top'), locale);
     const entry = openManifest(store, url('entry'), false, locale);
-    await answer(url('entry'));
+    expect(await entry).toBe('stale');
     await answer(url('top'));
-    expect(await top).toBe('stale');
-    await entry;
-    expect(store.get(shownManifestAtom)?.url).toBe(url('entry'));
+    expect(await top).toBe('shown');
+    expect(store.get(shownManifestAtom)?.url).toBe(url('top'));
   });
 
   it('keeps the served JSON with the shown manifest, and puts the one being left on the trail', async () => {
     const store = createStore();
     store.set(manifestUrlAtom, url('collection'));
-    const top = loadManifest(store, url('collection'), locale);
+    const top = loadContent(store, url('collection'), locale);
     await answer(url('collection'));
     await top;
     const entry = openManifest(store, url('entry'), true, locale);
@@ -115,7 +114,7 @@ describe('openManifest', () => {
   it('drops an entry still loading when the reader goes back', async () => {
     const store = createStore();
     store.set(manifestUrlAtom, url('collection'));
-    const top = loadManifest(store, url('collection'), locale);
+    const top = loadContent(store, url('collection'), locale);
     await answer(url('collection'));
     await top;
     const first = openManifest(store, url('first'), true, locale);
@@ -131,7 +130,7 @@ describe('openManifest', () => {
   it('counts each shown manifest, also the same one shown again', async () => {
     const store = createStore();
     store.set(manifestUrlAtom, url('collection'));
-    const top = loadManifest(store, url('collection'), locale);
+    const top = loadContent(store, url('collection'), locale);
     await answer(url('collection'));
     await top;
     const s1 = store.get(shownManifestAtom)!.seq;
@@ -145,7 +144,7 @@ describe('openManifest', () => {
   it('goes back to the page the reader was on', async () => {
     const store = createStore();
     store.set(manifestUrlAtom, url('top'));
-    const top = loadManifest(store, url('top'), locale);
+    const top = loadContent(store, url('top'), locale);
     await answer(url('top'));
     await top;
     // the reader is on the third page of what is shown

@@ -62,10 +62,10 @@ function targetsOf(ctx: PanelContext): Targets {
     const { geoCanvasId, geoFeatures } = parseManifestV4(manifest);
     t = {
       hasGeo: !!geoCanvasId || geoFeatures.length > 0,
-      galleryOk: rawManifest != null && canOpenInGallery(rawManifest),
-      browseOk: rawManifest != null && canOpenInBrowse(rawManifest),
+      galleryOk: canOpenInGallery(rawManifest),
+      browseOk: canOpenInBrowse(rawManifest),
     };
-    if (rawManifest != null) targetsCache.set(manifest, t);
+    targetsCache.set(manifest, t);
   }
   return t;
 }

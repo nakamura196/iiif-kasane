@@ -20,7 +20,7 @@ import {
   type ViewingInfo,
 } from '../../core';
 import { manifestUrlAtom, shownManifestAtom } from '../atoms';
-import { loadManifest, showManifest, useLocaleRef } from '../useManifest';
+import { isContentLoading, loadManifest, showManifest, useLocaleRef } from '../useManifest';
 
 /** 移動の依頼（右パネルの目次などが出し、ContainerList が受ける）。 */
 export interface NavRequest {
@@ -72,6 +72,12 @@ export const trailAtom = atom<{ owner: string | null; items: TrailItem[] }>({ ow
  */
 export const pickedPageAtom = atom<{ shown: number; index: number }>({ shown: 0, index: 0 });
 
+/**
+ * The iiif-content whose page URL arguments (?canvas=, ?pos=, a content state in ?iiif-content=) were used.
+ * They point into the first manifest shown for it, not into the entries opened from it afterwards.
+ */
+export const urlTargetsUsedForAtom = atom<string | null>(null);
+
 /** seq of a manifest shown again by going back: its first page is not chosen again from content state or `start`. */
 export const restoredSeqAtom = atom<number | null>(null);
 
@@ -120,9 +126,12 @@ export type OpenResult = 'shown' | 'failed' | 'stale';
 /**
  * Open the manifest (or Collection) at the URL in the viewer of this store. With push, "back" returns
  * to what is shown now. Only the latest request is shown: when another open, a back or a new
- * iiif-content comes before this one is read, this one is dropped ('stale').
+ * iiif-content comes before this one is read, this one is dropped ('stale'). It is also dropped at once while
+ * a new iiif-content is being read.
  */
 export async function openManifest(store: Store, url: string, push: boolean, locale: () => string): Promise<OpenResult> {
+  // a new iiif-content is being read: it wins, and this move (inside what was shown before) is dropped
+  if (isContentLoading(store)) return 'stale';
   return loadManifest(store, url, locale, () => {
     const here = store.get(shownManifestAtom);
     if (push && here) {

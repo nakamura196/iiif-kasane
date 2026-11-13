@@ -103,10 +103,11 @@ const ViewerContent: NextPage = () => {
     [setManifestUrl],
   );
 
-  // the Canvas ids of the item in the URL, for a puzzle link (?puzzle=)
+  // the Canvas ids of the item in the URL, read only for a puzzle link (?puzzle=)
+  const wantsCanvasIds = !!puzzleLink;
   useEffect(() => {
     setCanvasIds([]);
-    if (!manifestUrl) return;
+    if (!manifestUrl || !wantsCanvasIds) return;
     let cancelled = false;
     fetchManifest(manifestUrl)
       .then((raw) => {
@@ -117,7 +118,7 @@ const ViewerContent: NextPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [manifestUrl]);
+  }, [manifestUrl, wantsCanvasIds]);
 
   // When the puzzle is closed, remove the link's arguments (so that a reload or going back does not open it again)
   const closePuzzleLink = useCallback(() => {

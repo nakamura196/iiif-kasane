@@ -13,11 +13,12 @@ import {
 import { Provider, createStore, useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { containersOf, type ContainerInfo, type ManifestV4 } from '../core';
 import { manifestAtom, modelChoicesAtom, shownManifestAtom } from './atoms';
-import { navRequestAtom, nextSeq, pickedPageAtom } from './displays/structureState';
+import { navRequestAtom, nextSeq, pickedPageAtom, restoredSeqAtom } from './displays/structureState';
 import { ViewerEnv, type ResolvedTheme } from './env';
 import {
   CanvasNavigationContext,
   indexOfCanvas,
+  shouldApplyTarget,
   targetKey,
   type CanvasNavigation,
   type ViewerSelection,
@@ -246,7 +247,9 @@ function ViewerStateRoot({
     onSelectRef.current = onSelect;
     shownId.current = container?.id;
   });
-  const appliedTarget = useRef<string | null>(null);
+  const appliedTarget = useRef<{ manifestId: string; key: string } | null>(null);
+  const restoredSeq = useAtomValue(restoredSeqAtom);
+  const restored = !!shown && shown.manifest === manifest && shown.seq === restoredSeq;
   const waitingFor = useRef<string | null>(null);
   useEffect(() => {
     const next = targetRef.current;
@@ -254,9 +257,10 @@ function ViewerStateRoot({
       if (!next) waitingFor.current = null;
       return;
     }
-    const applied = `${manifest.id}|${key}`;
-    if (appliedTarget.current === applied) return;
-    appliedTarget.current = applied;
+    const now = { manifestId: manifest.id, key, restored };
+    const apply = shouldApplyTarget(appliedTarget.current, now);
+    appliedTarget.current = { manifestId: manifest.id, key };
+    if (!apply) return;
     const canvasId = next.canvasId ?? shownId.current ?? containers[0].id;
     if (indexOfCanvas(containers, canvasId) < 0) {
       waitingFor.current = null;
@@ -278,7 +282,7 @@ function ViewerStateRoot({
       highlight: next.highlight,
     });
     if (shownId.current === canvasId) applySeekRef.current(mediaRef.current);
-  }, [key, manifest, containers, setNavRequest, mediaRef]);
+  }, [key, manifest, containers, restored, setNavRequest, mediaRef]);
 
   const reported = useRef<string | null>(null);
   useEffect(() => {

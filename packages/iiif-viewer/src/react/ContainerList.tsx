@@ -20,7 +20,7 @@ import {
   type ContentStateTargets,
   type ContainerInfo,
 } from '../core';
-import { manifestAtom, shownManifestAtom } from './atoms';
+import { manifestAtom, manifestUrlAtom, shownManifestAtom } from './atoms';
 import {
   compareAtom,
   compareMultiAtom,
@@ -28,6 +28,7 @@ import {
   navRequestAtom,
   nextSeq,
   restoredSeqAtom,
+  urlTargetsUsedForAtom,
   usePageOrder,
   useManifestSwitch,
 } from './displays/structureState';
@@ -63,6 +64,8 @@ export default function ContainerList({ containers, selected, onSelect, pager = 
   const manifest = useAtomValue(manifestAtom);
   const shown = useAtomValue(shownManifestAtom);
   const restoredSeq = useAtomValue(restoredSeqAtom);
+  const iiifContent = useAtomValue(manifestUrlAtom);
+  const [urlTargetsUsedFor, setUrlTargetsUsedFor] = useAtom(urlTargetsUsedForAtom);
   const [request, setRequest] = useAtom(navRequestAtom);
   const setFocus = useSetAtom(focusAtom);
   const setCompare = useSetAtom(compareAtom);
@@ -162,7 +165,10 @@ export default function ContainerList({ containers, selected, onSelect, pager = 
       matched = matchTargets(pending.current, containers);
       pending.current = null;
     }
-    if (matched.length === 0 && typeof window !== 'undefined') {
+    // the page's URL arguments point into the first manifest shown for the iiif-content, not into entries opened later
+    const fromUrl = typeof window !== 'undefined' && urlTargetsUsedFor !== iiifContent;
+    if (fromUrl) setUrlTargetsUsedFor(iiifContent);
+    if (matched.length === 0 && fromUrl) {
       const param = new URLSearchParams(window.location.search).get('iiif-content');
       const state = parseContentState(param);
       if (state) {
@@ -171,12 +177,12 @@ export default function ContainerList({ containers, selected, onSelect, pager = 
       }
     }
     // ?pos= of a curation: which item to show first (from 1, as in IIIF Curation Viewer)
-    if (matched.length === 0 && typeof window !== 'undefined') {
+    if (matched.length === 0 && fromUrl) {
       const target = curationMemberAt(manifest, Number(new URLSearchParams(window.location.search).get('pos')));
       if (target) matched = matchTargets([target], containers);
     }
     // ?canvas= : the frame number (from 1) or a Canvas URI
-    if (matched.length === 0 && typeof window !== 'undefined') {
+    if (matched.length === 0 && fromUrl) {
       const target = canvasParamTarget(new URLSearchParams(window.location.search).get('canvas'), containers);
       if (target) matched = [target];
     }

@@ -15,7 +15,7 @@ const rawCache = new Map<string, Promise<unknown>>();
 /** The manifest as served (undefined while loading, null when it could not be read). */
 export function useRawManifest(url: string | null): unknown | null | undefined {
   const shown = useAtomValue(shownManifestAtom);
-  const stored = url && shown?.url === url && shown.raw != null ? shown.raw : undefined;
+  const stored = url && shown?.url === url ? shown.raw : undefined;
   const [res, setRes] = useState<{ url: string; raw: unknown } | null>(null);
   useEffect(() => {
     if (!url || stored !== undefined) return;
