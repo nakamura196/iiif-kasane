@@ -65,10 +65,7 @@ async function serveBook(page: Page) {
   await page.route('https://example.org/service/book1/autocomplete?**', (r) => r.fulfill(json(fixture('autocomplete2-handmade.json'))));
 }
 
-// FIXME: broken on main since the dependency bump in #320 (passes on 3fe5e06, fails on 1872afe, in CI and locally):
-// after clicking the two-word hit "blue bird", page 2 shows only one overlay mark (word-12...) instead of two.
-// Not caused by @iiif/parser (still fails with 4.0.3). Needs a look at the product; re-enable once fixed.
-test.fixme('Content Search 2.0: 当たりの一覧・単位の絞り込み・候補語・押すとそのページへ', async ({ page }) => {
+test('Content Search 2.0: 当たりの一覧・単位の絞り込み・候補語・押すとそのページへ', async ({ page }) => {
   await serveBook(page);
   await page.goto(`/ja/viewer/?iiif-content=${encodeURIComponent(`${BASE}/manifest`)}&tab=contentSearch`);
 
@@ -93,7 +90,17 @@ test.fixme('Content Search 2.0: 当たりの一覧・単位の絞り込み・候
   // 1 ページ目の画像に、行の当たりの印
   await expect(page.locator(`[data-overlay="annotations"] [data-annotation-id="${BASE}/annotation/line-1"]`)).toBeVisible();
 
-  // 2 語にまたがる当たりを押すと 2 ページ目に移り、印が 2 つ出る
+  // Clicking a hit that spans two words moves to page 2
+  await page.locator('mark', { hasText: 'blue bird' }).click();
+  await expect(page.getByText('2 / 2')).toBeVisible();
+});
+
+// FIXME(#341): broken on main since the dependency bump in #320 (passes on 3fe5e06, fails on 1872afe).
+// After clicking the two-word hit "blue bird", page 2 shows one overlay mark (word-12...) instead of two.
+// Re-enable (test.fixme -> test) once #341 is fixed.
+test.fixme('Content Search 2.0: a hit spanning two words draws two marks on page 2', async ({ page }) => {
+  await serveBook(page);
+  await page.goto(`/ja/viewer/?iiif-content=${encodeURIComponent(`${BASE}/manifest`)}&tab=contentSearch&q=bird`);
   await page.locator('mark', { hasText: 'blue bird' }).click();
   await expect(page.getByText('2 / 2')).toBeVisible();
   await expect(page.locator(`[data-overlay="annotations"] [data-annotation-id^="${BASE}/annotation/word-12"]`)).toHaveCount(2);

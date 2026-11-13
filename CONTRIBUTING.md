@@ -55,7 +55,8 @@ E2E_BASE_URL=https://kasane.ldas.jp npm run test:e2e   # run against another ser
 Pull requests run the same tests in GitHub Actions (`.github/workflows/e2e.yml`) against the static export, **except** tests that need an outside website (iiif.io, Hugging Face, ...). Those are tagged `@external` so CI stays stable when the outside site is slow or down. To reproduce CI locally:
 
 ```bash
-npm run build && npm run serve:export &      # serves out/ on :3862
+npm run build
+npm run serve:export &      # serves out/ on :3862
 E2E_BASE_URL=http://localhost:3862 npm run test:e2e:ci   # = playwright test --grep-invert @external
 ```
 

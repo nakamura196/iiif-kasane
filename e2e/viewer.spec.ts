@@ -1,15 +1,15 @@
 import { test, expect, type Page } from '@playwright/test';
 
-// ビューアの表示を、Cookbook の実データで確かめる。
-// iiif.io などの外のサイトを読むので、全部 @external（CI では走らせない）。
-// 単体テストでは見えないところ（動画に字幕が実際に読み込まれるか、3D が描かれるか）を見る。
+// Checks the viewer with real Cookbook data: what unit tests cannot see, such as captions actually
+// loading into a video and a 3D model being drawn.
+// All tests read outside sites (iiif.io), so they are tagged @external and skipped in CI.
 
 const v4 = (recipe: string) => `https://iiif.io/api/cookbook/recipe/${recipe}/v4/manifest.json`;
 const v3 = (recipe: string) => `https://iiif.io/api/cookbook/recipe/${recipe}/manifest.json`;
 
-// Cookbook の v4 版のうち、まだ iiif.io に無いもの（IIIF/cookbook-recipes #621・#622 が未マージ）。
-// preview.iiif.io には CORS ヘッダが無いので、ブラウザに渡る応答へヘッダを足して読ませる。
-// マージされたら v4() の URL に置き換え、allowCors も外す。
+// Cookbook v4 recipes that are not on iiif.io yet (IIIF/cookbook-recipes #621 and #622 are unmerged).
+// preview.iiif.io sends no CORS header, so add it to the response the browser receives.
+// Once merged, switch to v4() URLs and drop allowCors.
 const PREVIEW = 'https://preview.iiif.io/cookbook';
 const v4Preview0074 = `${PREVIEW}/v4-0074-update-with-provides/recipe/0074-multiple-language-captions/v4/manifest.json`;
 const v4Preview0079 = `${PREVIEW}/v4-0079-using-annotations-for-captions/recipe/0079-annotations-for-captions/v4/manifest.json`;

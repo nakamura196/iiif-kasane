@@ -1,11 +1,11 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { test, expect, type Page } from '@playwright/test';
 
-// 手元の画像を開く（/viewer の入口のボタン）。画像はサーバに送らず、ブラウザの中で表示・読み取りする。
-// 送っていないことは、ページが出したリクエストを全部記録して確かめる:
-// 行き先はこのサイト自身と、推論のモデル・実行の仕組みの配布元だけで、本文を持つ送信（POST など）は 1 つも無いこと。
+// Open a local image (the buttons on the viewer's entry screen). The image is never sent to a server: it is shown and read in the browser.
+// We check that by recording every request the page makes: they go only to this site and to the hosts that
+// serve the inference models and runtime, and none of them sends data (POST and so on).
 
-// 読み取らせる画像。ファイルを置かずに、文字を書いたページを撮って作る
+// The image to read: take a screenshot of a page with text on it instead of keeping a file
 async function textImage(page: Page): Promise<Buffer> {
   await page.setViewportSize({ width: 900, height: 300 });
   await page.setContent(
@@ -18,23 +18,34 @@ async function textImage(page: Page): Promise<Buffer> {
   return png;
 }
 
+interface Seen {
+  url: string;
+  method: string;
+  hasBody: boolean;
+  body: string;
+}
+
 function recordRequests(page: Page) {
-  const seen: { url: string; method: string; hasBody: boolean }[] = [];
-  page.on('request', (r) => seen.push({ url: r.url(), method: r.method(), hasBody: !!r.postDataBuffer()?.length }));
+  const seen: Seen[] = [];
+  page.on('request', (r) => seen.push({ url: r.url(), method: r.method(), hasBody: !!r.postDataBuffer()?.length, body: r.postData() ?? '' }));
   return seen;
 }
 
-function expectNothingSent(all: { url: string; method: string; hasBody: boolean }[], origin: string) {
-  // The production site adds page-view analytics (Google Analytics, POST beacons). They carry no image data
-  // and are absent from builds without NEXT_PUBLIC_GA_ID, so leave them out of both checks.
-  const seen = all.filter((r) => !/^https:\/\/([\w-]+\.)?(googletagmanager|google-analytics)\.com\//.test(r.url));
-  // モデルの配布元（Hugging Face）と、推論を動かす onnxruntime-web の配布元（jsDelivr）は取りに行ってよい
+// Page-view analytics (Google Analytics) are on the production site only (they need NEXT_PUBLIC_GA_ID) and use POST beacons.
+// They may go to their own hosts, but must not carry the image: no file name, blob: URL or image data in the address or body.
+const ANALYTICS = /^https:\/\/([\w-]+\.)*(googletagmanager\.com|google-analytics\.com|analytics\.google\.com)\//;
+const IMAGE_TRACES = /blob:|\.png|\.txt|%E7%8C%AB|猫|銘尽|iVBOR|data:image/;
+
+function expectNothingSent(all: Seen[], origin: string) {
+  const analytics = all.filter((r) => ANALYTICS.test(r.url));
+  const seen = all.filter((r) => !ANALYTICS.test(r.url));
   const allowed = /^https:\/\/((huggingface\.co|[\w.-]+\.(hf\.co|huggingface\.co))\/|cdn\.jsdelivr\.net\/npm\/onnxruntime-web@)/;
   const outside = seen.filter(
     (r) => !r.url.startsWith(origin) && !r.url.startsWith('blob:') && !r.url.startsWith('data:') && !allowed.test(r.url),
   );
   expect(outside, 'requests to other hosts').toEqual([]);
   expect(seen.filter((r) => r.hasBody || !['GET', 'HEAD'].includes(r.method)), 'requests that send data').toEqual([]);
+  expect(analytics.filter((r) => IMAGE_TRACES.test(decodeURIComponent(r.url.replace(/[?&]dl=[^&]*/, ''))) || IMAGE_TRACES.test(r.body)), 'analytics requests carrying the image').toEqual([]);
 }
 
 async function openLocal(page: Page, png: Buffer) {
@@ -48,19 +59,19 @@ test('opens a local image without putting it in the address', async ({ page, bas
   const seen = recordRequests(page);
   await openLocal(page, png);
 
-  // 画像は blob: の URL のまま表示される
+  // The image is shown from a blob: URL
   const img = page.locator('img[src^="blob:"]');
   await expect(img).toBeVisible();
   expect(await img.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBe(900);
 
-  // アドレス欄には画像も blob: も入らず、読み取りのタブで開く
-  // the address is updated just after the banner appears
+    // Neither the image nor blob: goes into the address; it opens on the inference tab.
+  // The address is updated just after the banner appears, so poll for it.
   await expect.poll(() => new URL(page.url()).searchParams.get('tab')).toBe('inference');
   const url = new URL(page.url());
   expect(url.search).not.toContain('blob');
   expect(url.searchParams.has('iiif-content')).toBe(false);
 
-  // URL で他のページに渡す「ほかの表示」と、マニフェストのダウンロードは出さない
+  // No "other views" tab (it hands a URL to other pages) and no manifest download
   await expect(page.getByRole('tab', { name: /ほかの表示/ })).toHaveCount(0);
   await expect(page.getByRole('link', { name: /マニフェスト/ })).toHaveCount(0);
 
@@ -73,7 +84,7 @@ test('refuses a file that is not an image', async ({ page }) => {
   await expect(page.getByRole('alert').filter({ hasText: '画像ファイルではありません' })).toBeVisible();
 });
 
-// 1 ページずつ数字の入った画像を作る（名前順と数字順が違うように、p1・p2・p10 にする）
+// One image per page with its number on it (p1, p2, p10, so that name order and number order differ)
 async function pageImage(page: Page, n: number): Promise<Buffer> {
   await page.setViewportSize({ width: 300 + n, height: 400 });
   await page.setContent(`<body style="margin:0;background:#fff"><p style="font:120px sans-serif;margin:100px">${n}</p></body>`);
@@ -83,8 +94,8 @@ async function pageImage(page: Page, n: number): Promise<Buffer> {
 }
 
 test('opens several images as one book, in number order', async ({ page, baseURL }) => {
-  // 幅をページごとに変えておき、並び順を幅で確かめる
-  // 同じページで描くので 1 枚ずつ
+  // Give each page a different width and check the order by width.
+  // They are drawn on the same page, so one at a time.
   const pages: { n: number; png: Buffer }[] = [];
   for (const n of [10, 2, 1]) pages.push({ n, png: await pageImage(page, n) });
   const seen = recordRequests(page);
@@ -97,11 +108,11 @@ test('opens several images as one book, in number order', async ({ page, baseURL
   await expect(banner).toBeVisible();
   await expect(banner).toContainText('1 件は開いていません');
 
-  // 画像の幅をページごとに変えてある（p1 = 301、p2 = 302、p10 = 310）。最初に出るのは p1
+  // The widths differ per page (p1 = 301, p2 = 302, p10 = 310). p1 comes first.
   const first = page.locator('img[src^="blob:"]').first();
   await expect(first).toBeVisible();
   await expect.poll(() => first.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBe(301);
-  // 次へ送ると p2、p10 の順に出る
+  // Going forward shows p2, then p10
   for (const width of [302, 310]) {
     await page.getByRole('button', { name: '次へ' }).click();
     await expect.poll(() => page.locator('img[src^="blob:"]').first().evaluate((el: HTMLImageElement) => el.naturalWidth)).toBe(width);
@@ -115,7 +126,7 @@ test('opens a folder, named after the folder', async ({ page }, testInfo) => {
   const dir = testInfo.outputPath('銘尽');
   await mkdir(dir, { recursive: true });
   for (const n of [2, 1]) await writeFile(`${dir}/${n}.png`, await pageImage(page, n));
-  // フォルダを開くと混ざる隠しファイル
+  // A hidden file that gets mixed in when a folder is opened
   await writeFile(`${dir}/.DS_Store`, 'x');
   await page.goto('/ja/viewer/');
   await page.getByTestId('local-folder-input').setInputFiles(dir);
@@ -125,7 +136,7 @@ test('opens a folder, named after the folder', async ({ page }, testInfo) => {
   await expect.poll(() => page.locator('img[src^="blob:"]').first().evaluate((el: HTMLImageElement) => el.naturalWidth)).toBe(301);
 });
 
-// モデル（約 150 MB）を Hugging Face からダウンロードするので時間がかかる（@external）
+// Downloads the model (about 150 MB) from Hugging Face, so it takes a while (@external)
 test('reads the text of a local image in the browser', { tag: '@external' }, async ({ page, baseURL }) => {
   test.setTimeout(600_000);
   const png = await textImage(page);
@@ -135,7 +146,7 @@ test('reads the text of a local image in the browser', { tag: '@external' }, asy
   const card = page.locator('li').filter({ has: page.getByRole('heading', { name: 'NDLOCR-Lite', exact: true }) });
   const download = card.getByRole('button', { name: /ダウンロード（/ });
   const run = card.getByRole('button', { name: /この画像で実行|もう一度実行/ });
-  // 前の実行でダウンロード済みなら、すぐ「実行」が出る
+  // If a previous run already downloaded the model, "run" shows up at once
   await expect(download.or(run).first()).toBeVisible();
   if (await download.isVisible()) await download.click();
   await card.getByRole('button', { name: /この画像で実行|もう一度実行/ }).click({ timeout: 540_000 });

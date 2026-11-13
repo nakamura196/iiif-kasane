@@ -1,11 +1,13 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// ブラウザで実際に画面を開いて確かめるテスト。
-//   npm run test:e2e                                   … next dev を立ち上げて試す（外のサイトを読むものも含む）
-//   E2E_BASE_URL=https://kasane.ldas.jp npm run test:e2e … 本番を試す
-// 外のサイト（iiif.io・Hugging Face など）を読むテストは、題に { tag: '@external' } を付ける。
-// GitHub Actions（.github/workflows/e2e.yml）は書き出した out/ を相手に、@external を除いて走らせる:
-//   npm run build && npm run serve:export &  →  E2E_BASE_URL=http://localhost:3862 npm run test:e2e:ci
+// Browser tests that open the real pages.
+//   npm run test:e2e                                      starts next dev and runs everything (including @external)
+//   E2E_BASE_URL=https://kasane.ldas.jp npm run test:e2e   runs against another server (none is started)
+// A test that reads an outside site (iiif.io, Hugging Face, ...) gets { tag: '@external' } in its title.
+// GitHub Actions (.github/workflows/e2e.yml) runs everything else against the static export out/:
+//   npm run build
+//   npm run serve:export &
+//   E2E_BASE_URL=http://localhost:3862 npm run test:e2e:ci
 const baseURL = process.env.E2E_BASE_URL ?? 'http://localhost:3838';
 
 export default defineConfig({

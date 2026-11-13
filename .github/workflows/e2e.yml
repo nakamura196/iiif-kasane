@@ -32,8 +32,25 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Get Playwright version
+        id: playwright
+        run: echo "version=$(npx playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Chromium
+        id: browsers
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+
       - name: Install Chromium
+        if: steps.browsers.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
+
+      # The browser files come from the cache, but the operating system libraries do not.
+      - name: Install Chromium system libraries
+        if: steps.browsers.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
 
       - name: Build static export
         run: npm run build
@@ -43,10 +60,11 @@ jobs:
           E2E_BASE_URL: http://localhost:3862
         run: |
           node scripts/serve-export.mjs 3862 &
-          sleep 2
+          for i in $(seq 1 30); do curl -sf -o /dev/null http://localhost:3862/ja/ && break; sleep 1; done
+          curl -sf -o /dev/null http://localhost:3862/ja/ || { echo "::error::the static server did not start"; exit 1; }
           npm run test:e2e:ci
 
-      - name: Upload Playwright report
+      - name: Upload Playwright traces
         if: failure()
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
