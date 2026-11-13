@@ -2,7 +2,7 @@
 # Vercel build is kept independent (vercel.json handles redirect).
 name: Deploy Next.js site to Pages
 
-# PR ではビルドと検査だけ (配布は main への push のみ)。
+# A pull request only builds and checks (the site is deployed only by a push to main).
 on:
   push:
     branches: ['main']
@@ -25,9 +25,9 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          # 新しい lockfile / 依存に追従しやすいよう Node 24 (npm 11) を使う。
-          # Node 20 だと "Missing: <pkg> from lock file" で npm ci が失敗する
-          # ケースに遭遇するため (dts-viewer の ci.yml と同じ理由)。
+          # Node 24 (npm 11) keeps up with newer lockfiles and dependencies.
+          # With Node 20, npm ci sometimes fails with "Missing: <pkg> from lock file"
+          # (same reason as in the ci.yml of dts-viewer).
           node-version: 24
           cache: npm
 
@@ -47,9 +47,13 @@ jobs:
       - name: Run unit tests
         run: npm test
 
-      # サブパス (basePath) 付きのビルドでも参照が壊れないことを先に確かめる。
-      # kasane.ldas.jp はホスト直下なので本番では使わないが、basePath の付け忘れは
-      # ホスト直下では隠れるため、フォーク先の github.io 配信などに備えて検査を残す。
+      # tsc, then the public API baseline of iiif-kasane (packages/iiif-viewer/api/public-api.txt).
+      - name: Type check
+        run: npm run typecheck
+
+      # Check first that references also survive a build under a subpath (basePath).
+      # kasane.ldas.jp is served at the host root, so production does not use it, but a missing
+      # basePath is hidden at the root. The check stays for forks served from github.io and the like.
       - name: Verify subpath build (basePath)
         env:
           GITHUB_PAGES: 'true'
@@ -59,13 +63,13 @@ jobs:
           NEXT_PUBLIC_BASE_PATH=/iiif-kasane npm run test:export
           rm -rf out .next
 
-      # 本番 (kasane.ldas.jp) はホスト直下で配る。独自ドメインは Pages の設定 (gh api) で指定済み。
+      # Production (kasane.ldas.jp) is served at the host root. The custom domain is already set in the Pages settings (gh api).
       - name: Build static export
         env:
-          # GA4 Measurement ID (公開値). Repo Variables に NEXT_PUBLIC_GA_ID を
-          # 設定したデプロイ者だけが計測を有効化する。フォーク先で意図せず
-          # オーナーの GA に送信しないため、fallback は持たない。未設定なら
-          # ビルドは成功するが GoogleAnalytics は描画されない。
+          # GA4 Measurement ID (a public value). Only a deployer who sets NEXT_PUBLIC_GA_ID in the
+          # repository Variables turns analytics on. There is no fallback, so that a fork does not
+          # send data to the owner's GA by accident. If unset, the build succeeds but
+          # GoogleAnalytics is not rendered.
           NEXT_PUBLIC_GA_ID: ${{ vars.NEXT_PUBLIC_GA_ID }}
         run: npm run build
 
