@@ -107,12 +107,12 @@ function CollectionDisplay(props: DisplayProps) {
   // the kept ones are worked out while rendering, so the first paint has them; only the fallback is asynchronous
   const stored = useMemo(() => (isCollection ? storedEntriesFor(shown, manifest) : null), [isCollection, shown, manifest]);
   const hasStored = stored !== null;
-  const [read, setRead] = useState<{ manifest: unknown; entries: CollectionEntry[] } | null>(null);
+  const [read, setRead] = useState<{ id: string; entries: CollectionEntry[] } | null>(null);
   useEffect(() => {
     if (!isCollection || hasStored || !manifest.id) return;
     let cancelled = false;
     void fetchedEntriesFor(manifest).then((entries) => {
-      if (!cancelled) setRead({ manifest, entries });
+      if (!cancelled) setRead({ id: manifest.id, entries });
     });
     return () => {
       cancelled = true;
@@ -131,7 +131,7 @@ function CollectionDisplay(props: DisplayProps) {
     type: 'Manifest',
     label: c.label,
   }));
-  const readEntries = stored ?? (read?.manifest === manifest ? read.entries : []);
+  const readEntries = stored ?? (read?.id === manifest.id ? read.entries : []);
   const entries = readEntries.length > 0 ? readEntries : fromContainers;
 
   const openEntry = async (e: CollectionEntry) => {

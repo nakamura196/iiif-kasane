@@ -73,15 +73,20 @@ export interface PreparedShow {
 
 /**
  * Parse a manifest for showing: the notes and painted models of the Scene `sceneId` (default: the first Scene).
- * Throws when the manifest's v4 form cannot be parsed (nothing is changed).
+ * Throws when the models cannot be read (nothing is changed); notes that cannot be read give no notes.
  */
 export function prepareShow(manifest: ManifestV4, locale: string, sceneId?: string): PreparedShow {
-  const { annotations, geoCanvasId, geoFeatures } = parseManifestV4(manifest, sceneId, locale);
-  return {
-    annotations,
-    hasGeo: !!geoCanvasId || geoFeatures.length > 0,
-    paintedModels: paintedModelsOf(sceneOf(manifest, sceneId)),
-  };
+  // the notes degrade on their own: when they cannot be read the models are still drawn, with no notes
+  let annotations: PreparedShow['annotations'] = [];
+  let hasGeo = false;
+  try {
+    const parsed = parseManifestV4(manifest, sceneId, locale);
+    annotations = parsed.annotations;
+    hasGeo = !!parsed.geoCanvasId || parsed.geoFeatures.length > 0;
+  } catch (e) {
+    console.error('Error reading the notes of the manifest:', e);
+  }
+  return { annotations, hasGeo, paintedModels: paintedModelsOf(sceneOf(manifest, sceneId)) };
 }
 
 // What was parsed for a manifest, by locale and Scene (null: it could not be parsed). The guard before showing
@@ -94,17 +99,20 @@ const parsedCache = new WeakMap<ManifestV4, Map<string, PreparedShow | null>>();
 export function tryPrepareShow(manifest: ManifestV4, locale: string, sceneId?: string): PreparedShow | null {
   let byKey = parsedCache.get(manifest);
   if (!byKey) parsedCache.set(manifest, (byKey = new Map()));
-  // the Scene actually read (no id, or an id the manifest does not have, is the first Scene)
-  const key = `${locale}\n${sceneOf(manifest, sceneId)?.id ?? ''}`;
-  if (byKey.has(key)) return byKey.get(key) ?? null;
-  let result: PreparedShow | null = null;
+  let key = '';
   try {
-    result = prepareShow(manifest, locale, sceneId);
+    // the Scene actually read (no id, or an id the manifest does not have, is the first Scene)
+    key = `${locale}\n${sceneOf(manifest, sceneId)?.id ?? ''}`;
+    if (byKey.has(key)) return byKey.get(key) ?? null;
+    const result = prepareShow(manifest, locale, sceneId);
+    byKey.set(key, result);
+    return result;
   } catch (e) {
     console.error('Error reading manifest:', e);
+    // a manifest whose Scene list cannot even be searched has no key: it is reported each time
+    if (key) byKey.set(key, null);
+    return null;
   }
-  byKey.set(key, result);
-  return result;
 }
 
 /**
@@ -128,6 +136,7 @@ function clearShown(store: Store): void {
   store.set(annotationsAtom, []);
   store.set(paintedModelsAtom, []);
   store.set(sceneIdAtom, null);
+  store.set(sceneDisplayAtom, (d) => ({ ...d, sceneId: null }));
 }
 
 /**
@@ -149,8 +158,10 @@ export function showManifest(
   const { hasGeo } = prepared;
   beginLoad(store);
   resetShownState(store);
+  // the Scene a display read last belongs to the manifest left
+  store.set(sceneDisplayAtom, (d) => ({ ...d, sceneId: null }));
   // shownSeqAtom only grows, also over a failed load that cleared what was shown
-  const seq = store.get(shownSeqAtom) + 1;
+  const seq = Math.max(store.get(shownSeqAtom), store.get(shownManifestAtom)?.seq ?? 0) + 1;
   store.set(shownSeqAtom, seq);
   store.set(shownManifestAtom, { url, raw, manifest, seq, origin, hasGeo });
   store.set(manifestAtom, manifest);

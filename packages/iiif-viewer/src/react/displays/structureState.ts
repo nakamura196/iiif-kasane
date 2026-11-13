@@ -20,14 +20,11 @@ import {
 } from '../../core';
 import { manifestUrlAtom, shownManifestAtom, type ShownOrigin } from '../atoms';
 import {
-  compareAtom,
-  compareMultiAtom,
-  focusAtom,
   backFailedAtom,
+  focusAtom,
   pickedPageAtom,
   resetViewState,
   sequenceIdAtom,
-  type CompareMulti,
 } from '../internalState';
 import {
   isContentLoading,
@@ -51,8 +48,6 @@ export interface NavRequest {
 }
 
 export const navRequestAtom = atom<NavRequest | null>(null);
-
-export { focusAtom, compareAtom, compareMultiAtom, sequenceIdAtom, type CompareMulti };
 
 export { trailAtom, type OpenResult, type TrailItem };
 

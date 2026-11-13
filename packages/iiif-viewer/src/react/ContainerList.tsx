@@ -21,11 +21,8 @@ import {
   type ContainerInfo,
 } from '../core';
 import { manifestAtom, shownManifestAtom } from './atoms';
-import { backFailedAtom } from './internalState';
+import { backFailedAtom, compareAtom, compareMultiAtom, focusAtom } from './internalState';
 import {
-  compareAtom,
-  compareMultiAtom,
-  focusAtom,
   navRequestAtom,
   nextSeq,
   openWithTargets,

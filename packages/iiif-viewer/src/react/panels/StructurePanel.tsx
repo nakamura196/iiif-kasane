@@ -12,7 +12,8 @@ import {
   viewingOf,
   type TocNode,
 } from '../../core';
-import { navRequestAtom, nextSeq, sequenceIdAtom } from '../displays/structureState';
+import { sequenceIdAtom } from '../internalState';
+import { navRequestAtom, nextSeq } from '../displays/structureState';
 import { useLocale, useTranslations } from '../env';
 import { usePlayback } from '../playback';
 import type { Panel, PanelContext } from './types';

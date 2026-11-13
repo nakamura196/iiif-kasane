@@ -37,14 +37,14 @@ const scene = (id: string, selector: object) => ({
   ],
 });
 
-const render = (selector: object) => {
+const render = (selector: object, brokenModels = false) => {
   const id = 'https://example.org/sd/m.json';
   const manifest = convertToV4({
     '@context': 'http://iiif.io/api/presentation/4/context.json',
     id,
     type: 'Manifest',
     label: { en: ['m'] },
-    items: [scene(`${id}/scene/1`, { type: 'PointSelector', x: 0, y: 0, z: 0 }), scene(`${id}/scene/2`, selector)],
+    items: [scene(`${id}/scene/1`, { type: 'PointSelector', x: 0, y: 0, z: 0 }), brokenModels ? { ...scene(`${id}/scene/2`, selector), items: {} } : scene(`${id}/scene/2`, selector)],
   });
   const containers = containersOf(manifest);
   const props = {
@@ -70,7 +70,7 @@ describe('SceneDisplay', () => {
 
   it('shows a notice inside the same root element, and keeps the host actions, for a Scene that cannot be parsed', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    const html = render({ type: 'WKTSelector' });
+    const html = render({ type: 'PointSelector', x: 1, y: 1, z: 1 }, true);
     // the same root as above (the ResizeObserver on it keeps working), not a different element
     expect(html.startsWith('<div class="relative flex-1')).toBe(true);
     expect(html).toContain('role="alert"');
@@ -79,7 +79,7 @@ describe('SceneDisplay', () => {
 });
 
 // Scenes whose models are SpecificResource-wrapped (as in the Smithsonian Triceratops sample): two Scenes, one model each.
-const wrapped = (id: string) => {
+const wrapped = (id: string, selector: object = { type: 'PointSelector', x: 0, y: 0, z: 0 }) => {
   const sceneOf = (n: number) => ({
     id: `${id}/scene/${n}`,
     type: 'Scene',
@@ -109,7 +109,7 @@ const wrapped = (id: string) => {
             motivation: ['commenting'],
             label: { en: [`note ${n}`] },
             body: { type: 'TextualBody', value: `note ${n}` },
-            target: { type: 'SpecificResource', source: { id: `${id}/scene/${n}`, type: 'Scene' }, selector: [{ type: 'PointSelector', x: 0, y: 0, z: 0 }] },
+            target: { type: 'SpecificResource', source: { id: `${id}/scene/${n}`, type: 'Scene' }, selector: [selector] },
           },
         ],
       },
@@ -136,6 +136,14 @@ describe('SceneDisplay with SpecificResource-wrapped models', () => {
     const manifest = wrapped('https://example.org/wr/m.json');
     // the Suspense fallback of the 3D canvas shows only when a model URL was found in this render
     expect(html(props(manifest, 1))).toContain('Viewer.loading');
+  });
+
+  it('still draws the model when only the notes cannot be read', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const manifest = wrapped('https://example.org/wr3/m.json', { type: 'WKTSelector' });
+    const out = html(props(manifest, 1));
+    expect(out).toContain('Viewer.loading');
+    expect(out).not.toContain('role="alert"');
   });
 
   it('puts the Scene it draws in the store: Scene 2 gives Scene 2 model and notes, and clears the selection', () => {

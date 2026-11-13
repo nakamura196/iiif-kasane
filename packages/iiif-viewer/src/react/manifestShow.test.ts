@@ -41,8 +41,13 @@ const manifestJson = (id: string, selector: object = { type: 'PointSelector', x:
     return { id: scene, type: 'Scene', items: [], annotations: [note(scene, selector)] };
   }),
 });
-// a Scene note whose WKTSelector has no string value: the parser throws on it
-const broken = (id: string) => manifestJson(id, { type: 'WKTSelector' });
+// Scenes whose painting list cannot be read (it is not a list): the models cannot be read, so the manifest is refused
+const broken = (id: string) => {
+  const m = manifestJson(id);
+  return { ...m, items: m.items.map((scene) => ({ ...scene, items: {} })) };
+};
+// Scene notes whose WKTSelector has no string value: only the notes cannot be read
+const notesBroken = (id: string) => manifestJson(id, { type: 'WKTSelector' });
 
 let run = 0;
 const url = (name: string) => `https://example.org/s${run}/${name}.json`;
@@ -107,6 +112,18 @@ describe('notes of the manifest shown', () => {
     expect(store.get(selectedAnnotationIdAtom)).toBe('mine');
   });
 
+  it('forgets the Scene of the manifest left, so going back to an image page relabels the first Scene', () => {
+    const a = url('back-a');
+    const b = url('back-b');
+    const { store, manifest } = showTwoScenes(a);
+    store.set(sceneDisplayAtom, { mounted: false, sceneId: `${a}/scene/2` });
+    const other = convertToV4(manifestJson(b));
+    showManifest(store, b, { raw: manifestJson(b), manifest: other }, 'move', prepareShow(other, 'ja'));
+    showManifest(store, a, { raw: manifestJson(a), manifest }, 'back', prepareShow(manifest, 'ja'));
+    reparseNotes(store, 'en');
+    expect(store.get(annotationsAtom).map((x) => x.title)).toEqual([`${a}/scene/1 note`]);
+  });
+
   it('parses a manifest once for the same locale and Scene, the first Scene included', () => {
     const id = url('once');
     const manifest = convertToV4(manifestJson(id));
@@ -129,13 +146,29 @@ describe('showManifest resets what belongs to the manifest shown', () => {
   });
 });
 
+describe('notes and models are read apart', () => {
+  it('draws the models with no notes when only the notes cannot be read', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const manifest = convertToV4(notesBroken(url('nb')));
+    const read = tryPrepareShow(manifest, 'en');
+    expect(read).not.toBeNull();
+    expect(read?.annotations).toEqual([]);
+    expect(console.error).toHaveBeenCalled();
+  });
+
+  it('does not throw for a manifest whose items are not a list', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(tryPrepareShow({ id: url('items'), type: 'Manifest', items: 5 } as never, 'en')).toBeNull();
+  });
+});
+
 describe('tryPrepareShow for one Scene', () => {
   it('reads a Scene of the manifest, and gives null (not a throw) for a Scene that cannot be parsed', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     const id = url('rs');
     const raw = manifestJson(id);
     // Scene 1 is good, Scene 2 has a note that cannot be parsed
-    raw.items[1] = broken(id).items[1];
+    raw.items[1] = broken(id).items[1] as never;
     const manifest = convertToV4(raw);
     expect(tryPrepareShow(manifest, 'en', `${id}/scene/1`)?.annotations).toHaveLength(1);
     expect(() => prepareShow(manifest, 'en')).not.toThrow();
