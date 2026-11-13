@@ -47,6 +47,10 @@ jobs:
       - name: Run unit tests
         run: npm test
 
+      # Also checks the exported type keys pinned in packages/iiif-viewer/src/publicApi.test.ts.
+      - name: Type check
+        run: npx tsc --noEmit
+
       # サブパス (basePath) 付きのビルドでも参照が壊れないことを先に確かめる。
       # kasane.ldas.jp はホスト直下なので本番では使わないが、basePath の付け忘れは
       # ホスト直下では隠れるため、フォーク先の github.io 配信などに備えて検査を残す。
