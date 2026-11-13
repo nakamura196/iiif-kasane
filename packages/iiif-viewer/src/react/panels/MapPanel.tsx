@@ -19,8 +19,8 @@ import { navRequestAtom, nextSeq, useManifestSwitch } from '../displays/structur
 import { useLocale, useTranslations } from '../env';
 import type { Panel, PanelContext } from './types';
 
-// 場所（navPlace・GeoJSON の注釈）を地図に載せるタブ。地図の部品は使わず、
-// OpenStreetMap のタイル画像を並べ、その上に SVG で場所を描く（パッケージを軽く保つため）。
+// A tab that puts places (navPlace, GeoJSON annotations) on a map. No map library: OpenStreetMap tiles are laid out
+// and the places drawn over them in SVG (to keep the package light).
 const TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 const HEIGHT = 260;
 
@@ -54,8 +54,8 @@ function MapPanel({ manifest, container }: PanelContext) {
 
   const frame = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
-  // 手で動かした地図の位置。資料が替わる（bounds が変わる）までは、これを使う。
-  // 手で動かすまでは、幅に合わせて、すべての場所が収まる位置を毎回計算する
+  // The map position the reader moved to, used until the item changes (bounds change).
+  // Until then, the position that fits all places is worked out from the width each time
   const [manual, setManual] = useState<{ bounds: typeof bounds; view: MapView } | null>(null);
   const [picked, setPicked] = useState<{ bounds: typeof bounds; key: string } | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
@@ -77,13 +77,13 @@ function MapPanel({ manifest, container }: PanelContext) {
   const selected = picked && picked.bounds === bounds ? picked.key : null;
   const setSelected = (key: string) => setPicked({ bounds, key });
 
-  // ホイールの受け手は一度だけ登録するので、今の値は ref で渡す
+  // the wheel handler is registered once, so the current values go through a ref
   const latest = useRef({ view, bounds });
   useEffect(() => {
     latest.current = { view, bounds };
   });
 
-  // ホイールで拡大・縮小。ページのスクロールを止めるため、passive: false で受ける
+  // zoom with the wheel; passive: false to stop the page from scrolling
   useEffect(() => {
     const el = frame.current;
     if (!el) return;
@@ -103,7 +103,7 @@ function MapPanel({ manifest, container }: PanelContext) {
     setSelected(p.key);
     setFailed(null);
     if (p.scope === 'item' && p.resourceId) {
-      if (!(await open(p.resourceId, true))) setFailed(p.key);
+      if ((await open(p.resourceId, true)) === 'failed') setFailed(p.key);
       return;
     }
     if (p.containerId && p.containerId !== current) setRequest({ seq: nextSeq(), target: { canvasId: p.containerId } });
@@ -132,7 +132,7 @@ function MapPanel({ manifest, container }: PanelContext) {
   };
   const onPointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
-    // ドラッグのあとに来る click を、場所の選択として扱わない
+    // the click after a drag does not pick a place
     if (drag.current?.moved) setTimeout(() => (drag.current = null));
     else drag.current = null;
   };
@@ -142,7 +142,7 @@ function MapPanel({ manifest, container }: PanelContext) {
   };
 
   const isActive = (p: MapPlace) => p.key === selected || (!!current && p.containerId === current);
-  // 選んだもの・今のページのものを上に描く
+  // draw the picked place and those of the current page on top
   const ordered = [...places].sort((a, b) => Number(isActive(a)) - Number(isActive(b)));
   const tiles = view && width > 0 ? tilesFor(view, width, HEIGHT, TILE_URL) : [];
   const btn =

@@ -9,7 +9,10 @@ import type { Panel } from './panels/types';
 import { ViewerProvider, useViewer } from './ViewerProvider';
 
 export interface ViewerActionsState {
+  /** The iiif-content given to the viewer. */
   iiifContent: string;
+  /** URL of the manifest shown now (the entry opened from a Collection); `selectedIndex` counts in it. */
+  shownUrl?: string;
   /** The main model (or, on an image Canvas, an image) has two or more candidates (a Choice). */
   hasChoices: boolean;
   /** Index of the shown Canvas / Scene in the manifest. */

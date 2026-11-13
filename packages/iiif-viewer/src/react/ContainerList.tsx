@@ -8,8 +8,6 @@ import {
   curationMemberAt,
   compareIndexesOf,
   containersOf,
-  convertToV4,
-  fetchManifest,
   labelIn,
   matchTargets,
   remoteGroupsOf,
@@ -22,17 +20,19 @@ import {
   type ContentStateTargets,
   type ContainerInfo,
 } from '../core';
-import { manifestAtom } from './atoms';
+import { manifestAtom, shownManifestAtom } from './atoms';
 import {
   compareAtom,
   compareMultiAtom,
   focusAtom,
   navRequestAtom,
   nextSeq,
+  openWithTargets,
   usePageOrder,
   useManifestSwitch,
 } from './displays/structureState';
 import { useLocale, useTranslations } from './env';
+import { readManifest } from './useManifest';
 
 interface Props {
   containers: ContainerInfo[];
@@ -61,6 +61,7 @@ const isEditable = (el: EventTarget | null): boolean => {
 export default function ContainerList({ containers, selected, onSelect, pager = true }: Props) {
   const t = useTranslations('Structure');
   const manifest = useAtomValue(manifestAtom);
+  const shown = useAtomValue(shownManifestAtom);
   const [request, setRequest] = useAtom(navRequestAtom);
   const setFocus = useSetAtom(focusAtom);
   const setCompare = useSetAtom(compareAtom);
@@ -102,7 +103,7 @@ export default function ContainerList({ containers, selected, onSelect, pager = 
   const hasPrev = groupAt > 0;
   const hasNext = groupAt >= 0 && groupAt < groups.length - 1;
 
-  // 0540: target が別のマニフェストの Canvas も指すとき、そのマニフェストを読んで並べて見せる
+  // 0540: when a target points to a Canvas of another manifest, read that manifest and show them side by side
   const startMulti = useCallback(
     (targets: ContentStateTargets['targets'], anchor: number) => {
       if (!manifest) return;
@@ -119,10 +120,10 @@ export default function ContainerList({ containers, selected, onSelect, pager = 
         const failed: string[] = [];
         await Promise.all(
           remote.map(async (g) => {
+            // one source that cannot be read goes to `failed`; the others are still shown
             try {
-              const raw = await fetchManifest(g.manifestUrl);
-              if (!raw) throw new Error('fetch failed');
-              const m = convertToV4(raw);
+              const m = await readManifest(g.manifestUrl);
+              if (!m) throw new Error('The manifest could not be read');
               sources.push({ manifestUrl: g.manifestUrl, label: nameOf(m, g.manifestUrl), containers: containersOf(m) });
             } catch {
               failed.push(g.manifestUrl);
@@ -151,6 +152,9 @@ export default function ContainerList({ containers, selected, onSelect, pager = 
     const key = `${manifest.id}`;
     if (applied.current === key) return;
     applied.current = key;
+    // shown again by going back: the reader returns to the page they were on, not to the first one
+    const origin = shown && shown.manifest === manifest ? shown.origin : 'content';
+    if (origin === 'back') return;
     let matched: Array<CanvasTarget & { index: number }> = [];
     let allTargets: ContentStateTargets['targets'] = [];
     if (pending.current) {
@@ -158,7 +162,9 @@ export default function ContainerList({ containers, selected, onSelect, pager = 
       matched = matchTargets(pending.current, containers);
       pending.current = null;
     }
-    if (matched.length === 0 && typeof window !== 'undefined') {
+    // the page's URL arguments point into the first manifest shown for the iiif-content, not into entries opened later
+    const fromUrl = typeof window !== 'undefined' && origin === 'content';
+    if (matched.length === 0 && fromUrl) {
       const param = new URLSearchParams(window.location.search).get('iiif-content');
       const state = parseContentState(param);
       if (state) {
@@ -167,19 +173,19 @@ export default function ContainerList({ containers, selected, onSelect, pager = 
       }
     }
     // ?pos= of a curation: which item to show first (from 1, as in IIIF Curation Viewer)
-    if (matched.length === 0 && typeof window !== 'undefined') {
+    if (matched.length === 0 && fromUrl) {
       const target = curationMemberAt(manifest, Number(new URLSearchParams(window.location.search).get('pos')));
       if (target) matched = matchTargets([target], containers);
     }
     // ?canvas= : the frame number (from 1) or a Canvas URI
-    if (matched.length === 0 && typeof window !== 'undefined') {
+    if (matched.length === 0 && fromUrl) {
       const target = canvasParamTarget(new URLSearchParams(window.location.search).get('canvas'), containers);
       if (target) matched = [target];
     }
     if (matched.length > 0) {
-      // リンク（content state・canvas=・pos=）や読み込み時の start で開いたときは、動きを付けずにその場所を出す
+      // opened from a link (content state, canvas=, pos=) or the manifest's start: show the place at once, without the glide
       go(matched[0].index, matched[0], undefined, true);
-      // 0540: 複数の Canvas を指すときは、並べて見せる
+      // 0540: several Canvases are pointed to: show them side by side
       setCompare(compareIndexesOf(matched));
       startMulti(allTargets, matched[0].index);
       return;
@@ -197,8 +203,8 @@ export default function ContainerList({ containers, selected, onSelect, pager = 
     const url = state?.manifestUrl;
     if (!state || !url || opened.current === manifest.id) return;
     opened.current = manifest.id;
-    pending.current = state.targets;
-    void open(url, false);
+    // the manifest the content state points to is still the iiif-content: its URL arguments and target apply
+    void openWithTargets(open, pending, url, state.targets, 'content');
   }, [manifest, type, open]);
 
   // --- keyboard: arrow keys follow the viewing direction ---
@@ -256,8 +262,7 @@ export default function ContainerList({ containers, selected, onSelect, pager = 
       const state = parseDroppedText(text);
       if (!state) return;
       if (state.manifestUrl) {
-        pending.current = state.targets;
-        void open(state.manifestUrl, false);
+        void openWithTargets(open, pending, state.manifestUrl, state.targets, 'move');
         return;
       }
       const matched = matchTargets(state.targets, containers);
