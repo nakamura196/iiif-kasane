@@ -11,10 +11,15 @@
     "loading": "Loading the image…",
     "error": "Could not load the image.",
     "status": "In place {placed} / {total} · Moves {moves}",
-    "solved": "Solved in {moves} moves",
     "piece": "Cell {cell}",
     "reshuffle": "Shuffle again",
     "sample": "Overlay the original",
-    "close": "Close"
+    "close": "Close",
+    "time": "Time {time}",
+    "solvedTitle": "Solved!",
+    "solvedStats": "{total} pieces in {moves} moves · {time}",
+    "copyLink": "Copy link",
+    "copied": "Copied",
+    "copyFailed": "Could not copy. Select the link and copy it yourself"
   }
 }

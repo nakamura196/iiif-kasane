@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Puzzle, canPlayPuzzle, type Panel, type PanelContext } from 'iiif-kasane';
 import { Link } from '@/i18n/routing';
-import { contentParam } from 'iiif-kasane/core';
+import { containersOf, contentParam } from 'iiif-kasane/core';
+import { puzzleQuery } from '@/lib/puzzleLink';
 import { OTHER_VIEWS_TAB } from '@/lib/viewerTabs';
 import {
   GALLERY_LIMITS,
@@ -38,9 +39,22 @@ interface Props {
   galleryOk: boolean;
   browseOk: boolean;
   compare: CompareTarget;
+  /** リンク（?puzzle=）で開くパズル。Canvas の id と、マスの数。 */
+  puzzle?: { canvasId: string; size: number } | null;
+  /** パズルを閉じたとき（リンクの引数を外すため）。 */
+  onPuzzleClose?: () => void;
 }
 
-function OtherViews({ manifestUrl, hasGeo, galleryOk, browseOk, compare, ctx }: Props & { ctx: PanelContext }) {
+function OtherViews({
+  manifestUrl,
+  hasGeo,
+  galleryOk,
+  browseOk,
+  compare,
+  puzzle,
+  onPuzzleClose,
+  ctx,
+}: Props & { ctx: PanelContext }) {
   const t = useTranslations('OtherViews');
   const tb = useTranslations('Browse');
   const [browseLayout, setBrowseLayout] = useState<BrowseLayout>('table');
@@ -143,12 +157,24 @@ function OtherViews({ manifestUrl, hasGeo, galleryOk, browseOk, compare, ctx }: 
       {canPlayPuzzle(ctx) && (
         <section className="space-y-2">
           <h3 className="font-semibold">{t('puzzleHeading')}</h3>
-          <Puzzle {...ctx} className="space-y-3" />
+          <Puzzle
+            {...ctx}
+            className="space-y-3"
+            autoStart={puzzle && puzzle.canvasId === ctx.container?.id ? puzzle.size : undefined}
+            shareUrl={(size) => puzzleShareUrl(manifestUrl, ctx, size)}
+            onClose={onPuzzleClose}
+          />
         </section>
       )}
     </div>
   );
 }
+
+// 表示中のページのパズルを開くリンク。いま開いているページ（言語の入った /ja/viewer など）の URL をもとにする
+const puzzleShareUrl = (manifestUrl: string, ctx: PanelContext, size: number) => {
+  const index = Math.max(0, containersOf(ctx.manifest).findIndex((c) => c.id === ctx.container?.id));
+  return `${window.location.origin}${window.location.pathname}?${puzzleQuery(manifestUrl, index, size)}`;
+};
 
 /** 比較・地図・美術館のどれかに渡せる資料か、パズルにできる画像のときだけ出すタブ。 */
 export const otherViewsPanel = (props: Props, label: string): Panel => ({

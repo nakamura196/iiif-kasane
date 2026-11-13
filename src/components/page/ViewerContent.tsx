@@ -6,15 +6,16 @@ import { useAtom } from 'jotai';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useTheme } from 'next-themes';
-import { Viewer, manifestUrlAtom, type InfoTab } from 'iiif-kasane';
+import { Viewer, manifestUrlAtom, type InfoTab, type ViewerTarget } from 'iiif-kasane';
 // 3D の Scene も表示する（three.js などは 3D を開いたときだけ読み込まれる）
 import 'iiif-kasane/scene';
 import ManifestInput from '@/components/Input';
 import ManifestParamWatcher from '@/components/ManifestParamWatcher';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import { convertToV4, fetchManifest, parseManifestV4 } from 'iiif-kasane/core';
-import { HIDDEN_VIEWER_TABS, viewerTabOf } from '@/lib/viewerTabs';
+import { containersOf, convertToV4, fetchManifest, parseManifestV4 } from 'iiif-kasane/core';
+import { HIDDEN_VIEWER_TABS, OTHER_VIEWS_TAB, viewerTabOf } from '@/lib/viewerTabs';
+import { puzzleFromParams } from '@/lib/puzzleLink';
 import { canOpenInGallery } from '@/lib/gallery';
 import { canOpenInBrowse } from '@/lib/browse';
 import { otherViewsPanel, type CompareTarget } from '@/components/OtherViewsPanel';
@@ -51,6 +52,25 @@ const ViewerContent: NextPage = () => {
   const [browseOk, setBrowseOk] = useState(false);
   // 表示中の模型か画像に候補が 2 つ以上あれば、比較のページに渡す Canvas / Scene の番号（ビューアが知らせる）
   const [compare, setCompare] = useState<CompareTarget>(null);
+  // ?puzzle=<ページ>&grid=<マスの数> で開いたときのパズル。ページの Canvas の id はマニフェストを読んでから決まる
+  const puzzleParam = searchParams?.get('puzzle') ?? null;
+  const gridParam = searchParams?.get('grid') ?? null;
+  const puzzleLink = useMemo(() => {
+    const params = new URLSearchParams();
+    if (puzzleParam !== null) params.set('puzzle', puzzleParam);
+    if (gridParam !== null) params.set('grid', gridParam);
+    return puzzleFromParams(params);
+  }, [puzzleParam, gridParam]);
+  const [canvasIds, setCanvasIds] = useState<string[]>([]);
+  const puzzleCanvasId = puzzleLink ? canvasIds[puzzleLink.index] : undefined;
+  const puzzle = useMemo(
+    () => (puzzleLink && puzzleCanvasId ? { canvasId: puzzleCanvasId, size: puzzleLink.size } : null),
+    [puzzleLink, puzzleCanvasId],
+  );
+  const puzzleTarget = useMemo<ViewerTarget | undefined>(
+    () => (puzzleCanvasId ? { canvasId: puzzleCanvasId } : undefined),
+    [puzzleCanvasId],
+  );
   const tl = useTranslations('LocalImage');
   // 手元の画像（サーバに送らず、このタブの中だけで開いたもの）
   const isLocal = isLocalManifestUrl(manifestUrl);
@@ -93,13 +113,16 @@ const ViewerContent: NextPage = () => {
     setHasGeoCanvas(false);
     setGalleryOk(false);
     setBrowseOk(false);
+    setCanvasIds([]);
     if (!manifestUrl) return;
     let cancelled = false;
     fetchManifest(manifestUrl)
       .then((raw) => {
         if (cancelled || !raw) return;
         // 2D の Canvas か、3D の Scene に位置情報（georeferencing）がある
-        const { geoCanvasId, geoFeatures } = parseManifestV4(convertToV4(raw));
+        const v4 = convertToV4(raw);
+        const { geoCanvasId, geoFeatures } = parseManifestV4(v4);
+        setCanvasIds(containersOf(v4).map((c) => c.id));
         setHasGeoCanvas(!!geoCanvasId || geoFeatures.length > 0);
         setGalleryOk(canOpenInGallery(raw));
         setBrowseOk(canOpenInBrowse(raw));
@@ -110,19 +133,34 @@ const ViewerContent: NextPage = () => {
     };
   }, [manifestUrl]);
 
+  // パズルを閉じたら、リンクの引数を外す（再読み込みや戻る操作で、また開かないように）
+  const closePuzzleLink = useCallback(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has('puzzle') && !params.has('grid')) return;
+    params.delete('puzzle');
+    params.delete('grid');
+    router.replace(`?${params.toString()}`);
+  }, [router]);
+
   // 比較・地図・3D の美術館・3D の一覧とパズルへは、右の「ほかの表示」タブから行く
   const otherViewsLabel = to('tab');
   const panels = useMemo(
     () =>
       // 手元の画像は、ほかのページ（比較・地図・3D）へ URL で渡せないので「ほかの表示」を出さない
       manifestUrl && !isLocal
-        ? [otherViewsPanel({ manifestUrl, hasGeo: hasGeoCanvas, galleryOk, browseOk, compare }, otherViewsLabel)]
+        ? [
+            otherViewsPanel(
+              { manifestUrl, hasGeo: hasGeoCanvas, galleryOk, browseOk, compare, puzzle, onPuzzleClose: closePuzzleLink },
+              otherViewsLabel,
+            ),
+          ]
         : [],
-    [manifestUrl, isLocal, hasGeoCanvas, galleryOk, browseOk, compare, otherViewsLabel],
+    [manifestUrl, isLocal, hasGeoCanvas, galleryOk, browseOk, compare, puzzle, closePuzzleLink, otherViewsLabel],
   );
 
   const tabParam = searchParams?.get('tab');
-  const tab = viewerTabOf(tabParam);
+  // パズルのリンクで開いたときは、パズルのある「ほかの表示」タブを開く
+  const tab = viewerTabOf(tabParam) ?? (puzzleLink ? OTHER_VIEWS_TAB : undefined);
 
   const handleTabChange = (next: InfoTab) => {
     const params = new URLSearchParams(searchParams?.toString() || '');
@@ -190,6 +228,9 @@ const ViewerContent: NextPage = () => {
             onTabChange={handleTabChange}
             panels={panels}
             hidePanels={HIDDEN_VIEWER_TABS}
+            target={puzzleTarget}
+            // 閉じた右パネルは中身を描かないので、パズルのリンクで開いたときは開いておく
+            panelOpen={puzzleLink ? true : undefined}
             // 左下には何も出さず、候補があるかだけを受け取って「ほかの表示」タブの比較に渡す
             renderActions={({ hasChoices, selectedIndex }) => (
               <CompareReport target={hasChoices ? selectedIndex : null} onChange={setCompare} />
