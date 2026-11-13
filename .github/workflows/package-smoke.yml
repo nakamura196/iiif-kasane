@@ -8,6 +8,7 @@ on:
     branches: ['main']
     paths:
       - 'packages/iiif-viewer/**'
+      - 'scripts/gen-registries.mjs' # the package build calls it
       - 'scripts/smoke-package.mjs'
       - 'e2e-package/**'
       - 'playwright.package.config.ts'

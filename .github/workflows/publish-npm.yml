@@ -3,6 +3,10 @@
 # Uses npm Trusted Publishing (OIDC): no npm token is stored in this repository,
 # and npm attaches a provenance statement linking the tarball to this workflow run.
 # The trusted publisher on npmjs.com must name this file: publish-npm.yml.
+#
+# Two jobs, so that the job that can publish runs no install of third-party code:
+#   smoke    (no id-token) installs, tests, packs the package, smoke-tests THAT tarball, uploads it.
+#   publish  (id-token)    downloads that exact tarball and publishes it. No checkout, no npm install.
 name: Publish to npm
 
 on:
@@ -13,13 +17,10 @@ permissions:
   contents: read
 
 jobs:
-  publish:
+  smoke:
     if: startsWith(github.event.release.tag_name, 'iiif-kasane-v')
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    permissions:
-      contents: read
-      id-token: write # npm Trusted Publishing
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -49,8 +50,53 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
+      # Builds and packs the package, checks the tarball, and leaves the tested tarball in pack/.
       - name: Smoke test the packed package
-        run: npm run test:package
+        run: npm run test:package -- --pack-dir "$RUNNER_TEMP/pack"
 
+      - name: Upload the tested tarball
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: iiif-kasane-tarball
+          path: ${{ runner.temp }}/pack/*.tgz
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Upload Playwright traces
+        if: failure()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: package-smoke-traces
+          path: test-results/
+          retention-days: 3
+
+  publish:
+    needs: smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write # npm Trusted Publishing
+    steps:
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Download the tested tarball
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: iiif-kasane-tarball
+          path: pack
+
+      # Provenance is made by npm from the OIDC token and the digest of the file it uploads,
+      # so publishing a tarball path keeps it. --provenance makes npm fail instead of skipping it.
       - name: Publish
-        run: npm publish -w iiif-kasane
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          ls pack
+          [ "$(ls pack | wc -l)" = 1 ] || { echo "expected exactly one tarball"; exit 1; }
+          [ -f "pack/iiif-kasane-${TAG#iiif-kasane-v}.tgz" ] || { echo "the tarball does not match tag $TAG"; exit 1; }
+          npm publish "pack/iiif-kasane-${TAG#iiif-kasane-v}.tgz" --access public --provenance

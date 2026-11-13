@@ -1,5 +1,6 @@
 // Smoke test of the npm package iiif-kasane (packages/iiif-viewer) as users receive it.
-//   node scripts/smoke-package.mjs [--no-browser] [--keep]
+//   node scripts/smoke-package.mjs [--no-browser] [--keep] [--pack-dir <dir>]
+// With --pack-dir the tarball that was tested is left in <dir>, so that the publish job can publish exactly that file.
 // It builds the package, packs it with `npm pack`, installs the tarball into a temporary
 // consumer project (with the peer dependencies at the versions of this repository's lockfile),
 // and checks what a user would get: the files named in "exports", the framework-free core
@@ -14,7 +15,9 @@ import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const pkgDir = join(root, 'packages', 'iiif-viewer');
-const args = new Set(process.argv.slice(2));
+const argv = process.argv.slice(2);
+const args = new Set(argv);
+const packDirArg = argv.indexOf('--pack-dir') >= 0 ? resolve(argv[argv.indexOf('--pack-dir') + 1]) : null;
 const started = Date.now();
 const failures = [];
 
@@ -31,10 +34,13 @@ step('Build the package');
 run('npm', ['run', 'build', '-w', 'iiif-kasane'], root);
 
 const work = mkdtempSync(join(tmpdir(), 'kasane-smoke-'));
-step(`Pack into ${work}`);
-const packOut = run('npm', ['pack', '--ignore-scripts', '--json', '--pack-destination', work], pkgDir, { quiet: true });
+const packDir = packDirArg ?? work;
+mkdirSync(packDir, { recursive: true });
+try {
+step(`Pack into ${packDir}`);
+const packOut = run('npm', ['pack', '--ignore-scripts', '--json', '--pack-destination', packDir], pkgDir, { quiet: true });
 const packed = JSON.parse(packOut)[0];
-const tarball = join(work, packed.filename);
+const tarball = join(packDir, packed.filename);
 const tarFiles = new Set(packed.files.map((f) => f.path));
 console.log(`  ${packed.filename}: ${packed.files.length} files, ${(packed.size / 1024).toFixed(0)} kB`);
 
@@ -81,8 +87,10 @@ check(coreOut === 'function undefined', `iiif-kasane/core imports without a DOM 
 // 5. The main entry must not pull three.js, even through its own chunks (static imports only; the 3D part is a lazy import).
 step('Main entry does not need 3D packages');
 const THREE = /^(three|three-stdlib|gsap|@react-three\/.+)(\/|$)/;
+// Static import/export specifiers, in readable and in minified syntax: `import a from "x"`, `import{a}from"x"`,
+// `export*from"x"`, `import"x"`. Dynamic imports (`import("x")`) are lazy chunks and are left out on purpose.
 const staticImports = (src) =>
-  [...src.matchAll(/(?:^|[;\n}])\s*(?:import|export)\s*(?:[^'"();]*?\sfrom\s*)?["']([^"']+)["']/g)].map((m) => m[1]);
+  [...src.matchAll(/(?:^|[;\n}])\s*(?:import|export)\s*(?:[^'"();]*?\s*from\s*|(?=["']))["']([^"']+)["']/g)].map((m) => m[1]);
 const walk = (entryAbs) => {
   const seen = new Set();
   const bare = new Set();
@@ -104,8 +112,8 @@ check(!main.bare.some((s) => THREE.test(s)), 'main entry does not statically imp
 check(main.bare.includes('react') && main.bare.includes('jotai'), 'react and jotai stay external (peers, not bundled)');
 const core = walk(join(installed, pkg.exports['./core'].default));
 check(!core.bare.some((s) => /^(react|react-dom|jotai|three)/.test(s)), `core entry needs no React/jotai/three (${core.bare.join(', ') || 'none'})`);
-const tagSrc = readFileSync(join(installed, 'dist', 'iiif-kasane.js'), 'utf8');
-check(!staticImports(tagSrc).some((s) => !s.startsWith('.')), 'tag bundle iiif-kasane.js has no bare imports (self-contained)');
+const tag = walk(join(installed, 'dist', 'iiif-kasane.js'));
+check(tag.bare.length === 0, `tag bundle and its chunks (${tag.files} files) have no bare imports (self-contained) ${tag.bare.join(', ')}`);
 check(readFileSync(join(installed, 'dist', 'iiif-viewer.js'), 'utf8').includes('iiif-kasane.js'), 'legacy iiif-viewer.js loads iiif-kasane.js');
 check(readFileSync(join(installed, 'dist', 'style.css'), 'utf8').length > 1000, 'style.css is not empty');
 
@@ -144,7 +152,9 @@ if (!args.has('--no-browser') && failures.length === 0) {
   }
 }
 
-if (!args.has('--keep')) rmSync(work, { recursive: true, force: true });
-else console.log(`\nKept ${work}`);
+} finally {
+  if (!args.has('--keep')) rmSync(work, { recursive: true, force: true });
+  else console.log(`\nKept ${work}`);
+}
 console.log(`\n${failures.length ? `FAILED (${failures.length}):\n - ${failures.join('\n - ')}` : 'All package checks passed'} in ${((Date.now() - started) / 1000).toFixed(0)} s`);
 process.exit(failures.length ? 1 : 0);
