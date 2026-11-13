@@ -6,6 +6,7 @@ import type { ModelFile } from './models/types';
 import { readModelFile } from './modelStore';
 import { hasWebGpu, loadOrt, type Backend, type OrtModule, type OrtSession } from './ort';
 import type { FromWorker, ToWorker } from './protocol';
+import { serial } from './serial';
 
 const post = (m: FromWorker) => (self as unknown as Worker).postMessage(m);
 
@@ -77,6 +78,11 @@ const run = async ({ job, modelId, bitmap, prompt, imageKey }: ToWorker) => {
   }
 };
 
+// 仕事は 1 つずつ順に行う。同じセッションを 2 つの仕事が同時に使うと、止まったり失敗したりする
+// （ページ一覧の全ページ実行の途中に、推論タブで 1 枚を実行したときなど）
+const queue = serial();
+
 self.onmessage = (e: MessageEvent<ToWorker>) => {
-  run(e.data).catch((err: unknown) => post({ type: 'error', job: e.data.job, message: String((err as Error)?.message ?? err) }));
+  const m = e.data;
+  queue(() => run(m)).catch((err: unknown) => post({ type: 'error', job: m.job, message: String((err as Error)?.message ?? err) }));
 };
