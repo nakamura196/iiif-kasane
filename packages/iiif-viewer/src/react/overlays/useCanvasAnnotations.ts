@@ -1,5 +1,6 @@
 'use client';
 
+import { CONTENT_SEARCH_SOURCE } from './contentSearchSource';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAtomValue } from 'jotai';
 import {
@@ -23,8 +24,8 @@ import { localAnnotationPagesAtom } from './canvasAnnotationState';
 
 const MAX_FOLLOWED_PAGES = 5;
 
-// 参照だけの AnnotationPage の取得結果。同じ画面で右パネルと重ね表示が同じ物を使うので、
-// 取得は 1 回だけにする（失敗は覚えず、次に開いたとき取り直す）。
+// The fetched AnnotationPages that were only referenced. The right panel and the overlay on the same screen use the same ones,
+// so each is fetched once (a failure is not remembered; it is fetched again at the next opening).
 const pageCache = new Map<string, Promise<unknown>>();
 
 export const fetchPage = (url: string): Promise<unknown> => {
@@ -40,7 +41,7 @@ export const fetchPage = (url: string): Promise<unknown> => {
   return p;
 };
 
-// 外部の stylesheet（Recipe 0045）。取得してすぐ、許可した性質だけに読み直す（生の CSS はここから外に出さない）。
+// External stylesheets (Recipe 0045). Once fetched they are read again at once, keeping only the allowed properties (raw CSS does not leave this place).
 const MAX_CSS_BYTES = 100_000;
 const sheetCache = new Map<string, Promise<StyleRules>>();
 
@@ -69,12 +70,12 @@ export interface CanvasAnnotationsState {
   annotations: CanvasAnnotation[];
   loading: boolean;
   failed: boolean;
-  /** 注釈の見た目（許可した性質だけ。外部 stylesheet は取得できたら反映される）。 */
+  /** How annotations look (allowed properties only; an external stylesheet is applied once it is fetched). */
   styleOf: (annotation: CanvasAnnotation) => AnnotationStyles;
 }
 
-// Canvas の注釈。マニフェストに書かれたものはすぐ、参照だけのページは取得してから足す。
-// 閲覧者の手元で作ったページ（localAnnotationPagesAtom）も足す。
+// The annotations of a Canvas. Those written in the manifest come at once; pages that are only referenced are added once fetched.
+// Pages made on the viewer's side (localAnnotationPagesAtom) are added too.
 export function useCanvasAnnotations(
   manifest: ManifestV4 | null | undefined,
   container: ContainerInfo | undefined,
@@ -104,7 +105,7 @@ export function useCanvasAnnotations(
         let url: string | undefined = ref;
         for (let n = 0; url && n < MAX_FOLLOWED_PAGES; n++) {
           try {
-            // マニフェストの参照に付いた AnnotationCollection の名前を、取得したページ（続きのページも）に引き継ぐ
+            // pass the name of the AnnotationCollection on the manifest's reference to the fetched page (and its following pages)
             const page = withReferenceLabels(await fetchPage(url), stubOf(ref));
             pages.push(page);
             // follow `next` only while this page still has annotations for this Canvas
@@ -131,7 +132,19 @@ export function useCanvasAnnotations(
         ? [
             // the Canvas's own pages: an annotation whose target is no Canvas of the manifest is on this one
             ...readCanvasAnnotations(canvasId, [...sources.pages, ...(current?.pages ?? [])], { width, height }, canvasIds),
-            ...readCanvasAnnotations(canvasId, local.filter((l) => l.canvasId === canvasId).map((l) => l.page), { width, height }),
+            // the pages of the Content Search panel are the only ones whose `hitId` is taken
+            ...readCanvasAnnotations(
+              canvasId,
+              local.filter((l) => l.canvasId === canvasId && l.source === CONTENT_SEARCH_SOURCE).map((l) => l.page),
+              { width, height },
+              undefined,
+              { hitIds: true },
+            ),
+            ...readCanvasAnnotations(
+              canvasId,
+              local.filter((l) => l.canvasId === canvasId && l.source !== CONTENT_SEARCH_SOURCE).map((l) => l.page),
+              { width, height },
+            ),
           ]
         : [],
     [canvasId, sources, current, local, width, height, canvasIds],
@@ -150,7 +163,7 @@ export function useCanvasAnnotations(
         (rules) => {
           if (!cancelled) setSheets((prev) => (prev[url] ? prev : { ...prev, [url]: rules }));
         },
-        // 取得できない（CORS など）ときは、下の styleOf で styleClass ごとの代わりの配色にする
+        // when it cannot be fetched (CORS and the like), styleOf below uses a fallback colour per styleClass
         () => {
           if (!cancelled) setFailedSheets((prev) => (prev[url] ? prev : { ...prev, [url]: true }));
         },
@@ -165,7 +178,7 @@ export function useCanvasAnnotations(
   const styleOf = useCallback(
     (a: CanvasAnnotation) => {
       const own = annotationStyles(a, sheets);
-      // 外部 stylesheet が読めなかった注釈だけ、クラスごとの代わりの配色にする
+      // only the annotations whose external stylesheet could not be read get a fallback colour per class
       if (a.stylesheetUrl && failedSheets[a.stylesheetUrl]) {
         const alt = fallbackStyleOf(a, order);
         if (alt) return { target: { ...alt.target, ...own.target }, body: { ...alt.body, ...own.body } };

@@ -1,9 +1,9 @@
-// annotations: Canvas 上の注釈（コメント・タグ・領域・ホットスポット）の読み取り。React に依存しない。この機能の担当だけがこのファイルを書く。
+// annotations: reads the annotations on a Canvas (comments, tags, regions, hotspots). Independent of React. Only the owner of this feature edits this file.
 //
-// 読むもの: Canvas の `annotations`（AnnotationPage の並び）と、テキストを画像に描く
-// painting の注釈。painting（画像など）と supplementing（字幕など）は別の場所で扱うので除く。
-// ただし画像の一部を指す supplementing（OCR の行など）は、ほかの注釈と同じに出す。
-// 領域は Canvas 座標の「矩形・点・多角形・Canvas 全体」にそろえる。
+// What it reads: the Canvas's `annotations` (a list of AnnotationPages) and the painting annotations
+// that draw text on the image. Other painting (images) and supplementing (captions) are handled elsewhere and left out.
+// A supplementing annotation that points at a part of the image (an OCR line, say) is shown like any other.
+// Regions are normalised to a rectangle, a point, a polygon or the whole Canvas, in Canvas coordinates.
 
 import type { ManifestV4 } from '../types/iiif';
 
@@ -64,6 +64,11 @@ export interface CanvasAnnotation extends AnnotationStyleSource {
   /** Text Granularity extension: the unit of text the annotation stands for (line, word …). */
   granularity?: string;
   /**
+   * Set on the marks drawn for a Content Search hit: the id of the hit. A hit that spans several words has one
+   * mark per word, and they are selected together. Other annotations leave it unset (they stand for themselves).
+   */
+  hitId?: string;
+  /**
    * Shared Region extension: the id of the target Specific Resource. Annotations with the same regionId
    * annotate the same region and are drawn as one box.
    */
@@ -79,6 +84,25 @@ const num = (v: unknown): number | undefined => {
 };
 
 // ---- regions -----------------------------------------------------------------
+
+/**
+ * The id that selection compares on: the hit for a mark of a Content Search hit, else the annotation itself.
+ * Ids are never parsed, so annotations named `x` and `x#1` are not mistaken for one hit.
+ */
+export const selectionKeyOf = (a: { id: string; hitId?: string }): string => a.hitId ?? a.id;
+
+/** What `selected` stands for: the hit of the selected mark, or the selected id itself (a hit has no mark on this Canvas). */
+export const selectedHitOf = (selected: string | null, annotations: { id: string; hitId?: string }[]): string | null => {
+  if (selected === null) return null;
+  const mark = annotations.find((a) => a.id === selected);
+  return mark ? selectionKeyOf(mark) : selected;
+};
+
+/** All the annotations (marks) of the selected hit; one annotation unless it is a Content Search hit. */
+export const annotationsOfSelection = <T extends { id: string; hitId?: string }>(
+  annotations: T[],
+  selectedHit: string | null,
+): T[] => (selectedHit === null ? [] : annotations.filter((a) => selectionKeyOf(a) === selectedHit));
 
 export const bboxOf = (rings: Point[][]): Box => {
   const pts = rings.flat();
@@ -398,6 +422,8 @@ export const readCanvasAnnotations = (
   pages: unknown[],
   canvasSize?: { width?: number; height?: number },
   canvasIds?: ReadonlySet<string>,
+  /** Take `hitId` from the pages. Only for the pages the Content Search panel builds itself, never for JSON from outside. */
+  options?: { hitIds?: boolean },
 ): CanvasAnnotation[] => {
   const out: CanvasAnnotation[] = [];
   const seen = new Set<string>();
@@ -469,6 +495,7 @@ export const readCanvasAnnotations = (
           ? { time: { start: time.start, ...(time.end !== undefined ? { end: time.end } : {}), ...(instant ? { instant: true as const } : {}) } }
           : {}),
         ...(str(raw.textGranularity) ? { granularity: str(raw.textGranularity) } : {}),
+        ...(options?.hitIds && str(raw.hitId) ? { hitId: str(raw.hitId) } : {}),
         ...(regionIdOf(rawTarget) ? { regionId: regionIdOf(rawTarget) } : {}),
       });
     }

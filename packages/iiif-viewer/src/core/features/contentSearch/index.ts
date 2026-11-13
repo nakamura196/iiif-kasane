@@ -1,12 +1,13 @@
-// contentSearch: IIIF Content Search API（1.0 と 2.0。0.9 は 1.0 として扱う）で、資料の中の文字を探す。
-// マニフェストの service から窓口を見つけ → 問い合わせ → 版の違いをならして「当たり」の並びにする。
-// 当たりは Canvas 上の位置を持つので、画像の上の印（手元の AnnotationPage）にも変えられる。
-// React に依存しない。取りに行く処理は呼ぶ側が渡す（テストで差し替える）。
+// contentSearch: search the text inside a resource with the IIIF Content Search API (1.0 and 2.0; 0.9 is treated as 1.0).
+// Find the search service in the manifest's service, query it, and normalize version differences into a list of hits.
+// Hits carry a position on the Canvas, so they can also be turned into markers on the image (a local AnnotationPage).
+// No React dependency. The fetching function is supplied by the caller (replaced in tests).
 //
-// 仕様: https://iiif.io/api/search/2.0/ ・ https://iiif.io/api/search/1.0/
-// 単位（行・語など）は Text Granularity 拡張: https://iiif.io/api/extension/text-granularity/
+// Spec: https://iiif.io/api/search/2.0/ and https://iiif.io/api/search/1.0/
+// Units (line, word, etc.) use the Text Granularity extension: https://iiif.io/api/extension/text-granularity/
 
 import { labelIn } from '../../services/paintedModels';
+import { bboxOf } from '../annotations';
 
 export type ContentSearchVersion = 1 | 2;
 
@@ -17,43 +18,43 @@ export interface ContentSearchService {
   autocomplete?: { id: string; version: ContentSearchVersion };
 }
 
-/** 当たり 1 つが指す、Canvas 上の 1 か所（語が 2 行にまたがれば 2 か所）。 */
+/** One location on a Canvas that a hit points to (two locations if a word spans two lines). */
 export interface ContentSearchRegion {
-  /** 結果の Annotation の id */
+  /** id of the result Annotation */
   annotationId: string;
   canvasId: string;
-  /** Canvas 座標の矩形。無ければ Canvas 全体 */
+  /** Rectangle in Canvas coordinates. The whole Canvas if absent */
   xywh?: [number, number, number, number];
-  /** 3D の Scene 上の点（PointSelector）。canvasId は Scene の id になる */
+  /** Point on a 3D Scene (PointSelector). canvasId becomes the Scene's id */
   point?: [number, number, number];
-  /** 結果の Annotation の label（言語ごとの辞書）。3D の当たりの見出しに使う */
+  /** label of the result Annotation (per-language map). Used as the heading of 3D hits */
   label?: unknown;
   text?: string;
-  /** Text Granularity の単位（page / block / paragraph / line / word / glyph） */
+  /** Text Granularity unit (page / block / paragraph / line / word / glyph) */
   granularity?: string;
 }
 
-/** 当たり 1 つ。一覧の 1 行になる。 */
+/** One hit. Becomes one row in the list. */
 export interface ContentSearchMatch {
   id: string;
   canvasId: string;
   regions: ContentSearchRegion[];
-  /** 当たった文字列 */
+  /** The matched text */
   match: string;
   before?: string;
   after?: string;
   granularity?: string;
-  /** 字幕の当たり: 台詞の時刻（秒、始まりと終わり） */
+  /** Caption hit: time of the line in seconds (start and end) */
   time?: [number, number];
-  /** 字幕・文字起こしのファイルの中の当たり */
+  /** Hit inside a caption or transcript file */
   transcript?: boolean;
 }
 
 export interface ContentSearchPage {
   matches: ContentSearchMatch[];
-  /** 全体の件数（窓口が教えてくれたとき） */
+  /** Total count (when the service reports it) */
   total?: number;
-  /** 続きのページの URL */
+  /** URL of the next page */
   next?: string;
 }
 
@@ -79,7 +80,7 @@ const idOf = (v: unknown): string | undefined =>
 const typeOf = (v: unknown): string => (isObj(v) ? String(v.type ?? v['@type'] ?? '') : '');
 const textOf = (v: unknown): string => asList(v).map((x) => String(x)).join(' ');
 
-// ---- 窓口を見つける ---------------------------------------------------------------
+// ---- Find the service ---------------------------------------------------------------
 
 const searchVersionOf = (s: Json): ContentSearchVersion | undefined => {
   const type = typeOf(s);
@@ -88,7 +89,7 @@ const searchVersionOf = (s: Json): ContentSearchVersion | undefined => {
   if (type === 'SearchService2') return 2;
   if (type === 'SearchService1' || type === 'SearchService0') return 1;
   if (/autocomplete/i.test(profile)) return undefined;
-  // 2.0 の窓口には profile が無い（type で見分ける）。1.0・0.9 は profile か @context で見分ける
+  // 2.0 services have no profile (identify them by type). 1.0 and 0.9 are identified by profile or @context
   if (/\/search\/[01]\/search$/.test(profile)) return 1;
   if (!profile && /\/search\/[01]\/context\.json$/.test(context)) return 1;
   return undefined;
@@ -109,8 +110,8 @@ const autocompleteOf = (s: Json): ContentSearchService['autocomplete'] => {
 };
 
 /**
- * マニフェスト（または Canvas・Range）の service から検索の窓口を探す。2.0 があれば 2.0 を選ぶ。
- * Presentation 2 から直したマニフェストでは `@id` `@type` のまま残るので、両方の書き方を見る。
+ * Find the search service from the service of a manifest (or Canvas or Range). Prefer 2.0 if available.
+ * Manifests converted from Presentation 2 keep `@id` and `@type`, so both spellings are checked.
  */
 export function findContentSearchService(resource: unknown, locale = 'en'): ContentSearchService | undefined {
   if (!isObj(resource)) return undefined;
@@ -134,10 +135,10 @@ const withQuery = (base: string, params: Record<string, string>): string => {
   return qs ? `${base}${base.includes('?') ? '&' : '?'}${qs}` : base;
 };
 
-/** 検索の URL。`q` だけを送る（motivation などの絞り込みは窓口ごとの対応がまちまちなので使わない）。 */
+/** Search URL. Sends only `q` (filters such as motivation are not used because services support them inconsistently). */
 export const contentSearchUrl = (service: { id: string }, q: string): string => withQuery(service.id, { q: q.trim() });
 
-// ---- 当たりの位置 ---------------------------------------------------------------
+// ---- Hit position ---------------------------------------------------------------
 
 const XYWH = /(?:^|[#&])xywh=(?:pixel:)?(-?[\d.]+),(-?[\d.]+),([\d.]+),([\d.]+)/;
 
@@ -146,7 +147,7 @@ const parseXywh = (s: string | undefined): ContentSearchRegion['xywh'] => {
   return m ? [Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4])] : undefined;
 };
 
-/** Annotation の target（1.0 は on）から Canvas（3D なら Scene）の id と矩形・点を取り出す。 */
+/** Extract the Canvas (or Scene for 3D) id and the rectangle or point from an Annotation's target (`on` in 1.0). */
 export function contentSearchTargetOf(
   target: unknown,
 ): { canvasId: string; xywh?: ContentSearchRegion['xywh']; point?: ContentSearchRegion['point'] } | undefined {
@@ -158,11 +159,11 @@ export function contentSearchTargetOf(
   if (!isObj(t)) return undefined;
   const rawSource = t.source ?? t.full;
   if (rawSource === undefined) {
-    // 位置の無い Canvas そのもの（{ id, type: 'Canvas' }）
+    // A bare Canvas with no position ({ id, type: 'Canvas' })
     const canvasId = idOf(t);
     return canvasId ? contentSearchTargetOf(canvasId) : undefined;
   }
-  // 3D の注釈は source を配列で書くことがある（[{ id, type: 'Scene' }]）
+  // 3D annotations may write source as an array ([{ id, type: 'Scene' }])
   const source = asList(rawSource)[0];
   const sources = asList(t.selector).filter(isObj);
   let point: ContentSearchRegion['point'];
@@ -174,7 +175,7 @@ export function contentSearchTargetOf(
     }
   }
   const sourceId = idOf(source);
-  // Scene の id は `…#scene` のように断片を含むことがあるので、切らない
+  // A Scene id may include a fragment such as `…#scene`, so do not strip it
   const canvasId = typeOf(source) === 'Scene' || point ? sourceId : sourceId?.split('#')[0];
   if (!canvasId) return undefined;
   if (point) return { canvasId, point };
@@ -188,7 +189,7 @@ export function contentSearchTargetOf(
 const granularityOf = (anno: Json): string | undefined => str(anno.textGranularity);
 
 const bodyText = (anno: Json): string | undefined => {
-  // 2.0: body（TextualBody の value）。1.0: resource（cnt:ContentAsText の chars）
+  // 2.0: body (value of TextualBody). 1.0: resource (chars of cnt:ContentAsText)
   for (const b of [...asList(anno.body), ...asList(anno.resource)]) {
     if (typeof b === 'string') return b;
     if (isObj(b)) {
@@ -217,7 +218,7 @@ const regionOf = (anno: unknown): ContentSearchRegion | undefined => {
   };
 };
 
-// ---- 応答をならす -----------------------------------------------------------------
+// ---- Normalize the response -----------------------------------------------------------------
 
 interface Context {
   ids: string[];
@@ -226,7 +227,7 @@ interface Context {
   after?: string;
 }
 
-// 1.0: hits（search:Hit）。annotations に当たりの Annotation の id が並ぶ。
+// 1.0: hits (search:Hit). annotations lists the ids of the hit Annotations.
 const hitsV1 = (json: Json): Context[] =>
   asList(json.hits)
     .filter(isObj)
@@ -237,8 +238,8 @@ const hitsV1 = (json: Json): Context[] =>
       after: str(h.after),
     }));
 
-// 2.0: annotations の中の contextualizing の Annotation。target が当たりの Annotation を指し、
-// TextQuoteSelector に前後の文がある。
+// 2.0: contextualizing Annotations inside annotations. The target points to the hit Annotation, and
+// the TextQuoteSelector holds the surrounding text.
 const hitsV2 = (json: Json): Context[] => {
   const out: Context[] = [];
   for (const page of asList(json.annotations)) {
@@ -268,9 +269,9 @@ const totalOf = (json: Json): number | undefined => {
 };
 
 /**
- * 検索の応答（1.0 の AnnotationList、2.0 の AnnotationPage）を、当たりの並びにする。
- * 前後の文（hits / contextualizing）があれば、それで当たりをまとめる（語が 2 か所にまたがるとき 1 件になる）。
- * 無ければ、結果の Annotation 1 つを 1 件にする。
+ * Turn a search response (1.0 AnnotationList, 2.0 AnnotationPage) into a list of hits.
+ * If surrounding text (hits / contextualizing) exists, group hits by it (a term spanning two places becomes one hit).
+ * Otherwise, each result Annotation becomes one hit.
  */
 export function parseContentSearchResponse(response: unknown): ContentSearchPage {
   if (!isObj(response)) return { matches: [] };
@@ -310,7 +311,7 @@ export function parseContentSearchResponse(response: unknown): ContentSearchPage
   return { matches, ...(total !== undefined ? { total } : {}), ...(next ? { next } : {}) };
 }
 
-/** 候補語の応答（1.0 の TermList、2.0 の TermPage）を、語の並びにする。 */
+/** Turn a suggestion response (1.0 TermList, 2.0 TermPage) into a list of terms. */
 export function parseAutocompleteResponse(response: unknown, locale = 'en'): ContentSearchTerm[] {
   if (!isObj(response)) return [];
   const out: ContentSearchTerm[] = [];
@@ -326,9 +327,9 @@ export function parseAutocompleteResponse(response: unknown, locale = 'en'): Con
 }
 
 export interface RunContentSearchOptions {
-  /** たどるページの上限（1.0 の MDZ は 1 ページ 50 件） */
+  /** Maximum number of pages to follow (MDZ in 1.0 returns 50 per page) */
   maxPages?: number;
-  /** 集める当たりの上限 */
+  /** Maximum number of hits to collect */
   maxMatches?: number;
   signal?: AbortSignal;
   onPage?: (soFar: ContentSearchPage) => void;
@@ -337,11 +338,11 @@ export interface RunContentSearchOptions {
 export interface ContentSearchResult {
   matches: ContentSearchMatch[];
   total?: number;
-  /** 上限で打ち切った（続きがまだある） */
+  /** Stopped at the limit (more remain) */
   truncated: boolean;
 }
 
-/** 検索して、続きのページを上限までたどる。 */
+/** Search and follow the next pages up to the limit. */
 export async function runContentSearch(
   service: { id: string },
   q: string,
@@ -367,7 +368,7 @@ export async function runContentSearch(
   return { matches: matches.slice(0, maxMatches), ...(total !== undefined ? { total } : {}), truncated: truncated || matches.length > maxMatches };
 }
 
-/** 候補語を取りに行く。 */
+/** Fetch suggested terms. */
 export async function fetchContentSearchTerms(
   autocomplete: { id: string },
   q: string,
@@ -378,7 +379,7 @@ export async function fetchContentSearchTerms(
   return parseAutocompleteResponse(await fetchJson(withQuery(autocomplete.id, { q: q.trim() })), locale);
 }
 
-/** 当たりを Canvas ごとに分ける（一覧の見出しと、画像の上の印に使う）。 */
+/** Group hits by Canvas (used for list headings and markers on the image). */
 export function groupMatchesByCanvas(matches: ContentSearchMatch[]): Map<string, ContentSearchMatch[]> {
   const out = new Map<string, ContentSearchMatch[]>();
   for (const m of matches) {
@@ -390,9 +391,9 @@ export function groupMatchesByCanvas(matches: ContentSearchMatch[]): Map<string,
 }
 
 /**
- * 1 つの Canvas の当たりを、画像の上の印にする AnnotationPage にする（motivation は highlighting）。
- * 印の id は当たりの id にそろえるので、一覧で選ぶと画像の上の同じ印が選ばれる。
- * 2 か所にまたがる当たりは、2 つ目以降の id に `#<番号>` を付ける。
+ * Turn the hits of one Canvas into an AnnotationPage of markers on the image (motivation is highlighting).
+ * Marker ids match hit ids, so selecting in the list selects the same marker on the image.
+ * For a hit spanning two or more places, the second and later ids get a `#<number>` suffix.
  */
 export function contentSearchAnnotationPage(canvasId: string, matches: ContentSearchMatch[]): Record<string, unknown> {
   const items: Json[] = [];
@@ -404,6 +405,8 @@ export function contentSearchAnnotationPage(canvasId: string, matches: ContentSe
         items.push({
           id: i === 0 ? m.id : `${m.id}#${i}`,
           type: 'Annotation',
+          // the marks of one hit are selected together (see selectionKeyOf)
+          hitId: m.id,
           motivation: 'highlighting',
           ...(r.granularity ? { textGranularity: r.granularity } : {}),
           body: { type: 'TextualBody', value: r.text ?? m.match, format: 'text/plain' },
@@ -419,7 +422,25 @@ export function contentSearchAnnotationPage(canvasId: string, matches: ContentSe
   };
 }
 
-/** Text Granularity の決まった単位。大きい順。 */
+/**
+ * The smallest box that contains every region of the hit on the given Canvas (with the number of regions), or undefined when none has a box.
+ * A hit that spans several words has one region per word; the view must fit all of them.
+ */
+export function hitUnionXywh(
+  regions: ContentSearchRegion[],
+  canvasId: string,
+): { box: [number, number, number, number]; count: number } | undefined {
+  const rings = regions.flatMap((r): [number, number][][] =>
+    r.canvasId === canvasId && r.xywh
+      ? [[[r.xywh[0], r.xywh[1]], [r.xywh[0] + r.xywh[2], r.xywh[1] + r.xywh[3]]]]
+      : [],
+  );
+  if (rings.length === 0) return undefined;
+  const { x, y, w, h } = bboxOf(rings);
+  return { box: [x, y, w, h], count: rings.length };
+}
+
+/** The fixed Text Granularity units, largest first. */
 export const TEXT_GRANULARITIES = ['page', 'block', 'paragraph', 'line', 'word', 'glyph'] as const;
 
 export * from './local';

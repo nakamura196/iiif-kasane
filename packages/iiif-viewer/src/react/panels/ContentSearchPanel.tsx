@@ -7,6 +7,7 @@ import {
   collectManifestAnnotations,
   containersOf,
   contentSearchAnnotationPage,
+  hitUnionXywh,
   fetchContentSearchTerms,
   findContentSearchService,
   findSceneAnnotation,
@@ -37,49 +38,50 @@ import { localAnnotationPagesAtom, selectedCanvasAnnotationAtom, type LocalAnnot
 import { fetchPage } from '../overlays/useCanvasAnnotations';
 import type { Panel, PanelContext } from './types';
 
-// 資料の中の文字を探す。探す先は 2 つ:
-// - 窓口（IIIF Content Search API 1.0 / 2.0）。マニフェストの service に書かれたもの
-// - 手元の注釈。マニフェストの注釈（参照だけのページは取りに行く）と、ブラウザ内の推論の結果、
-//   字幕・文字起こしのファイル（WebVTT と text/plain。字幕の当たりは押すとその時刻へ移る）
-// 当たりは一覧に出し、画像の上にも印を出す（推論の結果と同じ「手元の注釈」の仕組みを使う）。
-// 押すとそのページに移り、当たった所へ寄る。単位（行・語）が書いてあれば、それで絞り込める。
+// Search the text inside a resource. There are two places to search:
+// - A search service (IIIF Content Search API 1.0 / 2.0) declared in the manifest's service
+// - Local annotations: the manifest's annotations (pages that only hold a reference are fetched), in-browser inference results,
+//   and caption/transcript files (WebVTT and text/plain; selecting a caption hit seeks to its time)
+// Hits are listed and also marked on the image (using the same local-annotation mechanism as inference results).
+// Selecting a hit moves to its page and zooms to the match. If units (line, word) are given, they can be used to filter.
 
-export const CONTENT_SEARCH_SOURCE = 'content-search';
+import { CONTENT_SEARCH_SOURCE } from '../overlays/contentSearchSource';
+export { CONTENT_SEARCH_SOURCE };
 const SOURCE = CONTENT_SEARCH_SOURCE;
 const MAX_PAGES = 20;
 const MAX_MATCHES = 2000;
-/** 一覧に一度に出す数（Wellcome は 1 回で 1,753 件を返すことがある） */
+/** Number of hits shown in the list at a time (Wellcome can return 1,753 in one response) */
 const LIST_STEP = 200;
 
 const BUTTON =
   'px-2.5 py-1 rounded border border-gray-300 dark:border-gray-600 text-xs hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40';
 const PRIMARY = 'px-3 py-1 rounded text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-40';
 
-/** service: 提供元の窓口。local: 手元の注釈 */
+/** service: the provider's search service. local: local annotations */
 type Scope = 'service' | 'local';
 
 interface SearchState {
-  /** 何回目の検索か。古い検索の応答が後から届いても、新しい結果を上書きしない */
+  /** Which search this is. A late response from an old search must not overwrite newer results */
   run: number;
-  /** どのマニフェストの検索か（別の資料を開いたら捨てる） */
+  /** Which manifest this search belongs to (discarded when another resource is opened) */
   manifestId: string;
   q: string;
   scope: Scope;
   status: 'running' | 'done' | 'error';
   result?: ContentSearchResult;
-  /** 手元の注釈: 取りに行く注釈のページの進み具合 */
+  /** Local annotations: progress of fetching the annotation pages */
   progress?: { done: number; total: number };
-  /** 手元の注釈: 取りに行けなかった・上限で取りに行かなかったページの数 */
+  /** Local annotations: number of pages that failed to load or were skipped because of the limit */
   missed?: number;
 }
 
-/** 検索の結果。タブを切り替えても残す。Viewer に 1 つ（jotai store ごと）。 */
+/** Search results. Kept when switching tabs. One per Viewer (per jotai store). */
 const contentSearchAtom = atom<SearchState | null>(null);
 let runCounter = 0;
-/** 絞り込む単位（null はすべて） */
+/** Unit to filter by (null means all) */
 const granularityAtom = atom<string | null>(null);
 const showMarksAtom = atom<boolean>(true);
-/** 選んだ探す先（null は既定: 窓口があれば窓口） */
+/** Chosen search target (null is the default: the search service if there is one) */
 const scopeAtom = atom<Scope | null>(null);
 
 const fetchJson = async (url: string): Promise<unknown> => {
@@ -100,7 +102,7 @@ const urlParam = (name: string): string => {
 };
 const urlQuery = () => urlParam('q');
 
-/** 手元の注釈のうち、検索の対象にするもの（検索の印そのものは除く）。推論の結果は、画像に出していなくても探す。 */
+/** Local annotations to search (excluding the search markers themselves). Inference results are searched even when not shown on the image. */
 const localSearchPages = (local: LocalAnnotationPage[], inference: Record<string, { canvasId: string; modelId: string; page: unknown }>) => {
   const out = local.filter((l) => l.source !== SOURCE);
   for (const r of Object.values(inference)) {
@@ -111,9 +113,9 @@ const localSearchPages = (local: LocalAnnotationPage[], inference: Record<string
 };
 
 /**
- * 手元で探せるか（タブを出すか）。
- * Canvas: 字幕のファイルを指すだけの注釈しか無い資料（Cookbook 0219 など）では、探せる文字が無いので出さない。
- * 3D の Scene: 読み込んだ Scene の注釈（見出し・本文）を探す。注釈が 1 件も無ければ出さない。
+ * Whether local search is possible (whether to show the tab).
+ * Canvas: hide it for resources whose only annotations point to caption files (e.g. Cookbook 0219), as there is no text to search.
+ * 3D Scene: searches the loaded Scene's annotations (headings and body). Hidden if there are none.
  */
 export const canSearchLocal = ({ container, manifest, localAnnotationCount, annotationCount }: PanelContext) =>
   container?.kind === 'Scene'
@@ -135,7 +137,7 @@ function useAutocomplete(service: ContentSearchService | undefined, text: string
     const timer = window.setTimeout(() => {
       fetchContentSearchTerms(ac, q, fetchJson, locale).then(
         (ts) => live && setTerms({ q, terms: ts.slice(0, 20) }),
-        () => {}, // 候補が出ないだけにする
+        () => {}, // Only suppresses suggestions
       );
     }, 250);
     return () => {
@@ -162,7 +164,7 @@ function Highlighted({ text, q }: { text: string; q: string }) {
   );
 }
 
-// 3D の当たり: 注釈の見出しを 1 行目に（探した語を目立たせる）、本文を小さく 2 行目に出す
+// 3D hit: show the annotation heading on the first line (highlighting the searched term) and the body smaller on the second
 function SceneMatchText({ match, q, title }: { match: ContentSearchMatch; q: string; title: string }) {
   const body = match.regions[0]?.text ?? '';
   return (
@@ -207,7 +209,7 @@ export function ContentSearchPanelBody(ctx: PanelContext) {
   const [selected, setSelected] = useAtom(selectedCanvasAnnotationAtom);
   const setRequest = useSetAtom(navRequestAtom);
   const current = state && state.manifestId === manifestId ? state : null;
-  // 窓口があれば窓口から。URL の scope=local か、選び直したときは手元の注釈
+  // Use the search service if there is one. Local annotations if the URL has scope=local or the user re-selected them
   const wantedScope: Scope = scopeChoice ?? (urlParam('scope') === 'local' ? 'local' : 'service');
   const scope: Scope = !service ? 'local' : !localOk ? 'service' : wantedScope;
   const [text, setText] = useState(() => current?.q ?? urlQuery());
@@ -223,7 +225,7 @@ export function ContentSearchPanelBody(ctx: PanelContext) {
     const ctl = new AbortController();
     abort.current = ctl;
     const run = ++runCounter;
-    // この検索がまだ最新のときだけ書く（タブを開き直すと abort.current は別物になるため、番号でも見る）
+    // Write only while this search is still the latest (abort.current changes when the tab is reopened, so check the sequence number too)
     const put = (next: Omit<SearchState, 'run' | 'manifestId' | 'q' | 'scope'>) =>
       setState((prev) => (ctl.signal.aborted || prev?.run !== run ? prev : { run, manifestId, q: word, scope: where, ...next }));
     setLimit(LIST_STEP);
@@ -231,14 +233,14 @@ export function ContentSearchPanelBody(ctx: PanelContext) {
     setSelected(null);
     setState({ run, manifestId, q: word, scope: where, status: 'running' });
     if (where === 'local' && isScene) {
-      // 3D の Scene: 読み込み済みの注釈をその場で探す（取りに行くものは無い）
+      // 3D Scene: search the already-loaded annotations in place (nothing to fetch)
       const matches = searchSceneAnnotations(sceneAnnotations, container!.id, word, MAX_MATCHES);
       put({ status: 'done', result: { matches, truncated: matches.length >= MAX_MATCHES } });
       return;
     }
     if (where === 'local') {
       const pages = localSearchPages(local, inference);
-      // 字幕・文字起こしのファイルは注釈と並行して読む。読めなかったものは「読み込めなかった」の数に入れる
+      // Caption/transcript files are read in parallel with annotations. Those that fail are counted as failed to load
       const transcripts = Promise.all(
         transcriptFilesOf(manifest).map((f) =>
           fetchText(f.url).then(
@@ -276,7 +278,7 @@ export function ContentSearchPanelBody(ctx: PanelContext) {
       maxPages: MAX_PAGES,
       maxMatches: MAX_MATCHES,
       signal: ctl.signal,
-      // 1 ページ目が来た時点で一覧を出す（続きは後から足される）
+      // Show the list as soon as the first page arrives (the rest is appended later)
       onPage: (soFar) => put({ status: 'running', result: { ...soFar, truncated: false } }),
     }).then(
       (result) => put({ status: 'done', result }),
@@ -284,19 +286,19 @@ export function ContentSearchPanelBody(ctx: PanelContext) {
     );
   };
 
-  // ?q= があれば、開いたときに 1 回だけ探す
+  // If ?q= is present, search once on open
   const fromUrl = useRef(false);
   useEffect(() => {
     if (fromUrl.current || (!service && !localOk)) return;
     fromUrl.current = true;
     const q = urlQuery();
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- URL はブラウザでしか読めない
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the URL can only be read in the browser
     if (q && (current?.q !== q || current.scope !== scope)) search(q);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [service, localOk]);
 
-  // タブを閉じても検索は止めない（結果は Viewer の状態に残り、印も出し続ける）。
-  // 止めるのは、次の検索を始めたときと「消す」を押したときだけ。
+  // Closing the tab does not stop the search (results stay in Viewer state and the markers keep showing).
+  // It stops only when the next search starts or when Clear is pressed.
 
   const matches = useMemo(() => current?.result?.matches ?? [], [current]);
   const granularities = useMemo(
@@ -308,7 +310,7 @@ export function ContentSearchPanelBody(ctx: PanelContext) {
     [matches, granularity],
   );
 
-  // 画像の上の印。当たりのある Canvas ごとに 1 ページ（絞り込みに合わせる）
+  // Markers on the image: one page per Canvas that has hits (following the filter)
   useEffect(() => {
     setLocal((ls) => {
       const rest = ls.filter((l) => l.source !== SOURCE);
@@ -324,7 +326,7 @@ export function ContentSearchPanelBody(ctx: PanelContext) {
 
   const canvasLabels = useMemo(() => {
     const m = new Map<string, string>();
-    // 何枚目かを必ず出す。ラベルが番号と同じか「-」（Wellcome の番号の無いページ）のときは番号だけ
+    // Always show the ordinal. If the label equals the number or is "-" (unnumbered Wellcome pages), show only the number
     containersOf(manifest).forEach((c, i) => {
       const n = `${i + 1}`;
       const label = labelIn(c.label, locale).trim();
@@ -341,19 +343,23 @@ export function ContentSearchPanelBody(ctx: PanelContext) {
 
   const open = (m: ContentSearchMatch) => {
     setSelected(m.id);
-    // 3D の Scene の当たり: 注釈の一覧で選ぶのと同じ状態を立てる（カメラが寄り、ラベルが開く）
+    // 3D Scene hit: set the same state as selecting it in the annotation list (the camera moves in and the label opens)
     if (isSceneMatch(m)) {
       const hit = findSceneAnnotation(m, sceneAnnotations);
       if (hit) setSelectedScene(hit.id);
       return;
     }
-    // 字幕の当たりは、その Canvas のその時刻へ
+    // A caption hit goes to that time on that Canvas
     if (m.time) {
       setRequest({ seq: nextSeq(), target: { canvasId: m.canvasId, t: m.time } });
       return;
     }
-    const box = m.regions.find((r) => r.canvasId === m.canvasId && r.xywh)?.xywh;
-    setRequest({ seq: nextSeq(), target: { canvasId: m.canvasId, ...(box ? { xywh: box } : {}) } });
+    // fit all the regions of the hit (a phrase spans several words), not only the first
+    const union = hitUnionXywh(m.regions, m.canvasId);
+    // A hit of several words: while the marks are shown they mark each word, so no frame is drawn around the union
+    // (it would also cover the text between the words). With the marks hidden the frame is the only sign of the hit.
+    const marked = showMarks && (union?.count ?? 0) > 1;
+    setRequest({ seq: nextSeq(), target: { canvasId: m.canvasId, ...(union ? { xywh: union.box } : {}) }, ...(marked ? { highlight: false } : {}) });
   };
 
   const clear = () => {
@@ -375,7 +381,7 @@ export function ContentSearchPanelBody(ctx: PanelContext) {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1500);
     } catch {
-      // クリップボードが使えない環境では何もしない
+      // Do nothing where the clipboard is unavailable
     }
   };
 
@@ -424,7 +430,7 @@ export function ContentSearchPanelBody(ctx: PanelContext) {
               aria-pressed={scope === s}
               onClick={() => {
                 setScopeChoice(s);
-                // 探した語があれば、選び直した先で探し直す
+                // If a term was searched, search again on the newly chosen target
                 if (current && current.scope !== s) search(current.q, s);
               }}
               className={`px-2 py-0.5 rounded-full border ${
@@ -467,7 +473,7 @@ export function ContentSearchPanelBody(ctx: PanelContext) {
           ) : null}
           {result && matches.length > 0 ? (
             <div className="flex flex-wrap items-center gap-2">
-              {/* 字幕の当たりには画像の上の印が無いので、印の出る当たりがあるときだけ */}
+              {/* Caption hits have no marker on the image, so show this only when there are hits with markers */}
               {matches.some((m) => m.regions.length > 0 && !isSceneMatch(m)) ? (
                 <label className="inline-flex items-center gap-1 text-xs">
                   <input type="checkbox" checked={showMarks} onChange={(e) => setShowMarks(e.target.checked)} />
@@ -564,11 +570,11 @@ export function ContentSearchPanelBody(ctx: PanelContext) {
   );
 }
 
-// 文字の検索。マニフェストに検索の窓口（SearchService2 / SearchService1）が書かれているか、
-// 手元に探せる文字（本文のある注釈・推論の結果・字幕と文字起こしのファイル）があるときに出す。
+// Text search. Shown when the manifest declares a search service (SearchService2 / SearchService1),
+// or when there is local searchable text (annotations with a body, inference results, caption and transcript files).
 export const contentSearchPanel: Panel = {
   id: 'contentSearch',
-  // 書き起こし（70）と Canvas の注釈（80）の間
+  // Between the transcript (70) and Canvas annotations (80)
   order: 75,
   available: (ctx) => !!findContentSearchService(ctx.manifest) || canSearchLocal(ctx),
   Component: ContentSearchPanelBody,

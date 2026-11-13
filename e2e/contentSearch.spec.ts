@@ -90,20 +90,49 @@ test('Content Search 2.0: 当たりの一覧・単位の絞り込み・候補語
   // The line hit is marked on the image of page 1
   await expect(page.locator(`[data-overlay="annotations"] [data-annotation-id="${BASE}/annotation/line-1"]`)).toBeVisible();
 
-  // Clicking a hit that spans two words moves to page 2
+  // Selecting a hit that spans two words moves to the second page, fits the whole hit (2 words) on screen, and shows two markers.
+  // Check after the zoom animation finishes (mid-animation both markers are visible, which is timing-dependent).
   await page.locator('mark', { hasText: 'blue bird' }).click();
   await expect(page.getByText('2 / 2')).toBeVisible();
+  const marks = page.locator(`[data-overlay="annotations"] [data-annotation-id^="${BASE}/annotation/word-12"]`);
+  // the two marks stay put for 600 ms (the zoom has settled)
+  let last = '';
+  let still = 0;
+  await expect
+    .poll(async () => {
+      const rects = await marks.evaluateAll((els) => els.map((e) => e.getBoundingClientRect().toJSON()));
+      const boxes = JSON.stringify(rects);
+      // stable means: both marks are there and have not moved
+      still = rects.length === 2 && boxes === last ? still + 1 : 0;
+      last = boxes;
+      return still;
+    }, { intervals: [100] })
+    .toBeGreaterThanOrEqual(6);
+  await expect(marks).toHaveCount(2);
+  // both marks are fully inside the visible area (toBeInViewport honours the clipping of the stage)
+  for (let i = 0; i < 2; i++) await expect(marks.nth(i)).toBeInViewport({ ratio: 0.99 });
+  // No frame around the union of the words: it would also cover the text between them (the marks show each word)
+  await expect(page.getByTestId('region-highlight')).toHaveCount(0);
+
+  // Pressing the second word of the hit (the hit is selected by now, so the first press clears it) ...
+  const row = page.locator('button[aria-current]', { hasText: 'blue bird' });
+  await expect(row).toHaveCount(1);
+  await marks.nth(1).click();
+  await expect(row).toHaveCount(0);
+  // ... and pressing it again selects the whole hit: the row of the hit is the current one
+  await marks.nth(1).click();
+  await expect(row).toHaveCount(1);
 });
 
-// FIXME(#341): clicking a multi-word hit zooms to the first word's box, and AnnotationOverlay culls marks outside
-// the view, so the second word's mark ("bird") disappears after the zoom animation (page 2 shows one mark, not two).
-// Not caused by #320. Re-enable (test.fixme -> test) once the zoom covers the union of the hit's boxes.
-test.fixme('Content Search 2.0: a hit spanning two words draws two marks on page 2', async ({ page }) => {
+test('Content Search 2.0: with the marks hidden, a multi-word hit is still framed', async ({ page }) => {
   await serveBook(page);
   await page.goto(`/ja/viewer/?iiif-content=${encodeURIComponent(`${BASE}/manifest`)}&tab=contentSearch&q=bird`);
+  await expect(page.getByText('「bird」: 2 件（全 5 件）')).toBeVisible();
+  await page.getByLabel('画像に印を出す').uncheck();
   await page.locator('mark', { hasText: 'blue bird' }).click();
   await expect(page.getByText('2 / 2')).toBeVisible();
-  await expect(page.locator(`[data-overlay="annotations"] [data-annotation-id^="${BASE}/annotation/word-12"]`)).toHaveCount(2);
+  // without marks the frame is the only sign of the hit
+  await expect(page.getByTestId('region-highlight')).toBeVisible();
 });
 
 test('Content Search 1.0（MDZ の実物）: ?q= で開くと探してある', { tag: '@external' }, async ({ page }) => {

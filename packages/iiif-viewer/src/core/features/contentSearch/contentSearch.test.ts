@@ -9,6 +9,7 @@ import {
   fetchContentSearchTerms,
   findContentSearchService,
   groupMatchesByCanvas,
+  hitUnionXywh,
   parseAutocompleteResponse,
   parseContentSearchResponse,
   runContentSearch,
@@ -17,8 +18,8 @@ import {
 const fixture = (name: string): unknown =>
   JSON.parse(readFileSync(fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url)), 'utf8'));
 
-// 2026-10-15 に取った実物（件数を減らしてある）と、2.0 の仕様の例に沿って手で書いたもの。
-// 2.0 の窓口を持つ公開の資料は見つからなかった。
+// Real responses captured on 2026-10-15 (with fewer items) and hand-written ones following the 2.0 spec examples.
+// No public resource with a 2.0 search service was found.
 
 describe('findContentSearchService label', () => {
   it('picks the label in the locale asked for', () => {
@@ -119,7 +120,7 @@ describe('contentSearchTargetOf', () => {
     expect(
       contentSearchTargetOf({ type: 'SpecificResource', source: { id: 'https://e.org/c1' }, selector: { type: 'FragmentSelector', value: 'xywh=5,6,7,8' } }),
     ).toEqual({ canvasId: 'https://e.org/c1', xywh: [5, 6, 7, 8] });
-    // 1.0 の書き方（full）
+    // 1.0 style (full)
     expect(contentSearchTargetOf({ '@type': 'oa:SpecificResource', full: 'https://e.org/c1', selector: { value: 'xywh=1,1,2,2' } })).toEqual({
       canvasId: 'https://e.org/c1',
       xywh: [1, 1, 2, 2],
@@ -239,5 +240,19 @@ describe('contentSearchAnnotationPage', () => {
       ['https://example.org/book1/annotation/word-12', 'https://example.org/book1/canvas/p2#xywh=200,300,40,18', 'word', 'highlighting'],
       ['https://example.org/book1/annotation/word-12#1', 'https://example.org/book1/canvas/p2#xywh=60,320,38,18', 'word', 'highlighting'],
     ]);
+    // both marks name their hit, so that they are selected together
+    expect(page.items.map((a) => a.hitId)).toEqual(Array(2).fill('https://example.org/book1/annotation/word-12'));
+  });
+});
+
+describe('hitUnionXywh', () => {
+  const c = 'https://example.org/book1/canvas/p2';
+  it('covers every region of the hit on the Canvas, ignoring other Canvases and regions without a box', () => {
+    const { matches } = parseContentSearchResponse(fixture('search2-handmade.json'));
+    const phrase = matches.find((m) => m.match === 'blue bird')!;
+    // blue (200,300,40,18) and bird (60,320,38,18)
+    expect(hitUnionXywh(phrase.regions, c)).toEqual({ box: [60, 300, 180, 38], count: 2 });
+    expect(hitUnionXywh(phrase.regions, 'https://example.org/book1/canvas/p1')).toBeUndefined();
+    expect(hitUnionXywh([{ annotationId: 'a', canvasId: c }], c)).toBeUndefined();
   });
 });

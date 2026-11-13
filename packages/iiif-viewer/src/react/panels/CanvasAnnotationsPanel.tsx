@@ -6,9 +6,12 @@ import {
   annotationSourcesOf,
   canvasTagFacets,
   containersOf,
+  annotationsOfSelection,
   focusBoxOf,
   matchesCanvasAnnotation,
   searchTerms,
+  selectedHitOf,
+  selectionKeyOf,
   type RegionGroup,
   embeddedCanvasAnnotations,
   groupByRegion,
@@ -45,7 +48,7 @@ const KNOWN_MOTIVATIONS = new Set([
   'bookmarking', 'highlighting', 'questioning', 'replying', 'editing', 'moderating', 'painting',
 ]);
 
-// タグの札は、多い順にこの数まで出す（残りは「すべて表示」で開く）。値がばらばらのタグで札がパネルを埋めないように
+// Show tag chips up to this number, most frequent first (the rest open with "Show all"), so tags with scattered values do not fill the panel
 const TAG_LIMIT = 20;
 
 const isKnownGranularity = (g: string) => (TEXT_GRANULARITIES as readonly string[]).includes(g);
@@ -77,7 +80,7 @@ function Item({
   const locale = useLocale();
   const bodies = pickBodies(annotation.bodies, locale).filter((b) => !isResourceBody(b));
   const motivation = annotation.painted ? 'painting' : annotation.motivations[0];
-  // 「コメント」（既定の目的）と、枠のある注釈の「領域」は書かない。番号の札が画像の上の枠と対応するため
+  // Do not label "comment" (the default purpose) or "region" for annotations with a frame, because the numbered chip corresponds to the frame on the image
   const notes: string[] = [];
   if (motivation && motivation !== 'commenting')
     notes.push(KNOWN_MOTIVATIONS.has(motivation) ? t(`canvasAnnotationsMotivation_${motivation}`) : motivation);
@@ -117,12 +120,12 @@ function Item({
   );
 }
 
-// 一覧の 1 行: 注釈のまとまり（AnnotationCollection）の見出しか、注釈（同じ領域のものは 1 行）
+// One list row: a heading for a group of annotations (AnnotationCollection) or an annotation (those with the same region share one row)
 type Row =
   | { kind: 'header'; key: string; label: unknown; fallback: string; count: number }
   | { kind: 'item'; key: string; group: RegionGroup<CanvasAnnotation> };
 
-// 一覧の上の余白（スクロールする枠の padding-top と同じ値）
+// Top padding of the list (same value as padding-top of the scrolling frame)
 const LIST_TOP = 8;
 
 export function CanvasAnnotationsPanelBody({ container, manifest }: PanelContext) {
@@ -132,14 +135,16 @@ export function CanvasAnnotationsPanelBody({ container, manifest }: PanelContext
   // the same numbers as the marks on the image (none when there are very many)
   const numbers = useMemo(() => annotationNumbers(all), [all]);
   const [selected, setSelected] = useAtom(selectedCanvasAnnotationAtom);
-  // Text Granularity: 行と語が両方あるときなど、単位で絞り込めるようにする
+  // the same rule as the marks on the image: all the marks of a search hit are selected together
+  const selectedHit = useMemo(() => selectedHitOf(selected, all), [selected, all]);
+  // Text Granularity: allow filtering by unit, e.g. when both lines and words exist
   const [granularity, setGranularity] = useAtom(canvasAnnotationGranularityAtom);
   const [query, setQuery] = useAtom(canvasAnnotationQueryAtom);
   const [focusOnSelect, setFocusOnSelect] = useAtom(canvasAnnotationFocusOnSelectAtom);
   const [chosenTags, setChosenTags] = useAtom(canvasAnnotationTagsAtom);
   const [allTagsShown, setAllTagsShown] = useState(false);
   const setRequest = useSetAtom(navRequestAtom);
-  // 打っている間は入力を先に返し、一覧の絞り込みは後から追いつかせる
+  // While typing, update the input first and let the list filtering catch up later
   const deferredQuery = useDeferredValue(query);
   const granularities = useMemo(
     () =>
@@ -154,9 +159,9 @@ export function CanvasAnnotationsPanelBody({ container, manifest }: PanelContext
     [all, activeGranularity],
   );
   const terms = useMemo(() => searchTerms(deferredQuery), [deferredQuery]);
-  // タグ（「キー: 値」）の札。件数は一覧の行と同じく、場所の数で数える
+  // Tag chips ("key: value"). Counts are by number of locations, like the list rows
   const tagFacets = useMemo(() => canvasTagFacets(groupByRegion(annotations), locale), [annotations, locale]);
-  // 選んだタグのうち、今の Canvas と単位にあるものだけで絞る（無いタグで一覧が空にならないように）
+  // Filter only by selected tags that exist in the current Canvas and unit (so a missing tag does not empty the list)
   const tags = useMemo(
     () => chosenTags.filter((v) => tagFacets.some((f) => f.value === v)),
     [chosenTags, tagFacets],
@@ -215,7 +220,9 @@ export function CanvasAnnotationsPanelBody({ container, manifest }: PanelContext
   const rowOf = useMemo(() => {
     const m = new Map<string, number>();
     rows.forEach((r, i) => {
-      if (r.kind === 'item') for (const a of r.group.annotations) m.set(a.id, i);
+      if (r.kind !== 'item') return;
+      // keyed by what selection compares on: the first row (in list order) of a search hit's marks
+      for (const a of r.group.annotations) if (!m.has(selectionKeyOf(a))) m.set(selectionKeyOf(a), i);
     });
     return m;
   }, [rows]);
@@ -224,25 +231,29 @@ export function CanvasAnnotationsPanelBody({ container, manifest }: PanelContext
     if (i !== undefined) scrollRowIntoView(scroller.current, list.offsets, i, LIST_TOP);
   });
   useEffect(() => {
-    if (!selected) return;
-    showRow(selected);
+    if (!selectedHit) return;
+    showRow(selectedHit);
     // once more after the rows drawn there are measured (their heights were estimated)
     let id = requestAnimationFrame(() => {
-      id = requestAnimationFrame(() => showRow(selected));
+      id = requestAnimationFrame(() => showRow(selectedHit));
     });
     return () => cancelAnimationFrame(id);
-  }, [selected]);
+  }, [selectedHit]);
 
   const choose = (a: CanvasAnnotation, isSelected: boolean) => {
     // an annotation on a moment of a video or audio: go there, so that its frame is shown
     // (a little past the start: a seek may land a hair before the asked position)
     if (a.time && !isSelected) seek(a.time.start + 0.01);
     if (focusOnSelect && !isSelected && container) {
-      const box = focusBoxOf(a.region, { width: container.width ?? 0, height: container.height ?? 0 });
+      // all the marks of a search hit (one annotation otherwise), so that every word of the hit is in view
+      const box = focusBoxOf(
+        annotationsOfSelection(all, selectionKeyOf(a)).map((m) => m.region),
+        { width: container.width ?? 0, height: container.height ?? 0 },
+      );
       // the chosen annotation is marked on the image already: no second box around the wider part shown
       if (box) setRequest({ seq: nextSeq(), target: { canvasId: container.id, xywh: box }, highlight: false });
     }
-    setSelected(isSelected ? null : a.id);
+    setSelected(isSelected ? null : selectionKeyOf(a));
   };
 
   const searching = query.trim().length > 0 || tags.length > 0;
@@ -351,7 +362,7 @@ export function CanvasAnnotationsPanelBody({ container, manifest }: PanelContext
           <p className="text-sm text-gray-500 dark:text-gray-300">{t('canvasAnnotationsNoMatch')}</p>
         ) : null}
       </div>
-      {/* 見えている行とその前後だけを描く（注釈が数万件あっても重くならないように） */}
+      {/* Render only the visible rows and their neighbors (so tens of thousands of annotations stay light) */}
       <div
         ref={scroller}
         className="flex-1 min-h-0 overflow-auto px-3 pb-3 [overflow-anchor:none]"
@@ -370,7 +381,7 @@ export function CanvasAnnotationsPanelBody({ container, manifest }: PanelContext
                   (() => {
                     const rg = r.group;
                     const card = (a: CanvasAnnotation) => {
-                      const isSelected = a.id === selected;
+                      const isSelected = selectedHit !== null && selectionKeyOf(a) === selectedHit;
                       return (
                         <Item
                           key={a.id}
@@ -405,12 +416,12 @@ function LabelOf({ label, fallback }: { label: unknown; fallback: string }) {
   return <>{labelIn(label, locale) || fallback}</>;
 }
 
-// Canvas 上の注釈（コメント・タグ・リンクなど）の一覧。3D の Scene では出さない。
+// List of annotations on the Canvas (comments, tags, links, etc.). Not shown for 3D Scenes.
 export const canvasAnnotationsPanel: Panel = {
   id: 'canvasAnnotations',
 
   order: 80,
-  // 書かれている注釈か、取りに行く参照か、このページの画像に重ねている手元の注釈（推論の結果など）があるときだけ出す
+  // Show only when there are written annotations, references to fetch, or local annotations (e.g. inference results) overlaid on this page's image
   available: ({ container, manifest, containerLocalAnnotationCount }) => {
     if (container?.kind !== 'Canvas') return false;
     if ((containerLocalAnnotationCount ?? 0) > 0) return true;
