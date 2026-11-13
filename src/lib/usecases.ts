@@ -416,6 +416,21 @@ export const USE_CASES: UseCase[] = [
     site: 'https://www.ndl.go.jp/d_exhibitions/emaki/22',
   },
   {
+    id: 'smithsonian-triceratops-tour',
+    added: '2026-11-12',
+    title: {
+      ja: 'スミソニアンのトリケラトプスの 3D ツアー（ストーリー）',
+      en: '3D tour of the Smithsonian Triceratops (story)',
+    },
+    note: {
+      ja: 'スミソニアン国立自然史博物館が Voyager で公開しているトリケラトプスのツアーを、IIIF のマニフェストに変換しました。「次へ」を押すと、8 つの段ごとに視点が移り、その部位の注釈が開きます。記事のある段では、博物館の記事が右の欄にそのまま出ます。模型と記事は、スミソニアンの配信元から直接読み込みます（模型は CC0）。',
+      en: 'The Smithsonian National Museum of Natural History’s Voyager tour of its Triceratops, converted to a IIIF manifest. Press Next to move through eight steps: the view changes and the note on that part of the skeleton opens. Where a step has an article, the museum’s article appears as it is in the side panel. The model and the articles are loaded straight from the Smithsonian (the model is CC0).',
+    },
+    open: { page: 'viewer', manifest: `${SITE_URL}/manifests/si-triceratops.json`, tab: 'story' },
+    features: ['3d', 'annotations', 'story'],
+    site: 'https://3d-api.si.edu/voyager/3d_package:d8c623be-4ebc-11ea-b77f-2e728ce88125',
+  },
+  {
     id: 'wellcome-auth',
     added: '2026-10-14',
     title: {
