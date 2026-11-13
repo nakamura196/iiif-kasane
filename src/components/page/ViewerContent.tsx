@@ -26,11 +26,20 @@ const dragHasFiles = (e: React.DragEvent) => Array.from(e.dataTransfer.types).in
 
 // ビューアが左下に置く場所（renderActions）から、比較に渡せるかを受け取るだけの部品。何も描かない。
 // 候補の無い Canvas に移ると呼ばれなくなる（外される）ので、そのとき null に戻す。
-function CompareReport({ target, onChange }: { target: number | null; onChange: (c: CompareTarget) => void }) {
+// The index counts in the manifest shown now (the entry of a Collection, if one is open), so it goes with that URL.
+function CompareReport({
+  target,
+  manifestUrl,
+  onChange,
+}: {
+  target: number | null;
+  manifestUrl: string;
+  onChange: (c: CompareTarget) => void;
+}) {
   useEffect(() => {
-    onChange(target === null ? null : { selectedIndex: target });
+    onChange(target === null ? null : { selectedIndex: target, manifestUrl });
     return () => onChange(null);
-  }, [target, onChange]);
+  }, [target, manifestUrl, onChange]);
   return null;
 }
 
@@ -232,8 +241,8 @@ const ViewerContent: NextPage = () => {
             // 閉じた右パネルは中身を描かないので、パズルのリンクで開いたときは開いておく
             panelOpen={puzzleLink ? true : undefined}
             // 左下には何も出さず、候補があるかだけを受け取って「ほかの表示」タブの比較に渡す
-            renderActions={({ hasChoices, selectedIndex }) => (
-              <CompareReport target={hasChoices ? selectedIndex : null} onChange={setCompare} />
+            renderActions={({ iiifContent, hasChoices, selectedIndex }) => (
+              <CompareReport target={hasChoices ? selectedIndex : null} manifestUrl={iiifContent} onChange={setCompare} />
             )}
           />
         ) : (

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Puzzle, canPlayPuzzle, type Panel, type PanelContext } from 'iiif-kasane';
+import { Puzzle, canPlayPuzzle, useOptionalViewer, type Panel, type PanelContext } from 'iiif-kasane';
 import { Link } from '@/i18n/routing';
 import { containersOf, contentParam } from 'iiif-kasane/core';
 import { puzzleQuery } from '@/lib/puzzleLink';
@@ -30,8 +30,11 @@ const BUTTON =
   'inline-block px-3 py-1.5 rounded text-sm text-white bg-blue-600 hover:bg-blue-700 no-underline';
 const SELECT = 'rounded border border-gray-300 dark:border-gray-600 bg-transparent px-1 py-0.5 text-xs';
 
-/** 比較のページに渡せるとき、表示中の Canvas / Scene の番号。渡せないときは null。 */
-export type CompareTarget = { selectedIndex: number } | null;
+/**
+ * When the compare page can take it: the index of the shown Canvas / Scene, and the URL of the manifest
+ * the index counts in (the entry's URL after opening an entry of a Collection). null when it cannot.
+ */
+export type CompareTarget = { selectedIndex: number; manifestUrl?: string } | null;
 
 interface Props {
   manifestUrl: string;
@@ -57,6 +60,8 @@ function OtherViews({
 }: Props & { ctx: PanelContext }) {
   const t = useTranslations('OtherViews');
   const tb = useTranslations('Browse');
+  // the puzzle's page index counts in the shown manifest (the entry of a Collection, if one is open), so pair it with that URL
+  const shownUrl = useOptionalViewer()?.shownUrl ?? manifestUrl;
   const [browseLayout, setBrowseLayout] = useState<BrowseLayout>('table');
   const [mode, setMode] = useState<GalleryMode>('orbit');
   const [look, setLook] = useState<GalleryLook>('standard');
@@ -70,7 +75,7 @@ function OtherViews({
           <h3 className="font-semibold">{t('compareHeading')}</h3>
           <p className="text-xs text-gray-600 dark:text-gray-300">{t('compareHint')}</p>
           <Link
-            href={`/compare?${contentParam(manifestUrl)}${compare.selectedIndex > 0 ? `&canvas=${compare.selectedIndex}` : ''}`}
+            href={`/compare?${contentParam(compare.manifestUrl ?? manifestUrl)}${compare.selectedIndex > 0 ? `&canvas=${compare.selectedIndex}` : ''}`}
             className={BUTTON}
           >
             {t('open')}
@@ -161,7 +166,7 @@ function OtherViews({
             {...ctx}
             className="space-y-3"
             autoStart={puzzle && puzzle.canvasId === ctx.container?.id ? puzzle.size : undefined}
-            shareUrl={(size) => puzzleShareUrl(manifestUrl, ctx, size)}
+            shareUrl={(size) => puzzleShareUrl(shownUrl, ctx, size)}
             onClose={onPuzzleClose}
           />
         </section>

@@ -68,9 +68,22 @@ export const selectedAnnotationIdAtom = atom<string | null>(null);
 // 最初に渡された URL（iiif-content）。Collection をたどっても変わらない
 export const manifestUrlAtom = atom<string | null>(null);
 
-// いま表示している manifest（または Collection）の URL。Collection の項目を開くと、その項目の URL になる。
-// 元の manifest を読み直す部品（画像の表示・合成・比較）は、この URL を使う
-export const shownManifestUrlAtom = atom<string | null>(null);
+/**
+ * The manifest (or Collection) shown now, as one value: its URL, the JSON as served (before convertToV4,
+ * which drops the Image API service and other details that the displays need) and the converted one.
+ * `seq` grows by one each time something is shown, so parts can tell a new manifest from the same one shown again.
+ */
+export interface ShownManifest {
+  url: string;
+  raw: unknown;
+  manifest: ManifestV4;
+  seq: number;
+}
+export const shownManifestAtom = atom<ShownManifest | null>(null);
+
+// URL of the manifest (or Collection) shown now; after opening an entry of a Collection, the entry's URL.
+// Links (the compare page etc.) use it. The served JSON is in shownManifestAtom (not fetched again)
+export const shownManifestUrlAtom = atom((get) => get(shownManifestAtom)?.url ?? null);
 
 // アノテーション表示/非表示のアトム
 export const showAnnotationsAtom = atom<boolean>(true);

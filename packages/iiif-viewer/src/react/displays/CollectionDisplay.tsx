@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useAtomValue } from 'jotai';
 import {
   chronologyOf,
   collectionEntriesOf,
@@ -12,6 +13,7 @@ import {
   yearText,
   type CollectionEntry,
 } from '../../core';
+import { shownManifestAtom } from '../atoms';
 import { useLocale, useTranslations } from '../env';
 import { displayAfter } from './registry';
 import { useManifestSwitch } from './structureState';
@@ -86,8 +88,16 @@ function CollectionDisplay(props: DisplayProps) {
   const [state, setState] = useState<{ id: string; kind: 'opening' | 'error' } | null>(null);
   const [order, setOrder] = useState<'collection' | 'date'>('collection');
 
+  // the Collection as served is kept with the shown one; it is read again only when it is not this one
+  const shown = useAtomValue(shownManifestAtom);
+  const storedRaw = shown?.manifest === manifest && shown.raw != null ? shown.raw : null;
+  const stored = useMemo(
+    () => (isCollection && storedRaw ? { id: manifest.id, entries: collectionEntriesOf(storedRaw) } : null),
+    [isCollection, storedRaw, manifest.id],
+  );
+
   useEffect(() => {
-    if (!isCollection || !manifest.id) return;
+    if (!isCollection || !manifest.id || storedRaw) return;
     let cancelled = false;
     fetchManifest(manifest.id).then((raw) => {
       if (!cancelled && raw) setFetched({ id: manifest.id, entries: collectionEntriesOf(raw) });
@@ -95,7 +105,7 @@ function CollectionDisplay(props: DisplayProps) {
     return () => {
       cancelled = true;
     };
-  }, [isCollection, manifest.id]);
+  }, [isCollection, manifest.id, storedRaw]);
 
   // not a Collection: an empty Scene is a Canvas that the converter turned into a Scene (a rotated image,
   // a Choice, a missing image). The displays after this one decide how it looks (imageCanvas, then scene).
@@ -109,8 +119,8 @@ function CollectionDisplay(props: DisplayProps) {
     type: 'Manifest',
     label: c.label,
   }));
-  const entries =
-    fetched?.id === manifest.id && fetched.entries.length > 0 ? fetched.entries : fromContainers;
+  const read = stored ?? fetched;
+  const entries = read?.id === manifest.id && read.entries.length > 0 ? read.entries : fromContainers;
 
   const openEntry = async (e: CollectionEntry) => {
     setState({ id: e.id, kind: 'opening' });

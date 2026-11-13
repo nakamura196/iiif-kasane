@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { usePlayback } from '../playback';
-import { atom, useAtomValue, useSetAtom } from 'jotai';
+import { atom, useAtomValue, useStore, type createStore } from 'jotai';
 import {
   canvasBehaviorsOf,
   groupSpreads,
@@ -19,8 +19,8 @@ import {
   type SequenceInfo,
   type ViewingInfo,
 } from '../../core';
-import { manifestAtom, manifestUrlAtom, shownManifestUrlAtom } from '../atoms';
-import { readManifest, useShowManifest } from '../useManifest';
+import { manifestUrlAtom, shownManifestAtom } from '../atoms';
+import { loadManifest, showManifest, useLocaleRef } from '../useManifest';
 
 /** 移動の依頼（右パネルの目次などが出し、ContainerList が受ける）。 */
 export interface NavRequest {
@@ -55,10 +55,11 @@ export const compareMultiAtom = atom<CompareMulti | null>(null);
 export const sequenceIdAtom = atom<string | null>(null);
 
 /** Collection をたどってきた道すじ（戻るために、開く前のものを積む）。 */
-/** One step of the trail: what was shown, and its URL (to read the source manifest again after going back). */
+/** One step of the trail: what was shown, its URL and its served JSON (the displays need it after going back). */
 export interface TrailItem {
   url: string;
   manifest: ManifestV4;
+  raw?: unknown;
 }
 export const trailAtom = atom<{ owner: string | null; items: TrailItem[] }>({ owner: null, items: [] });
 
@@ -91,59 +92,68 @@ export function usePageOrder(manifest: ManifestV4 | null | undefined, containers
   }, [manifest, containers, sequenceId]);
 }
 
+type Store = ReturnType<typeof createStore>;
+
+// the first load shows a manifest through showManifest too; a move also leaves the sequence, focus and compare
+function leaveViewState(store: Store) {
+  store.set(sequenceIdAtom, null);
+  store.set(focusAtom, null);
+  store.set(compareAtom, []);
+  store.set(compareMultiAtom, null);
+}
+
+/**
+ * Open the manifest (or Collection) at the URL in the viewer of this store. With push, "back" returns
+ * to what is shown now. Only the latest request is shown: when another open, a back or a new
+ * iiif-content comes before this one is read, this one is dropped (and counts as done, not failed).
+ */
+export async function openManifest(store: Store, url: string, push: boolean, locale: () => string): Promise<boolean> {
+  const result = await loadManifest(store, url, locale, () => {
+    const here = store.get(shownManifestAtom);
+    if (!push || !here) return;
+    // what goes on the trail is the one being left (its own URL, not the one being opened)
+    const item: TrailItem = { url: here.url, manifest: here.manifest, raw: here.raw };
+    const owner = store.get(manifestUrlAtom);
+    store.set(trailAtom, (t) => ({ owner, items: t.owner === owner ? [...t.items, item] : [item] }));
+  });
+  if (result === 'failed') return false;
+  if (result === 'shown') leaveViewState(store);
+  return true;
+}
+
+/** Go back one step of the trail. false when there is nothing to go back to. */
+export function goBack(store: Store, locale: string): boolean {
+  const owner = store.get(manifestUrlAtom);
+  const trail = store.get(trailAtom);
+  const items = trail.owner === owner ? trail.items : [];
+  const prev = items[items.length - 1];
+  if (!prev) return false;
+  store.set(trailAtom, { owner, items: items.slice(0, -1) });
+  // a step saved without its JSON (older trail) leaves the displays to read it again by its URL
+  showManifest(store, prev.url, { raw: prev.raw ?? null, manifest: prev.manifest }, locale);
+  leaveViewState(store);
+  return true;
+}
+
 /** マニフェストを（URL から）読み直して、Viewer の状態に入れる。Collection からの移動にも使う。 */
 export function useManifestSwitch() {
-  const manifest = useAtomValue(manifestAtom);
+  const store = useStore();
+  const locale = useLocaleRef();
   const manifestUrl = useAtomValue(manifestUrlAtom);
-  const shownUrl = useAtomValue(shownManifestUrlAtom);
   const trail = useAtomValue(trailAtom);
-  const show = useShowManifest();
-  const setTrail = useSetAtom(trailAtom);
-  const setSequence = useSetAtom(sequenceIdAtom);
-  const setFocus = useSetAtom(focusAtom);
-  const setCompare = useSetAtom(compareAtom);
-  const setCompareMulti = useSetAtom(compareMultiAtom);
-
-  // the first load does the same through useShowManifest; a move also leaves the sequence, focus and compare
-  const apply = useCallback(
-    (url: string, next: ManifestV4) => {
-      show(url, next);
-      setSequence(null);
-      setFocus(null);
-      setCompare([]);
-      setCompareMulti(null);
-    },
-    [show, setSequence, setFocus, setCompare, setCompareMulti],
-  );
 
   /** URL のマニフェスト（または Collection）を開く。push なら「戻る」で今のものに戻れる。 */
   const open = useCallback(
-    async (url: string, push: boolean): Promise<boolean> => {
-      const next = await readManifest(url);
-      if (!next) return false;
-      if (push && manifest) {
-        const here: TrailItem = { url: shownUrl ?? manifestUrl ?? url, manifest };
-        setTrail((t) => ({
-          owner: manifestUrl,
-          items: t.owner === manifestUrl ? [...t.items, here] : [here],
-        }));
-      }
-      apply(url, next);
-      return true;
-    },
-    [apply, manifest, manifestUrl, shownUrl, setTrail],
+    (url: string, push: boolean): Promise<boolean> => openManifest(store, url, push, () => locale.current),
+    [store, locale],
   );
 
-  const items = useMemo(() => (trail.owner === manifestUrl ? trail.items : []), [trail, manifestUrl]);
-
   const back = useCallback(() => {
-    const prev = items[items.length - 1];
-    if (!prev) return;
-    setTrail({ owner: manifestUrl, items: items.slice(0, -1) });
-    apply(prev.url, prev.manifest);
-  }, [items, manifestUrl, setTrail, apply]);
+    goBack(store, locale.current);
+  }, [store, locale]);
 
-  return { open, back, canGoBack: items.length > 0 };
+  const canGoBack = trail.owner === manifestUrl && trail.items.length > 0;
+  return { open, back, canGoBack };
 }
 
 // Seeks to the time that a content state / table of contents entry points to, once the

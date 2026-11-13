@@ -1,0 +1,143 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createStore } from 'jotai';
+import { manifestAtom, manifestUrlAtom, shownManifestAtom, shownManifestUrlAtom } from '../atoms';
+import { loadManifest } from '../useManifest';
+import { goBack, openManifest, trailAtom } from './structureState';
+
+// Moves inside a Collection (openManifest) and the first load (loadManifest), checked on a jotai store alone.
+// fetch is replaced, and each test decides the order of the answers.
+
+const manifestJson = (id: string) => ({
+  '@context': 'http://iiif.io/api/presentation/3/context.json',
+  id,
+  type: 'Manifest',
+  label: { en: [id] },
+  items: [{ id: `${id}/canvas/1`, type: 'Canvas', width: 10, height: 10, items: [] }],
+});
+
+let run = 0;
+let pending: Map<string, () => void>;
+let requested: string[];
+// a unique URL per test: fetchManifest keeps answers for a minute
+const url = (name: string) => `https://example.org/t${run}/${name}.json`;
+
+beforeEach(() => {
+  run += 1;
+  pending = new Map();
+  requested = [];
+  vi.stubGlobal('fetch', (input: string) => {
+    requested.push(input);
+    return new Promise((resolve) => {
+      pending.set(input, () =>
+        resolve({ ok: true, json: async () => manifestJson(input) } as unknown as Response),
+      );
+    });
+  });
+});
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+/** Answer the request for the URL, and let the promise chains after it run. */
+async function answer(u: string) {
+  for (let i = 0; i < 20 && !pending.has(u); i++) await new Promise((r) => setTimeout(r, 0));
+  const reply = pending.get(u);
+  if (!reply) throw new Error(`no request for ${u}`);
+  reply();
+  for (let i = 0; i < 10; i++) await new Promise((r) => setTimeout(r, 0));
+}
+
+const locale = () => 'en';
+
+describe('openManifest', () => {
+  it('shows only the last of two entries opened quickly, even when the first answers last', async () => {
+    const store = createStore();
+    const a = openManifest(store, url('a'), true, locale);
+    const b = openManifest(store, url('b'), true, locale);
+    await answer(url('b'));
+    await answer(url('a'));
+    await Promise.all([a, b]);
+    expect(store.get(shownManifestUrlAtom)).toBe(url('b'));
+    expect(store.get(manifestAtom)?.id).toBe(url('b'));
+    // the dropped request does not count as a failure (no error on the entry)
+    expect(await a).toBe(true);
+  });
+
+  it('is dropped when a new iiif-content starts loading meanwhile', async () => {
+    const store = createStore();
+    const entry = openManifest(store, url('entry'), true, locale);
+    const top = loadManifest(store, url('other-top'), locale);
+    await answer(url('other-top'));
+    await answer(url('entry'));
+    expect(await top).toBe('shown');
+    await entry;
+    expect(store.get(shownManifestUrlAtom)).toBe(url('other-top'));
+  });
+
+  it('does not let a slow first load replace an entry opened after it', async () => {
+    const store = createStore();
+    const top = loadManifest(store, url('top'), locale);
+    const entry = openManifest(store, url('entry'), false, locale);
+    await answer(url('entry'));
+    await answer(url('top'));
+    expect(await top).toBe('stale');
+    await entry;
+    expect(store.get(shownManifestUrlAtom)).toBe(url('entry'));
+  });
+
+  it('keeps the served JSON with the shown manifest, and puts the one being left on the trail', async () => {
+    const store = createStore();
+    store.set(manifestUrlAtom, url('collection'));
+    const top = loadManifest(store, url('collection'), locale);
+    await answer(url('collection'));
+    await top;
+    const entry = openManifest(store, url('entry'), true, locale);
+    await answer(url('entry'));
+    expect(await entry).toBe(true);
+
+    const shown = store.get(shownManifestAtom);
+    expect(shown?.url).toBe(url('entry'));
+    expect((shown?.raw as { id: string }).id).toBe(url('entry'));
+    // the trail step is the Collection (its own URL, not the entry's), with its JSON
+    const trail = store.get(trailAtom);
+    expect(trail.items.map((i) => i.url)).toEqual([url('collection')]);
+    expect((trail.items[0].raw as { id: string }).id).toBe(url('collection'));
+
+    // back: the Collection is shown again from the trail, with its JSON, and nothing is fetched
+    const before = requested.length;
+    expect(goBack(store, 'en')).toBe(true);
+    expect(store.get(shownManifestAtom)?.url).toBe(url('collection'));
+    expect((store.get(shownManifestAtom)?.raw as { id: string }).id).toBe(url('collection'));
+    expect(requested.length).toBe(before);
+  });
+
+  it('drops an entry still loading when the reader goes back', async () => {
+    const store = createStore();
+    store.set(manifestUrlAtom, url('collection'));
+    const top = loadManifest(store, url('collection'), locale);
+    await answer(url('collection'));
+    await top;
+    const first = openManifest(store, url('first'), true, locale);
+    await answer(url('first'));
+    await first;
+    const second = openManifest(store, url('second'), true, locale);
+    goBack(store, 'en');
+    await answer(url('second'));
+    await second;
+    expect(store.get(shownManifestUrlAtom)).toBe(url('collection'));
+  });
+
+  it('counts each shown manifest, also the same one shown again', async () => {
+    const store = createStore();
+    store.set(manifestUrlAtom, url('collection'));
+    const top = loadManifest(store, url('collection'), locale);
+    await answer(url('collection'));
+    await top;
+    const s1 = store.get(shownManifestAtom)!.seq;
+    const entry = openManifest(store, url('entry'), true, locale);
+    await answer(url('entry'));
+    await entry;
+    goBack(store, 'en');
+    expect(store.get(shownManifestAtom)!.seq).toBe(s1 + 2);
+  });
+});

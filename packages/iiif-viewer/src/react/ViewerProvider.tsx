@@ -12,7 +12,7 @@ import {
 } from 'react';
 import { Provider, createStore, useAtomValue, useSetAtom } from 'jotai';
 import { containersOf, type ContainerInfo, type ManifestV4 } from '../core';
-import { manifestAtom, modelChoicesAtom, shownManifestUrlAtom } from './atoms';
+import { manifestAtom, modelChoicesAtom, shownManifestAtom } from './atoms';
 import { navRequestAtom, nextSeq } from './displays/structureState';
 import { ViewerEnv, type ResolvedTheme } from './env';
 import {
@@ -127,6 +127,14 @@ export function ViewerProvider({
   );
 }
 
+/**
+ * Index of the shown container: the picked one while the same manifest is shown, else the first.
+ * Kept within the containers.
+ */
+function pickedIndex(picked: { shown: number; index: number }, shownSeq: number, count: number): number {
+  return Math.min(picked.shown === shownSeq ? picked.index : 0, Math.max(count - 1, 0));
+}
+
 function ViewerStateRoot({
   iiifContent,
   target,
@@ -137,13 +145,16 @@ function ViewerStateRoot({
   resolvedTheme: ResolvedTheme;
 }) {
   const manifest = useAtomValue(manifestAtom);
-  const shownUrl = useAtomValue(shownManifestUrlAtom);
+  const shown = useAtomValue(shownManifestAtom);
   const setModelChoices = useSetAtom(modelChoicesAtom);
   const { failed } = useManifest(iiifContent);
 
   const containers = useMemo(() => containersOf(manifest), [manifest]);
-  const [picked, setPicked] = useState<{ content: string; index: number }>({ content: iiifContent, index: 0 });
-  const selected = Math.min(picked.content === iiifContent ? picked.index : 0, Math.max(containers.length - 1, 0));
+  // the page picked belongs to one shown manifest: a new one (another iiif-content, an entry of a Collection,
+  // going back) starts from its first page (or where a content state / `target` / `start` sends it)
+  const shownSeq = shown?.seq ?? 0;
+  const [picked, setPicked] = useState<{ shown: number; index: number }>({ shown: shownSeq, index: 0 });
+  const selected = pickedIndex(picked, shownSeq, containers.length);
   const container: ContainerInfo | undefined = containers[selected];
 
   // 動画・音声の再生位置。文字起こし（右パネル）と動画・音声の表示がこれで連動する。
@@ -202,7 +213,7 @@ function ViewerStateRoot({
   );
 
   const select = (index: number) => {
-    setPicked({ content: iiifContent, index });
+    setPicked({ shown: shownSeq, index });
     setModelChoices({});
     setCurrentTime(0);
   };
@@ -212,13 +223,13 @@ function ViewerStateRoot({
       goToCanvas: (canvasId: string) => {
         const index = indexOfCanvas(containers, canvasId);
         if (index < 0) return false;
-        setPicked({ content: iiifContent, index });
+        setPicked({ shown: shownSeq, index });
         setModelChoices({});
         setCurrentTime(0);
         return true;
       },
     }),
-    [containers, iiifContent, setModelChoices],
+    [containers, shownSeq, setModelChoices],
   );
 
   // 外（使う側のページ）から指定された Canvas・範囲へ移る。マニフェストが読めてから、値が変わったときだけ。
@@ -283,7 +294,7 @@ function ViewerStateRoot({
 
   const state: ViewerState = {
     iiifContent,
-    shownUrl: shownUrl ?? iiifContent,
+    shownUrl: shown?.url ?? iiifContent,
     manifest,
     failed,
     containers,

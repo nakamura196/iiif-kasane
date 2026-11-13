@@ -8,8 +8,6 @@ import {
   curationMemberAt,
   compareIndexesOf,
   containersOf,
-  convertToV4,
-  fetchManifest,
   labelIn,
   matchTargets,
   remoteGroupsOf,
@@ -33,6 +31,7 @@ import {
   useManifestSwitch,
 } from './displays/structureState';
 import { useLocale, useTranslations } from './env';
+import { readManifest } from './useManifest';
 
 interface Props {
   containers: ContainerInfo[];
@@ -119,14 +118,9 @@ export default function ContainerList({ containers, selected, onSelect, pager = 
         const failed: string[] = [];
         await Promise.all(
           remote.map(async (g) => {
-            try {
-              const raw = await fetchManifest(g.manifestUrl);
-              if (!raw) throw new Error('fetch failed');
-              const m = convertToV4(raw);
-              sources.push({ manifestUrl: g.manifestUrl, label: nameOf(m, g.manifestUrl), containers: containersOf(m) });
-            } catch {
-              failed.push(g.manifestUrl);
-            }
+            const m = await readManifest(g.manifestUrl);
+            if (m) sources.push({ manifestUrl: g.manifestUrl, label: nameOf(m, g.manifestUrl), containers: containersOf(m) });
+            else failed.push(g.manifestUrl);
           }),
         );
         if (run !== multiRun.current) return;

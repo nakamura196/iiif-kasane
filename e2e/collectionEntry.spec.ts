@@ -73,40 +73,56 @@ const info = {
 
 const cors = { 'access-control-allow-origin': '*' };
 
+
 async function serve(page: Page) {
-  const infoRequests: string[] = [];
+  const seen = { tiles: [] as string[], plain: [] as string[] };
   await page.route(`${BASE}/**`, (route) => {
     const url = route.request().url();
     if (url.endsWith('/collection.json')) return route.fulfill({ json: collection, headers: cors });
     if (url.endsWith('/manifest.json')) return route.fulfill({ json: manifest, headers: cors });
     if (url === `${SERVICE}/info.json`) {
-      infoRequests.push(url);
       return route.fulfill({ json: info, headers: cors });
     }
     // Image API の要求（{id}/{region}/{size}/{rotation}/{quality}.{format}）にだけ画像を返す
     if (url.startsWith(`${SERVICE}/`) && /\.(jpg|png)$/.test(url)) {
+      seen.tiles.push(url);
       return route.fulfill({ body: PNG, contentType: 'image/png', headers: cors });
     }
+    // the body id itself is not an image: asking for it is the bug (#334)
+    if (url === SERVICE) seen.plain.push(url);
     return route.fulfill({ status: 404, contentType: 'text/html', body: '<p>not an image</p>', headers: cors });
   });
-  return infoRequests;
+  return seen;
 }
 
+// number of the images that finished loading with a picture in them
+const loadedCount = (imgs: Element[]) =>
+  imgs.filter((i) => i instanceof HTMLImageElement && i.complete && i.naturalWidth > 0).length;
+
 test('Collection から開いた manifest の画像を、その manifest の Image API service で出す（#334）', async ({ page }) => {
-  const infoRequests = await serve(page);
+  const seen = await serve(page);
   await page.goto(`/en/viewer/?iiif-content=${encodeURIComponent(`${BASE}/collection.json`)}`);
 
   const entry = page.getByRole('button', { name: /Kameido/ });
   await entry.click();
-  await expect.poll(() => infoRequests.length).toBeGreaterThan(0);
+  // a tile from the service arrives: the image is drawn through its Image API service
+  await expect.poll(() => seen.tiles.length).toBeGreaterThan(0);
   await expect(page.getByText('Could not load the image')).toHaveCount(0);
+  expect(seen.plain).toEqual([]);
 
-  // 戻って、もう一度開いても出る
+  // back, and open it again: the image is drawn again from the service (a tile of the Image API that loaded),
+  // the body id is never asked for, and no error shows. (The Collection's card may show a thumbnail from the
+  // service, so only tiles, which name a region, count.)
+  const fromService = page.locator(`img[src^="${SERVICE}/0,0,"]`);
+  await expect.poll(() => fromService.evaluateAll(loadedCount)).toBeGreaterThan(0);
   await page.getByRole('button', { name: /^‹/ }).click();
   await expect(entry).toBeVisible();
-  const before = infoRequests.length;
+  // the Collection is shown: no tile of the entry is left on the page
+  await expect(fromService).toHaveCount(0);
   await entry.click();
   await expect(page.getByRole('button', { name: /^‹/ })).toBeVisible();
+  await expect.poll(() => fromService.evaluateAll(loadedCount)).toBeGreaterThan(0);
+  await expect(page.locator(`img[src="${SERVICE}"]`)).toHaveCount(0);
   await expect(page.getByText('Could not load the image')).toHaveCount(0);
-  expect(infoRequests.length).toBeGreaterThanOrEqual(before);
+  expect(seen.plain).toEqual([]);
 });
