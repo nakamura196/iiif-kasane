@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
-import { containersOf, labelIn, pagePlaceholderOf, pageThumbnailUrl } from '../../core';
+import { containersOf, labelIn, pageMediaOf, pageThumbnailUrl, type MediaKind } from '../../core';
 import { manifestAtom } from '../atoms';
 import { navRequestAtom, nextSeq, usePageOrder } from '../displays/structureState';
 import { useLocale, useTranslations } from '../env';
@@ -19,6 +19,71 @@ function readLayout(): Layout {
     return 'list';
   }
 }
+
+// In place of a missing thumbnail: an icon for the kind of media the page shows (outline, 24px grid).
+const MEDIA_ICONS: Record<MediaKind | 'empty', ReactNode> = {
+  Model: (
+    <>
+      <path d="M12 2.5 20.5 7v10L12 21.5 3.5 17V7z" />
+      <path d="M3.5 7 12 11.5 20.5 7M12 11.5v10" />
+    </>
+  ),
+  Image: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <circle cx="9" cy="9.5" r="1.75" />
+      <path d="m3.5 18 5.5-5.5 4 4 2.5-2.5 5 5" />
+    </>
+  ),
+  Video: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M10 9v6l5-3z" />
+    </>
+  ),
+  Audio: (
+    <>
+      <path d="M9 18V5l11-2v13" />
+      <circle cx="6.5" cy="18" r="2.5" />
+      <circle cx="17.5" cy="16" r="2.5" />
+    </>
+  ),
+  empty: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2" strokeDasharray="3 2.5" />
+      <path d="m4 4 16 16" />
+    </>
+  ),
+};
+
+function MediaIcon({ kind, label, size }: { kind: MediaKind | 'empty'; label: string; size: number }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      role="img"
+      aria-label={label}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="text-gray-400 dark:text-gray-500"
+    >
+      <title>{label}</title>
+      {MEDIA_ICONS[kind]}
+    </svg>
+  );
+}
+
+const MEDIA_LABEL_KEYS = {
+  Model: 'mediaModel',
+  Image: 'mediaImage',
+  Video: 'mediaVideo',
+  Audio: 'mediaAudio',
+  empty: 'noImage',
+} as const;
 
 // ページ（Canvas / Scene）の一覧。Mirador の「索引」と同じく、右パネルに縦に並べる。
 // グリッドに切り替えると、パネルの幅に入るだけ列を並べる（パネルを広げると一度に見えるページが増える）。
@@ -138,7 +203,10 @@ function PagesView({ container, manifest }: PanelContext) {
                       onError={() => setBroken((b) => ({ ...b, [c.id]: true }))}
                     />
                   ) : (
-                    <span className="text-xs text-gray-500 dark:text-gray-400">{pagePlaceholderOf(c) === 'empty' ? t('noImage') : c.kind}</span>
+                    (() => {
+                      const media = pageMediaOf(c);
+                      return <MediaIcon kind={media} label={t(MEDIA_LABEL_KEYS[media])} size={grid ? 40 : 28} />;
+                    })()
                   )}
                 </span>
                 {grid ? (

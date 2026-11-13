@@ -181,6 +181,13 @@ export const sceneOf = (manifest: ManifestV4 | null | undefined, sceneId?: strin
 export const pagePlaceholderOf = (c: Pick<ContainerInfo, 'kind' | 'painting'>): ContainerKind | 'empty' =>
   c.painting.length === 0 ? 'empty' : c.kind;
 
+// The kind of media a page shows, for the icon the page list draws in place of a missing thumbnail.
+// It follows the first painted option (a Canvas may hold a video), falling back to the container
+// kind; 'empty' for a page that paints nothing.
+const MEDIA_OF_KIND: Record<ContainerKind, MediaKind> = { Scene: 'Model', Canvas: 'Image', Timeline: 'Audio' };
+export const pageMediaOf = (c: Pick<ContainerInfo, 'kind' | 'painting'>): MediaKind | 'empty' =>
+  c.painting.length === 0 ? 'empty' : (c.painting[0].options[0]?.kind ?? MEDIA_OF_KIND[c.kind]);
+
 // The option a Choice of audio / video opens on: the first one the browser can play.
 // An option without a format stays a candidate; when none can be played, the first one.
 // `canPlay` is the browser's `canPlayType` (injected so that it can be tested).
