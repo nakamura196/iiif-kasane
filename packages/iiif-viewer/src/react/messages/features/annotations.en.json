@@ -25,8 +25,6 @@
     "canvasAnnotationsMotivation_editing": "Edit",
     "canvasAnnotationsMotivation_moderating": "Moderation",
     "canvasAnnotationsMotivation_painting": "Text",
-    "canvasAnnotationsGranularity": "Unit",
-    "canvasAnnotationsGranularityAll": "All",
     "canvasAnnotationsGranularity_page": "Page",
     "canvasAnnotationsGranularity_block": "Block",
     "canvasAnnotationsGranularity_paragraph": "Paragraph",
@@ -37,11 +35,8 @@
     "canvasAnnotationsTotal": "{count} annotations",
     "canvasAnnotationsSearchCount": "{count} of {total}",
     "canvasAnnotationsNoMatch": "No annotations match",
-    "canvasAnnotationsTags": "Tags",
-    "canvasAnnotationsTagsAll": "Show all ({count})",
-    "canvasAnnotationsTagsFewer": "Show fewer",
-    "canvasAnnotationsTagsClear": "Clear tags",
-    "canvasAnnotationsFocusOnSelect": "Zoom to the chosen annotation"
+    "canvasAnnotationsFocusOnSelect": "Zoom to the chosen annotation",
+    "canvasAnnotationsMotivation_supplementing": "Transcription"
   },
   "AnnotationResources": {
     "place": "Pictures of this place",
@@ -54,5 +49,14 @@
     "countImages": "Images: {count}",
     "countLinks": "Links: {count}",
     "countCitations": "References: {count}"
+  },
+  "AnnotationFilter": {
+    "all": "All",
+    "showAll": "Show all ({count})",
+    "fewer": "Show fewer",
+    "kind": "Kind",
+    "granularity": "Unit",
+    "tags": "Tags",
+    "showMarks": "Show marks"
   }
 }

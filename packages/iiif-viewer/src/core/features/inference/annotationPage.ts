@@ -1,9 +1,10 @@
-// 推論の結果（推論に渡した画像の画素）を、Canvas 座標の W3C / IIIF の AnnotationPage にする。
-// OCR の行は motivation "supplementing"（画像の一部の文字起こし。textGranularity "line"）、
-// 領域は "tagging"（本文は区分名）、画像全体の説明文は "describing"。どのモデルで作ったかは generator に書く。
-// 輪郭（polygon）のある領域は、枠（#xywh）ではなく SvgSelector の多角形を target にする。
-// 区分名（label）のあるものは、区分ごとに色を付ける（Recipe 0045 と同じく、target の styleClass と注釈の stylesheet）。
-// モデルが出したものは捨てない。文字の読めなかった行も、区分名があれば領域として残す。
+// Turns an inference result (in pixels of the image given to the model) into a W3C / IIIF AnnotationPage in Canvas
+// coordinates. Read lines are "supplementing" (a transcription of part of the image, textGranularity "line"),
+// regions are "tagging" (the body is the class name), and a description of the whole image is "describing".
+// The generator says which model made it. A region with an outline (polygon) targets an SvgSelector polygon
+// instead of a box (#xywh). Items with a class name (label) get a color per class (as in Recipe 0045: the target's
+// styleClass and the annotation's stylesheet). Nothing the model gave is dropped: a line whose text could not be read
+// stays as a region when it has a class name, and a read line keeps its class name as a tag.
 import type { InferenceOutput } from './types';
 
 /** How a pixel of the inferred image maps to the Canvas: canvas = offset + pixel * scale. */
@@ -100,8 +101,6 @@ export const toAnnotationPage = (out: InferenceOutput, o: AnnotationPageOptions)
       const target = selector
         ? { type: 'SpecificResource', source: { id: o.canvasId, type: 'Canvas' }, selector, ...(styleClass ? { styleClass } : {}) }
         : `${o.canvasId}#xywh=${x},${y},${w},${h}`;
-      // 文字のある注釈（行）だけ薄く塗る。区分だけの注釈（図版・ブロックなど）は枠線だけにする。
-      // 大きな枠が重なると塗りも重なり、絵が沈んで見えるため。
       // Only items with text (lines) get a fill; class-only regions (figures, blocks) get a border, since large
       // overlapping fills stack up and bury the picture.
       const fill = d.text ? `${color}2e` : 'transparent';
@@ -109,6 +108,7 @@ export const toAnnotationPage = (out: InferenceOutput, o: AnnotationPageOptions)
         ? { stylesheet: { type: 'CssStylesheet', value: `.${styleClass} { border-color: ${color}; background-color: ${fill}; }` } }
         : {};
       const textBody = { type: 'TextualBody', value: d.text, format: 'text/plain', ...(out.language ? { language: out.language } : {}) };
+      const tagBody = d.label ? { type: 'TextualBody', value: d.label, purpose: 'tagging', format: 'text/plain' } : undefined;
       if (out.kind === 'description') {
         return { id: o.newId(), type: 'Annotation', motivation: 'describing', body: textBody, target, generator };
       }
@@ -118,7 +118,9 @@ export const toAnnotationPage = (out: InferenceOutput, o: AnnotationPageOptions)
             type: 'Annotation',
             motivation: 'supplementing',
             textGranularity: 'line',
-            body: textBody,
+            // A read line keeps the model's class (e.g. a main line or a caption) as a tagging body, so that read
+            // lines can be filtered by class like the regions. Tags are left out of the text search.
+            body: tagBody ? [textBody, tagBody] : textBody,
             target,
             ...style,
             generator,
@@ -127,7 +129,7 @@ export const toAnnotationPage = (out: InferenceOutput, o: AnnotationPageOptions)
             id: o.newId(),
             type: 'Annotation',
             motivation: 'tagging',
-            body: { type: 'TextualBody', value: d.label, purpose: 'tagging', format: 'text/plain' },
+            body: tagBody,
             target,
             ...style,
             generator,

@@ -366,6 +366,7 @@ export [type] interface Annotation {
     target_manifest?: string;
     seeAlso?: AnnotationLink[];
     regionId?: string;
+    motivations?: string[];
     tags?: AnnotationTag[];
     images?: AnnotationImage[];
     bodies?: AnnotationBodyItem[];
@@ -453,6 +454,7 @@ export [type] interface AnnotationFilter {
     query: string;
     creators: string[];
     tags: string[];
+    kinds?: string[];
 }
 export [type] interface AnnotationImage {
     id: string;
@@ -828,6 +830,7 @@ export [type] interface CurationSelection {
     readable: boolean;
     members: CurationMember[];
 }
+export [value] DEFAULT_KIND: "commenting"
 export [value] DISCOVERY_MAX_ITEMS: 100
 export [type] interface DatedEntry {
     entry: CollectionEntry;
@@ -1099,6 +1102,7 @@ export [type] interface InfoPanelContent {
     wikidata: WikidataItem[];
     bibliography: BibliographyItem[];
 }
+export [value] KIND_ORDER: readonly ["supplementing", "painting", "commenting", "describing", "tagging", "classifying", "identifying", "linking", "bookmarking", "questioning", "replying", "editing", "moderating", "highlighting"]
 export [value] KOTEN_DET_SIZE: 1024
 export [value] KOTEN_NMS: { score: number; iou: number; scoreMin: number; topK: number; maxKeep: number; }
 export [value] KOTEN_REC_H: 32
@@ -1301,6 +1305,8 @@ export [type] interface PageMark {
     color: string;
     tag?: string;
     text: boolean;
+    kind?: string;
+    granularity?: string;
 }
 export [type] interface PaintedModel {
     id: string;
@@ -1726,6 +1732,8 @@ export [value] aboutOf: (manifest: ManifestV4 | null | undefined, containerId: s
 export [value] aboutScopeHasContent: (s: AboutScope, full?: boolean) => boolean
 export [value] activeItemsAt: (timeline: Timeline, t: number) => TimelineItem[]
 export [value] alignmentOf: (alignment: Alignment, a: string | undefined, b: string | undefined) => AlignTransform | null | undefined
+export [value] annotationKindFacets: (annotations: Annotation[]) => Facet[]
+export [value] annotationKindOf: (a: { motivations?: readonly string[] | undefined; painted?: boolean | undefined; }) => string
 export [value] annotationListSearchText: (a: Annotation) => string
 export [value] annotationPlainText: (a: CanvasAnnotation) => string
 export [value] annotationSearchText: (a: Pick<CanvasAnnotation, "bodies" | "resources" | "title">) => string
@@ -1764,6 +1772,7 @@ export [value] chosenUrl: (model: PaintedModel, choices: Record<string, number>)
 export [value] chronologyOf: (entries: CollectionEntry[]) => Chronology
 export [value] clampZoom: (z: number) => number
 export [value] classColorOf: (out: InferenceOutput, label: string | undefined) => string | undefined
+export [value] clearPresentChoices: (chosen: readonly string[], present: readonly string[]) => string[]
 export [value] clusterExpansionScale: (cluster: PointCluster, unitPx: number, box: { w: number; h: number; }, current: number, max: number, radius: number) => null | number
 export [value] clusterLevelScale: (scale: number) => number
 export [value] clusterPoints: (points: ClusterPoint[], pxPerUnit: number, radius: number) => PointCluster[]
@@ -1833,6 +1842,7 @@ export [value] geoFeaturesOf: (v: unknown) => Json[]
 export [value] geoFeaturesToAnnotations: (features: GeoFeature[]) => Annotation[]
 export [value] georefSearchText: (feature: GeoFeature, annotation?: Annotation | undefined) => string
 export [value] georefTagFacets: (annotations: Annotation[]) => Facet[]
+export [value] granularityRank: (g: string) => number
 export [value] groupByRegion: <T extends Regional>(annotations: T[]) => RegionGroup<T>[]
 export [value] groupMatchesByCanvas: (matches: ContentSearchMatch[]) => Map<string, ContentSearchMatch[]>
 export [value] groupSpreads: (order: number[], mode: ViewingMode, standalone: (index: number) => boolean) => number[][]
@@ -1870,10 +1880,12 @@ export [value] isPresentation2: (json: unknown) => boolean
 export [value] isPuzzleSolved: (b: PuzzleBoard) => boolean
 export [value] isResourceBody: (b: AnnotationBodyItem) => boolean
 export [value] isSceneMatch: (m: ContentSearchMatch) => boolean
+export [value] isSearchHit: (a: { motivations?: readonly string[] | undefined; }) => boolean
 export [value] isTagBody: (b: AnnotationBodyItem) => boolean
 export [value] isTocNodeActive: (node: TocNode, canvasId: string | undefined, time?: number) => boolean
 export [value] isUnresolvableEditorId: (url: string | undefined) => boolean
 export [value] isVtt: (s: SupplementingContent) => boolean
+export [value] kindFacets: (kinds: readonly string[]) => Facet[]
 export [value] kotenDetTensor: (square: Uint8ClampedArray<ArrayBufferLike>, side: number) => Float32Array<ArrayBufferLike>
 export [value] kotenLines: (boxes: ArrayLike<number>, scores: ArrayLike<number>, W: number, H: number) => KotenLine[]
 export [value] labelIn: (label: unknown, locale: string) => string
@@ -1907,6 +1919,7 @@ export [value] memberManifestUrlsOf: (raw: unknown) => string[]
 export [value] mergedScheme: (info: ImageInfo, scheme: { width: number; height: number; }) => null | { width: number; height: number; }
 export [value] metadataRecordOf: (metadata: unknown, locale: string) => Record<string, string[]>
 export [value] moveLayer: (ids: string[], id: string, to: number) => string[]
+export [value] narrowByKindAndUnit: <T extends Narrowable>(all: readonly T[], chosenKinds: readonly string[], granularity: null | string) => { kindFacets: Facet[]; kinds: string[]; granularities: string[]; activeGranularity: null | string; narrowing: boolean; annotations: T[]; }
 export [value] navDateKey: (iso: string | undefined) => null | { year: number; key: number; }
 export [value] navDateText: (iso: string, locale: string) => string
 export [value] navigableTree: (nodes: TocNode[]) => TocNode[]
@@ -1915,6 +1928,7 @@ export [value] ndlFirstRecognizer: (charCount: number) => 0 | 1 | 2
 export [value] ndlOcrLines: (labels: ArrayLike<number>, boxes: ArrayLike<number>, scores: ArrayLike<number>, charCount: ArrayLike<number>, W: number, H: number) => NdlLine[]
 export [value] ndlOcrRegions: (labels: ArrayLike<number>, boxes: ArrayLike<number>, scores: ArrayLike<number>, charCount: ArrayLike<number>, W: number, H: number) => { x: number; y: number; w: number; h: number; score: number; label: string; }[]
 export [value] ndlParseqTensor: (px: Uint8ClampedArray<ArrayBufferLike>, w: number, h: number, width: number) => Float32Array<ArrayBufferLike>
+export [value] nextChoice: (chosen: readonly string[], value: string, multiple: boolean) => string[]
 export [value] nextPageOf: (page: unknown) => string | undefined
 export [value] nextPlaybackStep: (step: number, count: number, loop: boolean) => null | number
 export [value] nextZoomDistance: (current: number, zoomIn: boolean, factor: number, limits: ZoomLimits) => number
@@ -1957,6 +1971,7 @@ export [value] parseVtt: (text: string) => VttCue[]
 export [value] parseVttTime: (s: string) => null | number
 export [value] parseXywh: (fragment: string, canvasW?: number | undefined, canvasH?: number | undefined) => Box | null
 export [value] parseqTensor: (px: Uint8ClampedArray<ArrayBufferLike>, w: number, h: number, W: number, H: number) => Float32Array<ArrayBufferLike>
+export [value] passesChoice: (value: string | undefined, chosen: readonly string[]) => boolean
 export [value] pathPoints: (d: string) => Point[][]
 export [value] physdimOf: (canvas: unknown) => Physdim | undefined
 export [value] pickBodies: (bodies: AnnotationBodyItem[], locale: string) => AnnotationBodyItem[]
@@ -1976,6 +1991,7 @@ export [value] ppocrQuadBox: (quad: XY[]) => { x: number; y: number; w: number; 
 export [value] ppocrRead: (page: Uint8ClampedArray<ArrayBufferLike>, W: number, H: number, chars: string[], run: PpocrRunners) => Promise<PpocrLine[]>
 export [value] ppocrRecTensor: (px: Uint8ClampedArray<ArrayBufferLike>, w: number, h: number) => { data: Float32Array<ArrayBufferLike>; width: number; }
 export [value] presentCanvasTags: (annotations: Pick<CanvasAnnotation, "bodies">[], chosen: string[], locale: string) => string[]
+export [value] presentChoices: (chosen: readonly string[], facets: readonly Facet[]) => string[]
 export [value] probeServiceOf: (resource: unknown, locale?: string) => AuthProbeRef | undefined
 export [value] project: (args: LngLat) => [number, number]
 export [value] puzzlePlacedCount: (b: PuzzleBoard) => number

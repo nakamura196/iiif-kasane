@@ -299,6 +299,7 @@ const buildAnnotation = (
   const label =
     localizedString(anno.label, locale) || localizedString(annotationTitleOf({ body: anno.body, motivation: anno.motivation }), locale) || bodies.label;
   const regionId = typeof anno.target === 'object' ? anno.target.id : undefined;
+  const motivations = motivationsOf(anno).filter((m): m is string => typeof m === 'string' && m !== '');
 
   return {
     id: anno.id || `annotation-${fallbackIndex}`,
@@ -311,6 +312,7 @@ const buildAnnotation = (
     position: { x: position[0], y: position[1], z: position[2] },
     seeAlso: anno.seeAlso as AnnotationLinkV4[] | undefined,
     ...(regionId ? { regionId } : {}),
+    ...(motivations.length > 0 ? { motivations } : {}),
     ...(tags.length > 0 ? { tags } : {}),
     ...(images.length > 0 ? { images } : {}),
     ...(items.length > 0 ? { bodies: items } : {}),

@@ -1,7 +1,7 @@
 'use client';
 
 import { useAtom, useSetAtom } from 'jotai';
-import { useDeferredValue, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
+import { useDeferredValue, useEffect, useEffectEvent, useMemo, useRef } from 'react';
 import {
   annotationSourcesOf,
   canvasTagFacets,
@@ -20,7 +20,7 @@ import {
   labelIn,
   pickBodies,
   isResourceBody,
-  TEXT_GRANULARITIES,
+  narrowByKindAndUnit,
   type CanvasAnnotation,
   type StyleDeclarations,
 } from '../../core';
@@ -28,6 +28,7 @@ import { useLocale, useTranslations } from '../env';
 import {
   canvasAnnotationFocusOnSelectAtom,
   canvasAnnotationGranularityAtom,
+  canvasAnnotationKindsAtom,
   canvasAnnotationQueryAtom,
   canvasAnnotationTagsAtom,
   selectedCanvasAnnotationAtom,
@@ -38,24 +39,16 @@ import { useCanvasAnnotations } from '../overlays/useCanvasAnnotations';
 import AnnotationBody from '../annotation/AnnotationBody';
 import AnnotationResources from '../annotation/AnnotationResources';
 import { AnnotationCardFrame, RegionGroupFrame } from '../annotation/AnnotationCardFrame';
+import { FilterChips } from '../annotation/FilterChips';
+import { ShowMarksToggle } from '../annotation/ShowMarksToggle';
+import { useGranularityLabel, useKindLabel, useKindOptions } from '../annotation/kindLabels';
 import { annotationNumbers } from '../overlays/annotationMarks';
 import { fmt } from '../displays/TranscriptPanel';
 import { usePlayback } from '../playback';
 import type { Panel, PanelContext } from './types';
 
-const KNOWN_MOTIVATIONS = new Set([
-  'commenting', 'tagging', 'linking', 'describing', 'identifying', 'classifying',
-  'bookmarking', 'highlighting', 'questioning', 'replying', 'editing', 'moderating', 'painting',
-]);
-
 // Show tag chips up to this number, most frequent first (the rest open with "Show all"), so tags with scattered values do not fill the panel
 const TAG_LIMIT = 20;
-
-const isKnownGranularity = (g: string) => (TEXT_GRANULARITIES as readonly string[]).includes(g);
-const granularityRank = (g: string) => {
-  const i = (TEXT_GRANULARITIES as readonly string[]).indexOf(g);
-  return i < 0 ? TEXT_GRANULARITIES.length : i;
-};
 
 function Item({
   annotation,
@@ -79,18 +72,15 @@ function Item({
   const t = useTranslations('Info');
   const locale = useLocale();
   const bodies = pickBodies(annotation.bodies, locale).filter((b) => !isResourceBody(b));
+  const kindLabel = useKindLabel();
+  const granularityLabel = useGranularityLabel();
   const motivation = annotation.painted ? 'painting' : annotation.motivations[0];
   // Do not label "comment" (the default purpose) or "region" for annotations with a frame, because the numbered chip corresponds to the frame on the image
   const notes: string[] = [];
   if (motivation && motivation !== 'commenting')
-    notes.push(KNOWN_MOTIVATIONS.has(motivation) ? t(`canvasAnnotationsMotivation_${motivation}`) : motivation);
+    notes.push(kindLabel(motivation));
   if (annotation.region.type === 'canvas') notes.push(t('canvasAnnotationsAbout'));
-  if (annotation.granularity)
-    notes.push(
-      isKnownGranularity(annotation.granularity)
-        ? t(`canvasAnnotationsGranularity_${annotation.granularity}`)
-        : annotation.granularity,
-    );
+  if (annotation.granularity) notes.push(granularityLabel(annotation.granularity));
   if (annotation.layer)
     notes.push(t('canvasAnnotationsLayer', { label: labelIn(annotation.layer.label, locale) || annotation.layer.id }));
   if (annotation.time)
@@ -130,6 +120,7 @@ const LIST_TOP = 8;
 
 export function CanvasAnnotationsPanelBody({ container, manifest }: PanelContext) {
   const t = useTranslations('Info');
+  const tf = useTranslations('AnnotationFilter');
   const locale = useLocale();
   const { annotations: all, loading, failed, styleOf } = useCanvasAnnotations(manifest, container);
   // the same numbers as the marks on the image (none when there are very many)
@@ -142,22 +133,17 @@ export function CanvasAnnotationsPanelBody({ container, manifest }: PanelContext
   const [query, setQuery] = useAtom(canvasAnnotationQueryAtom);
   const [focusOnSelect, setFocusOnSelect] = useAtom(canvasAnnotationFocusOnSelectAtom);
   const [chosenTags, setChosenTags] = useAtom(canvasAnnotationTagsAtom);
-  const [allTagsShown, setAllTagsShown] = useState(false);
+  const [chosenKinds, setChosenKinds] = useAtom(canvasAnnotationKindsAtom);
   const setRequest = useSetAtom(navRequestAtom);
   // While typing, update the input first and let the list filtering catch up later
   const deferredQuery = useDeferredValue(query);
-  const granularities = useMemo(
-    () =>
-      [...new Set(all.map((a) => a.granularity).filter((g): g is string => !!g))].sort(
-        (a, b) => granularityRank(a) - granularityRank(b),
-      ),
-    [all],
+  // Kind (motivation) first, then the unit of text: the same narrowing as the marks over the image
+  const { kindFacets, granularities, activeGranularity, narrowing, annotations } = useMemo(
+    () => narrowByKindAndUnit(all, chosenKinds, granularity),
+    [all, chosenKinds, granularity],
   );
-  const activeGranularity = granularity && granularities.includes(granularity) ? granularity : null;
-  const annotations = useMemo(
-    () => (activeGranularity ? all.filter((a) => a.granularity === activeGranularity) : all),
-    [all, activeGranularity],
-  );
+  const kindOptions = useKindOptions(kindFacets);
+  const granularityLabel = useGranularityLabel();
   const terms = useMemo(() => searchTerms(deferredQuery), [deferredQuery]);
   // Tag chips ("key: value"). Counts are by number of locations, like the list rows
   const tagFacets = useMemo(() => canvasTagFacets(groupByRegion(annotations), locale), [annotations, locale]);
@@ -167,11 +153,6 @@ export function CanvasAnnotationsPanelBody({ container, manifest }: PanelContext
     [chosenTags, tagFacets],
   );
   const filtering = terms.length > 0 || tags.length > 0;
-  const toggleTag = (v: string) =>
-    setChosenTags((cur) => (cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v]));
-  const shownTagFacets = allTagsShown
-    ? tagFacets
-    : tagFacets.filter((f, i) => i < TAG_LIMIT || tags.includes(f.value));
   const { currentTime, seek } = usePlayback();
   const timed = annotations.some((a) => a.time);
 
@@ -210,7 +191,11 @@ export function CanvasAnnotationsPanelBody({ container, manifest }: PanelContext
     }
     return { rows: out, shown: count };
   }, [annotations, filtering, terms, tags, locale]);
-  const total = useMemo(() => (filtering ? groupByRegion(annotations).length : shown), [annotations, filtering, shown]);
+  // out of all the places on the Canvas, so that a kind or a unit chosen shows as "N of M"
+  const total = useMemo(
+    () => (filtering || narrowing ? groupByRegion(all).length : shown),
+    [all, filtering, narrowing, shown],
+  );
 
   const scroller = useRef<HTMLDivElement>(null);
   const keys = useMemo(() => rows.map((r) => r.key), [rows]);
@@ -256,7 +241,7 @@ export function CanvasAnnotationsPanelBody({ container, manifest }: PanelContext
     setSelected(isSelected ? null : selectionKeyOf(a));
   };
 
-  const searching = query.trim().length > 0 || tags.length > 0;
+  const searching = query.trim().length > 0 || tags.length > 0 || narrowing;
 
   return (
     <div className="h-full min-h-0 flex flex-col">
@@ -286,75 +271,37 @@ export function CanvasAnnotationsPanelBody({ container, manifest }: PanelContext
                 ? t('canvasAnnotationsSearchCount', { count: shown, total })
                 : t('canvasAnnotationsTotal', { count: shown })}
             </span>
-            <label className="inline-flex items-center gap-1 cursor-pointer">
-              <input type="checkbox" checked={focusOnSelect} onChange={(e) => setFocusOnSelect(e.target.checked)} />
-              {t('canvasAnnotationsFocusOnSelect')}
-            </label>
+            <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
+              <ShowMarksToggle />
+              <label className="inline-flex items-center gap-1 cursor-pointer">
+                <input type="checkbox" checked={focusOnSelect} onChange={(e) => setFocusOnSelect(e.target.checked)} />
+                {t('canvasAnnotationsFocusOnSelect')}
+              </label>
+            </span>
           </div>
         ) : null}
-        {granularities.length > 1 ? (
-          <div className="flex flex-wrap items-center gap-1 text-xs" role="group" aria-label={t('canvasAnnotationsGranularity')}>
-            <span className="text-gray-500 dark:text-gray-300 mr-1">{t('canvasAnnotationsGranularity')}</span>
-            {[null, ...granularities].map((g) => (
-              <button
-                key={g ?? 'all'}
-                type="button"
-                aria-pressed={activeGranularity === g}
-                onClick={() => setGranularity(g)}
-                className={`px-2 py-0.5 rounded-full border ${
-                  activeGranularity === g
-                    ? 'border-blue-600 bg-blue-600 text-white'
-                    : 'border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800'
-                }`}
-              >
-                {g === null
-                  ? t('canvasAnnotationsGranularityAll')
-                  : isKnownGranularity(g)
-                    ? t(`canvasAnnotationsGranularity_${g}`)
-                    : g}
-              </button>
-            ))}
-          </div>
-        ) : null}
-        {tagFacets.length > 0 ? (
-          <div className="flex flex-wrap items-center gap-1 text-xs" role="group" aria-label={t('canvasAnnotationsTags')}>
-            <span className="text-gray-500 dark:text-gray-300 mr-1">{t('canvasAnnotationsTags')}</span>
-            {shownTagFacets.map((f) => (
-              <button
-                key={f.value}
-                type="button"
-                aria-pressed={tags.includes(f.value)}
-                onClick={() => toggleTag(f.value)}
-                className={`px-2 py-0.5 rounded-full border ${
-                  tags.includes(f.value)
-                    ? 'border-blue-600 bg-blue-600 text-white'
-                    : 'border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800'
-                }`}
-              >
-                {f.value} ({f.count})
-              </button>
-            ))}
-            {tagFacets.length > TAG_LIMIT ? (
-              <button
-                type="button"
-                aria-expanded={allTagsShown}
-                onClick={() => setAllTagsShown((v) => !v)}
-                className="px-1 text-blue-600 dark:text-blue-400 hover:underline"
-              >
-                {allTagsShown ? t('canvasAnnotationsTagsFewer') : t('canvasAnnotationsTagsAll', { count: tagFacets.length })}
-              </button>
-            ) : null}
-            {tags.length > 0 ? (
-              <button
-                type="button"
-                onClick={() => setChosenTags([])}
-                className="px-1 text-blue-600 dark:text-blue-400 hover:underline"
-              >
-                {t('canvasAnnotationsTagsClear')}
-              </button>
-            ) : null}
-          </div>
-        ) : null}
+        <FilterChips
+          label={tf('kind')}
+          options={kindOptions}
+          chosen={chosenKinds}
+          onChange={setChosenKinds}
+          minOptions={2}
+        />
+        <FilterChips
+          label={tf('granularity')}
+          options={granularities.map((g) => ({ value: g, label: granularityLabel(g) }))}
+          chosen={activeGranularity ? [activeGranularity] : []}
+          onChange={(next) => setGranularity(next[0] ?? null)}
+          multiple={false}
+          minOptions={2}
+        />
+        <FilterChips
+          label={tf('tags')}
+          options={tagFacets}
+          chosen={tags}
+          onChange={setChosenTags}
+          limit={TAG_LIMIT}
+        />
         {!loading && annotations.length === 0 ? (
           <p className="text-sm text-gray-500 dark:text-gray-300">{t('canvasAnnotationsEmpty')}</p>
         ) : null}

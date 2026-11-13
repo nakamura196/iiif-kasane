@@ -25,9 +25,10 @@ describe('pageMarksOf', () => {
     );
     const marks = pageMarksOf(page);
     expect(marks).toEqual([
-      { x: 2, y: 4, w: 6, h: 8, color: CLASS_PALETTE[0], tag: 'text_block', text: false },
-      { x: 10, y: 12, w: 14, h: 16, color: CLASS_PALETTE[1], text: true },
-      { x: 0, y: 0, w: 2, h: 2, color: CLASS_PALETTE[0], text: true },
+      { x: 2, y: 4, w: 6, h: 8, color: CLASS_PALETTE[0], tag: 'text_block', text: false, kind: 'tagging' },
+      // a read line keeps its class as a tag, so it can be filtered by class like the regions
+      { x: 10, y: 12, w: 14, h: 16, color: CLASS_PALETTE[1], tag: 'line_main', text: true, kind: 'supplementing', granularity: 'line' },
+      { x: 0, y: 0, w: 2, h: 2, color: CLASS_PALETTE[0], text: true, kind: 'supplementing', granularity: 'line' },
     ]);
   });
 
@@ -45,5 +46,16 @@ describe('pageMarksOf', () => {
   it('skips targets without a region and pages without items', () => {
     expect(pageMarksOf(undefined)).toEqual([]);
     expect(pageMarksOf({ items: [{ target: 'https://example.org/c1' }] })).toEqual([]);
+  });
+
+  it('reads the kind from an array of motivations and skips descriptions given that way', () => {
+    const page = {
+      items: [
+        { motivation: ['commenting', 'tagging'], target: 'c#xywh=0,0,1,1', body: { value: 'note' } },
+        { motivation: ['describing'], target: 'c#xywh=0,0,9,9', body: { value: 'all' } },
+        { target: 'c#xywh=0,0,2,2', body: { value: 'no motivation' } },
+      ],
+    };
+    expect(pageMarksOf(page).map((m) => m.kind)).toEqual(['commenting', 'commenting']);
   });
 });
