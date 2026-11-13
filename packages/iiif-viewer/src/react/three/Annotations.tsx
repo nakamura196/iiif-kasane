@@ -230,9 +230,12 @@ export default function Annotations({ model }: { model: GLTF }) {
   const storyOpen = useAtomValue(storyOpenAtom);
   const storyNotes = useAtomValue(storyNotesAtom);
   const told = storyOpen ? storyNotes : null;
-  useEffect(() => {
+  // adjusted while rendering (not in an effect): a new step, or the story opened, opens its note
+  const [toldBefore, setToldBefore] = useState(told);
+  if (told !== toldBefore) {
+    setToldBefore(told);
     if (told) setOpenAnnotationId(told[0] ?? null);
-  }, [told]);
+  }
   const zoom = { label: t('zoomToNote'), onClick: () => openAnnotationId && focusOnAnnotation(openAnnotationId) };
 
   useEffect(() => {
