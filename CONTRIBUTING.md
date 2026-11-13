@@ -43,11 +43,30 @@ npm test
 npm run build
 ```
 
-End-to-end tests use Playwright (`npm run test:e2e`). If you add a page or change a page's entry screen (what it shows without a manifest), run `e2e/entryPages.spec.ts` against a dev server:
+### End-to-end tests
+
+Browser tests use Playwright (`e2e/*.spec.ts`).
 
 ```bash
-E2E_BASE_URL=http://localhost:3838 npx playwright test e2e/entryPages.spec.ts
+npm run test:e2e                                    # starts next dev on :3838 and runs everything
+E2E_BASE_URL=https://kasane.ldas.jp npm run test:e2e   # run against another server (no dev server is started)
 ```
+
+Pull requests run the same tests in GitHub Actions (`.github/workflows/e2e.yml`) against the static export, **except** tests that need an outside website (iiif.io, Hugging Face, ...). Those are tagged `@external` so CI stays stable when the outside site is slow or down. To reproduce CI locally:
+
+```bash
+npm run build
+npm run serve:export &      # serves out/ on :3862
+E2E_BASE_URL=http://localhost:3862 npm run test:e2e:ci   # = playwright test --grep-invert @external
+```
+
+When you write a test, serve its data yourself with `page.route(...)` (see `e2e/canvasAnnotations.spec.ts`) or with the local mock server `scripts/auth-mock-server.mjs`. If it really needs an outside site, add the tag to the title and it is skipped in CI but still runs locally:
+
+```ts
+test('reads a Cookbook recipe', { tag: '@external' }, async ({ page }) => { /* ... */ });
+```
+
+If you add a page or change a page's entry screen (what it shows without a manifest), run `e2e/entryPages.spec.ts` too (it is included above).
 
 How to add a feature (where files go) is described in [packages/iiif-viewer/EXTENDING.md](packages/iiif-viewer/EXTENDING.md).
 

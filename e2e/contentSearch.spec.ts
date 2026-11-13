@@ -2,14 +2,14 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 
-// Text search (IIIF Content Search). No public resource with a 2.0 search service was found (2026-10-15),
-// so for 2.0 the manifest, image and search responses are served inside this test. 1.0 queries the real MDZ.
+// Text search (IIIF Content Search). No public material with a 2.0 service was found (2026-10-15), so for 2.0
+// the manifest, images and search responses are served inside the test. For 1.0 the real MDZ service is queried (@external).
 
 const BASE = 'https://example.org/book1';
 const fixture = (name: string) =>
   readFileSync(join(__dirname, '../packages/iiif-viewer/src/core/features/contentSearch/fixtures', name), 'utf8');
 
-// 1x1 gray PNG (the image itself does not matter; it is drawn at the Canvas size)
+// A 1x1 grey PNG (any image will do; it is drawn at the size of the Canvas)
 const PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGNoAAAAggCBd81ytgAAAABJRU5ErkJggg==',
   'base64',
@@ -58,18 +58,18 @@ async function serveBook(page: Page) {
   const json = (body: string) => ({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body });
   await page.route(`${BASE}/manifest`, (r) => r.fulfill(json(JSON.stringify(manifest))));
   await page.route(`${BASE}/*.png`, (r) => r.fulfill({ status: 200, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: PNG }));
-  // Make the second page (after next) empty
+  // The second page of results (behind next) is empty
   await page.route('https://example.org/service/book1/search?**', (r) =>
     r.fulfill(json(new URL(r.request().url()).searchParams.get('page') ? '{"type":"AnnotationPage","items":[]}' : fixture('search2-handmade.json'))),
   );
   await page.route('https://example.org/service/book1/autocomplete?**', (r) => r.fulfill(json(fixture('autocomplete2-handmade.json'))));
 }
 
-test('Content Search 2.0: hit list, unit filtering, suggested terms, selecting goes to that page', async ({ page }) => {
+test('Content Search 2.0: 当たりの一覧・単位の絞り込み・候補語・押すとそのページへ', async ({ page }) => {
   await serveBook(page);
   await page.goto(`/ja/viewer/?iiif-content=${encodeURIComponent(`${BASE}/manifest`)}&tab=contentSearch`);
 
-  const box = page.getByPlaceholder('資料の中の文字を探す') // the role changes to combobox when suggestions appear, so do not locate it by role;
+  const box = page.getByPlaceholder('資料の中の文字を探す') // once suggestions appear the role changes to combobox, so do not look it up by role
   await box.fill('bir');
   await expect(page.locator('datalist option')).toHaveCount(3);
   await box.fill('bird');
@@ -77,7 +77,7 @@ test('Content Search 2.0: hit list, unit filtering, suggested terms, selecting g
 
   await expect(page.getByText('「bird」: 2 件（全 5 件）')).toBeVisible();
   await expect(page.getByText('IIIF Content Search 2.0')).toBeVisible();
-  // Mark the matched term within the surrounding text
+  // The matched word is marked inside the surrounding text
   await expect(page.locator('mark', { hasText: 'blue bird' })).toBeVisible();
 
   // Filter by unit (Text Granularity)
@@ -87,7 +87,7 @@ test('Content Search 2.0: hit list, unit filtering, suggested terms, selecting g
   await expect(page.locator('mark')).toHaveCount(1);
   await units.getByRole('button', { name: 'すべて' }).click();
 
-  // Marker for the line hit on the first page's image
+  // The line hit is marked on the image of page 1
   await expect(page.locator(`[data-overlay="annotations"] [data-annotation-id="${BASE}/annotation/line-1"]`)).toBeVisible();
 
   // Selecting a hit that spans two words moves to the second page, fits the whole hit (2 words) on screen, and shows two markers.
@@ -135,7 +135,7 @@ test('Content Search 2.0: with the marks hidden, a multi-word hit is still frame
   await expect(page.getByTestId('region-highlight')).toBeVisible();
 });
 
-test('Content Search 1.0 (real MDZ): opening with ?q= has already searched', async ({ page }) => {
+test('Content Search 1.0（MDZ の実物）: ?q= で開くと探してある', { tag: '@external' }, async ({ page }) => {
   const m = 'https://api.digitale-sammlungen.de/iiif/presentation/v2/bsb00026283/manifest';
   await page.goto(`/ja/viewer/?iiif-content=${encodeURIComponent(m)}&tab=contentSearch&q=der`);
   await expect(page.getByText(/「der」: \d+ 件（全 \d+ 件）/)).toBeVisible();
@@ -143,7 +143,7 @@ test('Content Search 1.0 (real MDZ): opening with ?q= has already searched', asy
   await expect(page.locator('[data-overlay="annotations"] [data-annotation-id*="/search/v1/bsb00026283/anno/"]').first()).toBeVisible();
 });
 
-test('Show hit markers on both pages of a spread (MDZ frames 2 and 3)', async ({ page }) => {
+test('見開きの両ページにも当たりの印を出す（MDZ の 2・3 コマ目）', { tag: '@external' }, async ({ page }) => {
   const m = 'https://api.digitale-sammlungen.de/iiif/presentation/v2/bsb00026283/manifest';
   await page.goto(`/ja/viewer/?iiif-content=${encodeURIComponent(m)}&tab=contentSearch&q=der&canvas=2`);
   await expect(page.getByText('2・3 / 79')).toBeVisible();
@@ -153,9 +153,9 @@ test('Show hit markers on both pages of a spread (MDZ frames 2 and 3)', async ({
   }
 });
 
-// Search local annotations: a resource without a search service (page 1 has inline annotations, page 2 only a reference), and
-// switching the search target on a resource that has a search service.
-test('Local annotations: inline and referenced annotations are searchable without a search service', async ({ page }) => {
+// Search the annotations at hand: a material without a search service (page 1 has annotations written in,
+// page 2 only references them), and switching the "search target" in a material that has a service.
+test('手元の注釈: 窓口が無くても、書かれた注釈と参照先の注釈を探せる', async ({ page }) => {
   await serveBook(page);
   const line = (n: number, id: string, value: string, xywh: string) => ({
     id: `${BASE}/local/${id}`,
@@ -181,19 +181,19 @@ test('Local annotations: inline and referenced annotations are searchable withou
   );
   await page.goto(`/ja/viewer/?iiif-content=${encodeURIComponent(`${BASE}/plain`)}&tab=contentSearch`);
 
-  // There is no search service, so the search-target control is not shown
+  // There is no service, so no "search target" switch is shown
   await expect(page.getByRole('group', { name: '探す先' })).toHaveCount(0);
   const box = page.getByPlaceholder('資料の中の文字を探す');
   await box.fill('源氏');
   await box.press('Enter');
   await expect(page.getByText('「源氏」: 2 件（全 2 件）')).toBeVisible();
-  // Selecting the second page's hit (annotation fetched from the reference) moves there
+  // Clicking the hit on page 2 (an annotation fetched from the reference) moves there
   await page.getByRole('button', { name: /帚木/ }).click();
   await expect(page.getByText('2 / 2')).toBeVisible();
   await expect(page.locator(`[data-overlay="annotations"] [data-annotation-id^="${BASE}/local/b#search"]`)).toBeVisible();
 });
 
-test('Local annotations: on a resource with a search service, switch via the search-target control', async ({ page }) => {
+test('手元の注釈: 窓口のある資料では「探す先」で切り替える', async ({ page }) => {
   await serveBook(page);
   const withNotes = {
     ...manifest,
