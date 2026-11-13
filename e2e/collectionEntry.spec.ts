@@ -1,14 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
 
-// Collection の項目を開いたとき、画像の表示が「いま開いている manifest」を読み直すこと（Issue #334）。
-// 以前は最初に渡された Collection の URL を読み直していたため、画像の service が見つからず、
-// 画像の id（ここでは画像ではない URL）をそのまま読みに行って「画像を読み込めませんでした」になった。
-// 戻ったあとにもう一度開いても同じように出ることも見る。データはこのテストの中で返す。
+// An entry opened from a Collection draws its image with the entry's own manifest (Issue #334).
+// Before, the image display used the URL first given to the viewer (the Collection), found no service,
+// asked for the image id itself (here not an image) and showed "Could not load the image".
+// Also checks that the image shows again after going back and reopening. The data is served by the test.
 
 const BASE = 'https://example.org/collection-entry';
 const SERVICE = `${BASE}/front`;
 
-// 1×1 の灰色の PNG（画像そのものは何でもよい。Canvas の大きさで描かれる）
+// A 1×1 gray PNG (any image will do; it is drawn at the Canvas size)
 const PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGNoAAAAggCBd81ytgAAAABJRU5ErkJggg==',
   'base64',
@@ -22,8 +22,8 @@ const collection = {
   items: [{ id: `${BASE}/manifest.json`, type: 'Manifest', label: { en: ['Kameido'] } }],
 };
 
-// 画像の id は service と同じ URL で、そこ自体は画像を返さない（実在のサイトの形）。
-// 画像は Image API の service（level 0、info.json）からしか取れない
+// The image id is the same URL as the service and returns no image itself (as on the real site).
+// The image is only reachable through the Image API service (level 0, info.json)
 const manifest = {
   '@context': 'http://iiif.io/api/presentation/3/context.json',
   id: `${BASE}/manifest.json`,
@@ -83,7 +83,7 @@ async function serve(page: Page) {
     if (url === `${SERVICE}/info.json`) {
       return route.fulfill({ json: info, headers: cors });
     }
-    // Image API の要求（{id}/{region}/{size}/{rotation}/{quality}.{format}）にだけ画像を返す
+    // only Image API requests ({id}/{region}/{size}/{rotation}/{quality}.{format}) get an image
     if (url.startsWith(`${SERVICE}/`) && /\.(jpg|png)$/.test(url)) {
       seen.tiles.push(url);
       return route.fulfill({ body: PNG, contentType: 'image/png', headers: cors });
@@ -99,7 +99,7 @@ async function serve(page: Page) {
 const loadedCount = (imgs: Element[]) =>
   imgs.filter((i) => i instanceof HTMLImageElement && i.complete && i.naturalWidth > 0).length;
 
-test('Collection から開いた manifest の画像を、その manifest の Image API service で出す（#334）', async ({ page }) => {
+test('an entry opened from a Collection draws its image through its own Image API service (#334)', async ({ page }) => {
   const seen = await serve(page);
   await page.goto(`/en/viewer/?iiif-content=${encodeURIComponent(`${BASE}/collection.json`)}`);
 

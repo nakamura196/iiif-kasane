@@ -65,7 +65,7 @@ export const annotationsAtom3 = atom<Annotation3[]>([]);
 // 選択中のアノテーションIDのアトム
 export const selectedAnnotationIdAtom = atom<string | null>(null);
 
-// 最初に渡された URL（iiif-content）。Collection をたどっても変わらない
+// The URL first given to the viewer (iiif-content). It stays the same while moving inside a Collection
 export const manifestUrlAtom = atom<string | null>(null);
 
 /**

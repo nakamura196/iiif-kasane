@@ -172,7 +172,9 @@ test('changing the locale of <iiif-kasane> keeps the opened entry and its page',
   await expect(pager(page)).toContainText('2 / 4');
 
   await page.locator('iiif-kasane').evaluate((el) => el.setAttribute('locale', 'ja'));
-  const jaPager = page.getByRole('group', { name: 'ページ送り' });
+  // the Japanese label of the pager, from the viewer's messages
+  const ja = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../packages/iiif-viewer/src/react/messages/features/structure.ja.json'), 'utf8'));
+  const jaPager = page.getByRole('group', { name: ja.Structure.pager });
   await expect(jaPager).toBeVisible();
   // give a reload (the bug) time to come back to the top of the Collection
   await page.waitForTimeout(1500);
