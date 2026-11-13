@@ -28,7 +28,11 @@ The English file links to its Japanese counterpart (as `README.md` links to `REA
 
 Since 2026-11-13 Kasane has outside users: the `iiif-kasane` npm package and sites that embed the viewer. A bug breaks their sites, not only kasane.ldas.jp. This rule came from #334 (images of a Manifest opened from a Collection did not show), which an outside user reported.
 
-- Run `/code-review` on a PR that changes code before merging it. Use `high` for small changes. Before a large change or an npm release, use `ultra` (several agents review in the cloud; the maintainer starts it).
+- Run `/code-review` on a PR that changes code before merging it. Pick the level by what the change touches, since a review costs more the higher the level:
+  - `low` for a small change that only affects how things look (a position, a colour, a label).
+  - `high` for a change to behaviour: state, filtering, loading, parsing, or the public API.
+  - `ultra` before a large change or an npm release (several agents review in the cloud; the maintainer starts it).
+  - When several small PRs come in a row, one review over them together is fine.
 - For each finding, write in the PR description or a comment whether it was fixed, and why if not.
 - A bug fix comes with a reproduction test that was confirmed to fail before the fix.
 - The public API (Web Component attributes, exported types such as `ViewerState` and `DisplayProps`, URL parameters) only grows. Renaming or removing needs the maintainer's agreement. If it must change, say so in the release notes.
