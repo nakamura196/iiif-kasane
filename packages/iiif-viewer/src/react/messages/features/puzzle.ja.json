@@ -11,10 +11,15 @@
     "loading": "画像を読み込み中…",
     "error": "画像を読み込めませんでした。",
     "status": "正しい位置 {placed} / {total} ・ 手数 {moves}",
-    "solved": "完成しました（{moves} 手）",
     "piece": "{cell} 番目のマス",
     "reshuffle": "混ぜ直す",
     "sample": "見本を重ねる",
-    "close": "閉じる"
+    "close": "閉じる",
+    "time": "時間 {time}",
+    "solvedTitle": "完成！",
+    "solvedStats": "{total} ピースを {moves} 手・{time} で揃えました",
+    "copyLink": "リンクをコピー",
+    "copied": "コピーしました",
+    "copyFailed": "コピーできませんでした。リンクを選んでコピーしてください"
   }
 }
