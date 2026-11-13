@@ -45,7 +45,8 @@ const check = (ok, msg) => {
 // scripts of `npm publish` (prepack, prepublishOnly, ...) do not run on that path. Fail if the package
 // defines any that would then be skipped.
 step('Build the package');
-const manifestPkg = JSON.parse(readFileSync(join(pkgDir, 'package.json'), 'utf8'));
+const pkg = JSON.parse(readFileSync(join(pkgDir, 'package.json'), 'utf8'));
+const manifestPkg = pkg;
 const scripts = manifestPkg.scripts ?? {};
 if (scripts.prepack !== undefined && scripts.prepack !== 'npm run build') {
   console.error(`"prepack" must be exactly "npm run build" (it is: ${scripts.prepack}): the tarball is packed with --ignore-scripts after an explicit build.`);
@@ -73,10 +74,13 @@ console.log(`  ${packed.filename}: ${packed.files.length} files, ${(packed.size 
 
 // 2. Every path in "exports" (and the legacy entry) must be in the tarball.
 step('Check the tarball against package.json');
-const pkg = JSON.parse(readFileSync(join(pkgDir, 'package.json'), 'utf8'));
 const exported = new Set();
-const collect = (v) => (typeof v === 'string' ? exported.add(v.replace(/^\.\//, '')) : Object.values(v).forEach(collect));
-collect(pkg.exports);
+const collect = (v, where) => {
+  if (typeof v === 'string') exported.add(v.replace(/^\.\//, ''));
+  else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) collect(x, `${where}.${k}`);
+  else check(false, `package.json exports${where} has no file path (${JSON.stringify(v)})`);
+};
+collect(pkg.exports, '');
 for (const extra of ['dist/iiif-kasane.js', 'dist/iiif-viewer.js', 'dist/style.css', 'README.md', 'LICENSE']) exported.add(extra);
 for (const p of [...exported].sort()) check(tarFiles.has(p), `tarball contains ${p}`);
 check(![...tarFiles].some((p) => p.startsWith('src/') || p.endsWith('.map')), 'tarball has no src/ or source maps');

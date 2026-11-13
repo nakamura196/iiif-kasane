@@ -16,6 +16,7 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/package-smoke.yml'
+      - '.github/workflows/publish-npm.yml'
   workflow_dispatch:
 
 concurrency:

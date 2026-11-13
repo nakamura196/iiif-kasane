@@ -107,6 +107,7 @@ test.beforeAll(async () => {
 });
 test.afterAll(() => server?.close());
 
+// Known limit: page.route does not see requests made by a service worker; the page registers none.
 test('the <iiif-kasane> tag from the packed package shows a manifest', async ({ page }) => {
   const errors: string[] = [];
   const missing: string[] = [];
@@ -120,7 +121,10 @@ test('the <iiif-kasane> tag from the packed package shows a manifest', async ({ 
     outside.push(route.request().url());
     return route.abort();
   });
-  page.on('requestfailed', (r) => failed.push(`${r.url()} ${r.failure()?.errorText}`));
+  // An aborted outside request also fires requestfailed; it is already counted in `outside`.
+  page.on('requestfailed', (r) => {
+    if (!outside.includes(r.url())) failed.push(`${r.url()} ${r.failure()?.errorText}`);
+  });
   await page.goto(origin + '/');
   const tag = page.locator('iiif-kasane');
   // The viewer shows the painted image as an <img> on its stage, and the manifest label in the About panel.
