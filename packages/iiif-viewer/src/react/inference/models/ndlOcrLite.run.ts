@@ -7,7 +7,9 @@ import {
   decodeParseq,
   ndlDetTensor,
   ndlFirstRecognizer,
+  NDL_CLASSES,
   ndlOcrLines,
+  ndlOcrRegions,
   ndlParseqTensor,
 } from '../../../core';
 import type { ModelRunner } from './types';
@@ -49,6 +51,8 @@ export const run: ModelRunner = async ({ ort, bitmap, session, progress }) => {
   });
   const num = (t: { data: unknown }) => Array.from(t.data as ArrayLike<number | bigint>, Number);
   const lines = ndlOcrLines(num(r.labels), r.boxes.data as Float32Array, r.scores.data as Float32Array, num(r.char_count), W, H);
+  // 行以外の区分（本文の塊・図版・表・柱・ノンブルなど）も、検出したまま結果に入れる
+  const regions = ndlOcrRegions(num(r.labels), r.boxes.data as Float32Array, r.scores.data as Float32Array, num(r.char_count), W, H);
   progress('detect', 1, 1);
 
   // 2. 文字の読み取り（process_cascade）: 文字数の見込みで 30 字用・50 字用・100 字用を選び、あふれたら次の大きさで読み直す。
@@ -78,8 +82,8 @@ export const run: ModelRunner = async ({ ort, bitmap, session, progress }) => {
       const half = w >> 1;
       text = (await read(2, crop(px, w, 0, 0, half, h), half, h)) + (await read(2, crop(px, w, half, 0, w - half, h), w - half, h));
     }
-    items.push({ x: l.x, y: l.y, w: l.w, h: l.h, score: l.score, text });
+    items.push({ x: l.x, y: l.y, w: l.w, h: l.h, score: l.score, label: l.type, text });
   }
   progress('read', lines.length, lines.length);
-  return { kind: 'lines', items, imageWidth: W, imageHeight: H, language: 'ja' };
+  return { kind: 'lines', items: [...items, ...regions], imageWidth: W, imageHeight: H, language: 'ja', classes: NDL_CLASSES };
 };

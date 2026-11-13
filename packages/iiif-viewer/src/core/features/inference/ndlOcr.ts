@@ -488,6 +488,30 @@ const smoothOrder = (page: El) => {
  * sort_lines with 割注 grouping, smoothing), then every LINE in document order. With no LINE at all, every detection
  * becomes a line, in detection order.
  */
+/**
+ * The detector's other regions (text blocks, figures, tables, folios ...: every class not a line), in image pixels,
+ * clipped to the image. The lines are read and returned by ndlOcrLines; these are kept as found, nothing dropped
+ * beyond the detector's own threshold (NDL_DET_CONF, as deim.py).
+ */
+export const ndlOcrRegions = (
+  labels: ArrayLike<number>,
+  boxes: ArrayLike<number>,
+  scores: ArrayLike<number>,
+  charCount: ArrayLike<number>,
+  W: number,
+  H: number,
+): { x: number; y: number; w: number; h: number; score: number; label: string }[] =>
+  detections(labels, boxes, scores, charCount, Math.max(W, H))
+    .filter((d) => NDL_CLASSES[d.cls] && !NDL_CLASSES[d.cls].startsWith('line_'))
+    .map((d) => {
+      const x1 = Math.min(d.b[0], W);
+      const y1 = Math.min(d.b[1], H);
+      const x2 = Math.min(d.b[2], W);
+      const y2 = Math.min(d.b[3], H);
+      return { x: x1, y: y1, w: x2 - x1, h: y2 - y1, score: d.conf, label: NDL_CLASSES[d.cls] };
+    })
+    .filter((r) => r.w > 0 && r.h > 0);
+
 export const ndlOcrLines = (
   labels: ArrayLike<number>,
   boxes: ArrayLike<number>,
