@@ -1,14 +1,14 @@
 import { atom } from 'jotai';
 
-// 右パネルの一覧と、画像の上の印で共有する「選ばれている注釈」。Viewer ごとの store に載る。
+// The chosen annotation, shared by the list in the right panel and the marks over the image. Kept in each Viewer's store.
 export const selectedCanvasAnnotationAtom = atom<string | null>(null);
 
-// 右パネルの注釈の一覧で選んだ単位（Text Granularity の line・word など）。null はすべて。
-// 画像の上の印も同じ単位に絞る。ただし文字の検索の当たり（highlighting）は、検索タブの側で絞る。
+// The unit (Text Granularity: line, word …) chosen in the annotations tab; null is all. The marks over the image and
+// over the page thumbnails follow it too, except the hits of a text search (highlighting), which the search tab narrows.
 export const canvasAnnotationGranularityAtom = atom<string | null>(null);
 
-// 閲覧者の手元で作った AnnotationPage（ブラウザ内の推論の結果など）。マニフェストには無いが、
-// マニフェストの注釈と同じく、右パネルの一覧と画像の上の印に出す。Canvas ごとに、作った側の id で持つ。
+// AnnotationPages made in the reader's browser (the results of inference, for example). They are not in the manifest,
+// but are shown in the right panel's list and over the image like its annotations. Kept per Canvas, by their maker.
 export interface LocalAnnotationPage {
   /** Who made it (for example `inference:<model id>`). One page per maker and Canvas. */
   source: string;
@@ -18,17 +18,22 @@ export interface LocalAnnotationPage {
 
 export const localAnnotationPagesAtom = atom<LocalAnnotationPage[]>([]);
 
-// その Canvas の画像に重ねている、手元で作った AnnotationPage の数。ignore の作り手（文字の検索の印など）は数えない。
-// 推論の結果は、画像に重ねている間だけここに入る（推論タブで隠すと抜ける）。
+// How many AnnotationPages made in the browser are laid over the Canvas's image, not counting those of `ignore` (the
+// marks of a text search, for example). A result of inference is here only while it is shown (hiding it in the
+// inference tab takes it out).
 export const localPageCountOn = (pages: LocalAnnotationPage[], canvasId: string | undefined, ignore: string): number =>
   canvasId ? pages.filter((l) => l.canvasId === canvasId && l.source !== ignore).length : 0;
 
-// 右パネルの注釈の検索欄の文字。画像の上の印も、当たった注釈だけに絞る。
+// The text in the annotations tab's search box. The marks over the image are narrowed to the matching annotations too.
 export const canvasAnnotationQueryAtom = atom<string>('');
 
-// 右パネルで選んだタグ（「キー: 値」）。どれか 1 つを持つ注釈だけを一覧と画像の上の印に出す。
-// 今の Canvas に無いタグは無視する（別の Canvas へ移っても選択は残す）。
+// Tags ("key: value") chosen in the annotations tab or the pages grid. Only annotations with one of them are shown in
+// the list and over the image. Tags the current Canvas lacks are ignored (the choice is kept when moving to another Canvas).
 export const canvasAnnotationTagsAtom = atom<string[]>([]);
 
-// 一覧で注釈を選んだとき、画像をその場所へ寄せるか（既定は寄せない）。
+// Kinds (motivations) chosen in the annotations tab or the pages grid; empty shows every kind. The list, the marks over
+// the image and the marks over the page thumbnails all follow it. Kinds the current Canvas lacks are ignored.
+export const canvasAnnotationKindsAtom = atom<string[]>([]);
+
+// Whether choosing an annotation in the list moves the image to it (off by default).
 export const canvasAnnotationFocusOnSelectAtom = atom<boolean>(false);

@@ -6,14 +6,18 @@
 // ここで区分を選ぶと、画像の上の印と注釈タブの一覧も同じ区分に絞られる。
 import { useEffect, useMemo, useState } from 'react';
 import { atom, useAtom, useAtomValue, useStore } from 'jotai';
-import { pageMarksOf, type ContainerInfo, type ManifestV4, type PageMark } from '../../core';
+import { kindFacets, pageMarksOf, passesChoice, presentChoices, type ContainerInfo, type ManifestV4, type PageMark } from '../../core';
+import { showAnnotationsAtom } from '../atoms';
+import { FilterChips } from '../annotation/FilterChips';
+import { ShowMarksToggle } from '../annotation/ShowMarksToggle';
+import { useKindOptions } from '../annotation/kindLabels';
 import { useLocale, useTranslations } from '../env';
 import { batchStateAtom, batchTargetsOf, startBatch, stopBatch } from '../inference/batch';
 import { modelStatus } from '../inference/modelStore';
 import { MODELS } from '../inference/models/registry';
 import type { InferenceModel } from '../inference/models/types';
 import { inferenceResultsAtom, resultKey } from '../inference/state';
-import { canvasAnnotationTagsAtom } from '../overlays/canvasAnnotationState';
+import { canvasAnnotationGranularityAtom, canvasAnnotationKindsAtom, canvasAnnotationTagsAtom } from '../overlays/canvasAnnotationState';
 
 const BUTTON =
   'px-2.5 py-1 rounded border border-gray-300 dark:border-gray-600 text-xs hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40';
@@ -37,19 +41,47 @@ const shownModelAtom = atom((get) => {
   return b?.running ? b.modelId : get(batchModelAtom);
 });
 
-/** The classes in the shown model's results, with how many marks each has (most first) and their color. */
-const shownTagsAtom = atom((get) => {
+/** The marks of the shown model's results, on every page that has them. */
+const shownMarksAtom = atom((get) => {
   const modelId = get(shownModelAtom);
-  const counts = new Map<string, { count: number; color: string }>();
   if (!modelId) return [];
-  for (const r of Object.values(get(inferenceResultsAtom))) {
-    if (r.modelId !== modelId) continue;
-    for (const m of marksOf(r.page)) {
-      if (!m.tag) continue;
-      const e = counts.get(m.tag) ?? { count: 0, color: m.color };
-      e.count++;
-      counts.set(m.tag, e);
-    }
+  return Object.values(get(inferenceResultsAtom))
+    .filter((r) => r.modelId === modelId)
+    .flatMap((r) => marksOf(r.page));
+});
+
+/** The kinds in the shown model's results (read text, classified regions …), with how many marks each has. */
+const shownKindsAtom = atom((get) => kindFacets(get(shownMarksAtom).map((m) => m.kind)));
+
+/** The chosen kinds that the shown results have (as in the annotations tab, other kinds are ignored). */
+const shownChosenKindsAtom = atom((get) => presentChoices(get(canvasAnnotationKindsAtom), get(shownKindsAtom)));
+
+/**
+ * The unit of text chosen in the annotations tab, when the shown results of the chosen kinds have it (else none, as
+ * in the annotations tab).
+ */
+const shownChosenGranularityAtom = atom((get) => {
+  const g = get(canvasAnnotationGranularityAtom);
+  if (!g) return null;
+  const kinds = get(shownChosenKindsAtom);
+  return get(shownMarksAtom).some((m) => m.granularity === g && passesChoice(m.kind, kinds)) ? g : null;
+});
+
+/**
+ * The classes in the shown model's results of the chosen kinds and unit, with how many marks each has (most first)
+ * and their color. As in the annotations tab, the tags offered (and the chosen tags that count) are those of the
+ * chosen kinds and unit.
+ */
+const shownTagsAtom = atom((get) => {
+  const counts = new Map<string, { count: number; color: string }>();
+  const kinds = get(shownChosenKindsAtom);
+  const granularity = get(shownChosenGranularityAtom);
+  for (const m of get(shownMarksAtom)) {
+    if (!passesChoice(m.kind, kinds) || (granularity && m.granularity !== granularity)) continue;
+    if (!m.tag) continue;
+    const e = counts.get(m.tag) ?? { count: 0, color: m.color };
+    e.count++;
+    counts.set(m.tag, e);
   }
   return [...counts].map(([value, e]) => ({ value, ...e })).sort((a, b) => b.count - a.count);
 });
@@ -79,6 +111,7 @@ const useReadyModels = (): InferenceModel[] | null => {
 
 export function PagesBatchBar({ pages, manifest }: { pages: ContainerInfo[]; manifest: ManifestV4 | null | undefined }) {
   const t = useTranslations('Inference');
+  const tf = useTranslations('AnnotationFilter');
   const locale = useLocale() === 'ja' ? 'ja' : 'en';
   const store = useStore();
   const ready = useReadyModels();
@@ -86,6 +119,8 @@ export function PagesBatchBar({ pages, manifest }: { pages: ContainerInfo[]; man
   const batch = useAtomValue(batchStateAtom);
   const results = useAtomValue(inferenceResultsAtom);
   const [chosenTags, setChosenTags] = useAtom(canvasAnnotationTagsAtom);
+  const [chosenKinds, setChosenKinds] = useAtom(canvasAnnotationKindsAtom);
+  const kindOptions = useKindOptions(useAtomValue(shownKindsAtom));
   const running = !!batch?.running;
 
   // 選んだモデルが無ければ、ダウンロード済みの最初のもの
@@ -96,7 +131,7 @@ export function PagesBatchBar({ pages, manifest }: { pages: ContainerInfo[]; man
   const shownModel = useAtomValue(shownModelAtom);
 
   const tags = useAtomValue(shownTagsAtom);
-  const toggleTag = (v: string) => setChosenTags((cur) => (cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v]));
+  const hasMarks = useAtomValue(shownMarksAtom).length > 0;
 
   if (ready === null) return null;
   if (ready.length === 0) {
@@ -164,37 +199,30 @@ export function PagesBatchBar({ pages, manifest }: { pages: ContainerInfo[]; man
           />
         </div>
       ) : null}
-      {tags.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-1" role="group" aria-label={t('batchTags')}>
-          <span className="text-gray-500 dark:text-gray-400 mr-1">{t('batchTags')}</span>
-          {tags.map((g) => {
-            const on = chosenTags.includes(g.value);
-            return (
-              <button
-                key={g.value}
-                type="button"
-                aria-pressed={on}
-                onClick={() => toggleTag(g.value)}
-                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 ${
-                  on ? 'border-blue-500 bg-blue-50 dark:bg-blue-950' : 'border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800'
-                }`}
-              >
-                <span aria-hidden="true" className="inline-block w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: g.color }} />
-                {g.value}
-                <span className="tabular-nums opacity-60">{g.count}</span>
-              </button>
-            );
-          })}
-          {chosenTags.length > 0 ? (
-            <button type="button" className="underline text-gray-500 dark:text-gray-400 ml-1" onClick={() => setChosenTags([])}>
-              {t('batchTagsClear')}
-            </button>
-          ) : null}
-        </div>
-      ) : null}
+      {hasMarks ? <ShowMarksToggle /> : null}
+      <FilterChips label={tf('kind')} options={kindOptions} chosen={chosenKinds} onChange={setChosenKinds} minOptions={2} />
+      <FilterChips label={t('batchTags')} options={tags} chosen={chosenTags} onChange={setChosenTags} />
     </div>
   );
 }
+
+/**
+ * The marks a thumbnail shows: none with the marks switched off; otherwise those of the chosen kinds, unit and tags (a
+ * page without them shows no frame, so the pages that have them stand out). `kinds`, `granularity` and `tags` are the
+ * chosen values the shown results have; empty (or none) means all.
+ */
+export const thumbMarksShown = (
+  marks: readonly PageMark[],
+  o: { showMarks: boolean; kinds: readonly string[]; granularity?: string | null; tags: readonly string[] },
+): PageMark[] =>
+  !o.showMarks
+    ? []
+    : marks.filter(
+        (m) =>
+          passesChoice(m.kind, o.kinds) &&
+          (!o.granularity || m.granularity === o.granularity) &&
+          (o.tags.length === 0 || (!!m.tag && o.tags.includes(m.tag))),
+      );
 
 const shapeOf = (m: PageMark, i: number) => {
   // 読んだ行は細かく並ぶので、サムネイルでは枠線を引かず薄く塗るだけにする（線が詰まって塗りつぶしに見えるため）
@@ -217,13 +245,16 @@ export function PageThumbMarks({ page }: { page: ContainerInfo }) {
   const batch = useAtomValue(batchStateAtom);
   const results = useAtomValue(inferenceResultsAtom);
   const chosenTags = useAtomValue(shownChosenTagsAtom);
+  const chosenKinds = useAtomValue(shownChosenKindsAtom);
+  const granularity = useAtomValue(shownChosenGranularityAtom);
+  const showMarks = useAtomValue(showAnnotationsAtom);
   const result = shown ? results[resultKey(page.id, shown)] : undefined;
   const marks = marksOf(result?.page);
   const reading = !!batch?.running && batch.current === page.id;
   // 区分を選んだら、どのページでもその区分の枠だけを出す（その区分の無いページは枠が消え、ある頁が目立つ）
   const visible = useMemo(
-    () => (chosenTags.length === 0 ? marks : marks.filter((m) => m.tag && chosenTags.includes(m.tag))),
-    [marks, chosenTags],
+    () => thumbMarksShown(marks, { showMarks, kinds: chosenKinds, granularity, tags: chosenTags }),
+    [marks, showMarks, chosenKinds, granularity, chosenTags],
   );
 
   return (

@@ -25,8 +25,6 @@
     "canvasAnnotationsMotivation_editing": "修正",
     "canvasAnnotationsMotivation_moderating": "管理",
     "canvasAnnotationsMotivation_painting": "本文",
-    "canvasAnnotationsGranularity": "単位",
-    "canvasAnnotationsGranularityAll": "すべて",
     "canvasAnnotationsGranularity_page": "ページ",
     "canvasAnnotationsGranularity_block": "ブロック",
     "canvasAnnotationsGranularity_paragraph": "段落",
@@ -37,11 +35,8 @@
     "canvasAnnotationsTotal": "{count} 件",
     "canvasAnnotationsSearchCount": "{count} 件 / 全 {total} 件",
     "canvasAnnotationsNoMatch": "当てはまる注釈がありません",
-    "canvasAnnotationsTags": "タグ",
-    "canvasAnnotationsTagsAll": "すべて表示（{count} 種）",
-    "canvasAnnotationsTagsFewer": "少なく表示",
-    "canvasAnnotationsTagsClear": "タグの選択を解除",
-    "canvasAnnotationsFocusOnSelect": "選んだ注釈へ画像を寄せる"
+    "canvasAnnotationsFocusOnSelect": "選んだ注釈へ画像を寄せる",
+    "canvasAnnotationsMotivation_supplementing": "文字起こし"
   },
   "AnnotationResources": {
     "place": "この場所の写真",
@@ -54,5 +49,14 @@
     "countImages": "画像 {count}",
     "countLinks": "リンク {count}",
     "countCitations": "文献 {count}"
+  },
+  "AnnotationFilter": {
+    "all": "すべて",
+    "showAll": "すべて表示（{count} 種）",
+    "fewer": "少なく表示",
+    "kind": "種類",
+    "granularity": "単位",
+    "tags": "タグ",
+    "showMarks": "印を表示"
   }
 }

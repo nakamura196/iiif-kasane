@@ -48,6 +48,8 @@ export interface Annotation {
   // id of the target Specific Resource. Annotations with the same regionId
   // annotate the same region (Shared Region extension).
   regionId?: string;
+  // The annotation's motivations (W3C / IIIF), when it has any. The list filters by kind with them.
+  motivations?: string[];
   // Tagging bodies. `key` comes from the body's label (Keyed Tag extension).
   tags?: AnnotationTag[];
   // Image bodies (pictures of the annotated place)

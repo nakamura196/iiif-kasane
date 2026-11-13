@@ -1,8 +1,9 @@
-// 推論の結果の AnnotationPage（toAnnotationPage が作るもの）から、サムネイルに重ねる印を取り出す。
-// 枠（#xywh か FragmentSelector）と多角形（SvgSelector）を Canvas 座標のまま返す。色は注釈の stylesheet から、
-// タグ（区分名）は purpose が tagging の本文から読む。色の無い注釈は区分の無い色（CLASS_PALETTE[0]）にする。
-// Marks to draw over a page thumbnail, read back from an inference AnnotationPage (Canvas coordinates).
+// Marks to draw over a page thumbnail, read from an inference AnnotationPage (the one toAnnotationPage makes).
+// Boxes (#xywh or FragmentSelector) and polygons (SvgSelector) are returned in Canvas coordinates. The color comes
+// from the annotation's stylesheet, the tag (class name) from the body whose purpose is tagging, and the kind from
+// the motivation. An annotation without a color gets the color of no class (CLASS_PALETTE[0]).
 import { CLASS_PALETTE } from './annotationPage';
+import { annotationKindOf } from '../annotationKinds';
 
 export interface PageMark {
   /** Bounding box on the Canvas. */
@@ -17,18 +18,22 @@ export interface PageMark {
   tag?: string;
   /** Whether the annotation has text (a read line): drawn with a light fill. */
   text: boolean;
+  /** The kind of the annotation (its motivation, see annotationKindOf), for filtering by kind. */
+  kind: string;
+  /** Text Granularity extension: the unit of text (line, word …), when the annotation says. */
+  granularity?: string;
 }
 
 const XYWH = /xywh=(?:pixel:)?(-?[\d.]+),(-?[\d.]+),([\d.]+),([\d.]+)/;
 const COLOR = /border-color:\s*(#[0-9a-fA-F]{3,8})/;
 const POINTS = /points=['"]([^'"]+)['"]/;
 
-const boxOf = (s: string): Omit<PageMark, 'color' | 'text'> | null => {
+const boxOf = (s: string): Omit<PageMark, 'color' | 'text' | 'kind' | 'granularity'> | null => {
   const m = XYWH.exec(s);
   return m ? { x: +m[1], y: +m[2], w: +m[3], h: +m[4] } : null;
 };
 
-const polygonOf = (svg: string): Omit<PageMark, 'color' | 'text'> | null => {
+const polygonOf = (svg: string): Omit<PageMark, 'color' | 'text' | 'kind' | 'granularity'> | null => {
   const m = POINTS.exec(svg);
   if (!m) return null;
   const points = m[1]
@@ -45,13 +50,14 @@ const polygonOf = (svg: string): Omit<PageMark, 'color' | 'text'> | null => {
 };
 
 type Item = {
-  motivation?: string;
+  motivation?: string | string[];
+  textGranularity?: string;
   target?: unknown;
   body?: { value?: string; purpose?: string } | { value?: string; purpose?: string }[];
   stylesheet?: { value?: string };
 };
 
-const shapeOf = (target: unknown): Omit<PageMark, 'color' | 'text'> | null => {
+const shapeOf = (target: unknown): Omit<PageMark, 'color' | 'text' | 'kind' | 'granularity'> | null => {
   if (typeof target === 'string') return boxOf(target);
   const sel = (target as { selector?: { type?: string; value?: string } } | null)?.selector;
   if (!sel?.value) return null;
@@ -66,15 +72,18 @@ export const pageMarksOf = (page: Record<string, unknown> | undefined): PageMark
   const items = (page?.items as Item[] | undefined) ?? [];
   const out: PageMark[] = [];
   for (const a of items) {
-    // 画像全体の説明文（describing）は枠にしない（ページ全体を囲むだけになる）
-    if (a.motivation === 'describing') continue;
+    // A description of the whole image (describing) gets no mark: it would only frame the whole page
+    const motivations = Array.isArray(a.motivation) ? a.motivation : a.motivation ? [a.motivation] : [];
+    if (motivations.includes('describing')) continue;
     const shape = shapeOf(a.target);
     if (!shape) continue;
     const bodies = Array.isArray(a.body) ? a.body : a.body ? [a.body] : [];
     const tag = bodies.find((b) => b.purpose === 'tagging')?.value;
     const text = bodies.some((b) => b.purpose !== 'tagging' && !!b.value);
     const color = COLOR.exec(a.stylesheet?.value ?? '')?.[1] ?? CLASS_PALETTE[0];
-    out.push({ ...shape, color, text, ...(tag ? { tag } : {}) });
+    const kind = annotationKindOf({ motivations });
+    const granularity = typeof a.textGranularity === 'string' && a.textGranularity ? a.textGranularity : undefined;
+    out.push({ ...shape, color, text, kind, ...(tag ? { tag } : {}), ...(granularity ? { granularity } : {}) });
   }
   return out;
 };

@@ -4,6 +4,7 @@ import { convertToV4 } from './services/manifestConverter';
 import { parseManifestV4 } from './services/manifestParser';
 import {
   EMPTY_FILTER,
+  annotationKindFacets,
   creatorFacets,
   filterAnnotations,
   isFilterActive,
@@ -104,5 +105,38 @@ describe('facets', () => {
       'place type: country name',
       'example',
     ]);
+  });
+});
+
+describe('filter by kind', () => {
+  const kinds = (list: typeof annotations) => list.map((a) => a.motivations);
+  it('reads the motivations of the 3D annotations', () => {
+    expect(kinds(annotations).every((m) => Array.isArray(m) && m.length > 0)).toBe(true);
+  });
+
+  it('keeps only the chosen kinds, and nothing chosen keeps everything', () => {
+    const facets = annotationKindFacets(annotations);
+    expect(facets.reduce((n, f) => n + f.count, 0)).toBe(annotations.length);
+    const [first] = facets;
+    const only = filterAnnotations(annotations, { ...EMPTY_FILTER, kinds: [first.value] });
+    expect(only).toHaveLength(first.count);
+    expect(filterAnnotations(annotations, { ...EMPTY_FILTER, kinds: [] })).toHaveLength(annotations.length);
+    expect(filterAnnotations(annotations, { ...EMPTY_FILTER, kinds: ['no-such-kind'] })).toHaveLength(0);
+  });
+
+  it('counts a chosen kind as an active filter', () => {
+    expect(isFilterActive({ ...EMPTY_FILTER, kinds: ['commenting'] })).toBe(true);
+  });
+
+  it('still works with a filter written before kinds existed', () => {
+    const old = { query: '', creators: [], tags: [] };
+    expect(isFilterActive(old)).toBe(false);
+    expect(filterAnnotations(annotations, old)).toHaveLength(annotations.length);
+  });
+
+  it('files an annotation without a motivation as a note', () => {
+    const [a] = annotations;
+    const bare = { ...a, motivations: undefined };
+    expect(filterAnnotations([bare], { ...EMPTY_FILTER, kinds: ['commenting'] })).toHaveLength(1);
   });
 });

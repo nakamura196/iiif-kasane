@@ -49,7 +49,6 @@
     "batchFailed": "（読めなかったページ {count}）",
     "batchNoModel": "推論タブでモデルをダウンロードすると、ここから全ページにかけられます。",
     "batchTags": "区分",
-    "batchTagsClear": "すべて表示",
     "batchResume": "続きを実行（残り {count} ページ）"
   }
 }

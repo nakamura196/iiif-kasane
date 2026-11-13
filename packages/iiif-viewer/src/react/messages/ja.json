@@ -17,8 +17,7 @@
     "filteredCount": "{total}件中 {shown}件",
     "images": "画像",
     "relatedImages": "関連する資料",
-    "clearFilter": "絞り込みを解除",
-    "showOnModel": "3D に表示"
+    "clearFilter": "絞り込みを解除"
   },
   "SidePanel": {
     "open": "説明を開く",

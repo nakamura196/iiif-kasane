@@ -6,8 +6,10 @@ import {
   bboxOf,
   annotationsOfSelection,
   groupByRegion,
+  isSearchHit,
   labelIn,
   matchesCanvasAnnotation,
+  narrowByKindAndUnit,
   pickBodies,
   presentCanvasTags,
   pointPercent,
@@ -20,10 +22,11 @@ import {
   type RegionGroup,
   type StyleDeclarations,
 } from '../../core';
-import { manifestAtom } from '../atoms';
+import { manifestAtom, showAnnotationsAtom } from '../atoms';
 import { useLocale } from '../env';
 import {
   canvasAnnotationGranularityAtom,
+  canvasAnnotationKindsAtom,
   canvasAnnotationQueryAtom,
   canvasAnnotationTagsAtom,
   selectedCanvasAnnotationAtom,
@@ -81,40 +84,44 @@ export function AnnotationOverlayView({ container, canvasWidth, canvasHeight, st
   const storyOpen = useAtomValue(storyOpenAtom);
   const storyFrame = useAtomValue(storyFrameAtom);
   const granularity = useAtomValue(canvasAnnotationGranularityAtom);
+  const chosenKinds = useAtomValue(canvasAnnotationKindsAtom);
+  // The marks switch (shared with the 3D view and the page thumbnails). Search hits keep their own switch.
+  const showMarks = useAtomValue(showAnnotationsAtom);
   // If the right panel's search box has text or tags are selected, show markers only for matching annotations (the selected annotation stays)
   const query = useDeferredValue(useAtomValue(canvasAnnotationQueryAtom));
   const terms = useMemo(() => searchTerms(query), [query]);
-  // Tags selected in the right panel. Tags absent from annotations of the current unit are ignored, as in the right panel
-  const chosenTags = useAtomValue(canvasAnnotationTagsAtom);
-  const tags = useMemo(
-    () =>
-      presentCanvasTags(
-        granularity ? annotations.filter((a) => a.granularity === granularity) : annotations,
-        chosenTags,
-        locale,
-      ),
-    [annotations, granularity, chosenTags, locale],
+  // The kinds and unit chosen in the right panel, narrowed the same way as the list (choices the Canvas lacks are ignored)
+  // (the marks of a text search are always kept by it)
+  const narrowed = useMemo(
+    () => narrowByKindAndUnit(annotations, chosenKinds, granularity).annotations,
+    [annotations, chosenKinds, granularity],
   );
+  // Tags selected in the right panel. Tags absent from the narrowed annotations are ignored, as in the right panel
+  const chosenTags = useAtomValue(canvasAnnotationTagsAtom);
+  const tags = useMemo(() => presentCanvasTags(narrowed, chosenTags, locale), [narrowed, chosenTags, locale]);
   const filtering = terms.length > 0 || tags.length > 0;
 
   // Annotations that share a region (Shared Region extension) are drawn as one box, in the order of the list.
   // A story shows only its current scene, so the chosen annotation matters to the list only then.
   const storySelected = storyOpen ? (storyFrame && selectedHit ? selectedHit : '\u0000') : null;
   const drawn = useMemo(() => {
-    const shown = annotations
+    const shown = narrowed
       .filter((a) => a.region.type !== 'canvas' && !a.layer) // layer annotations are drawn by the layer itself
       .filter((a) => storySelected === null || selectionKeyOf(a) === storySelected)
-      .filter((a) => !granularity || a.granularity === granularity || a.motivations.includes('highlighting'))
+      // the marks of a text search (highlighting) are not hidden by the marks switch (the search tab has its own)
+      .filter((a) => showMarks || isSearchHit(a))
       .filter((a) => !filtering || matchesCanvasAnnotation(a, terms, tags, locale));
     return groupByRegion(shown).sort((a, b) => areaOf(b.annotations[0]) - areaOf(a.annotations[0]));
-  }, [annotations, storySelected, granularity, filtering, terms, tags, locale]);
+  }, [narrowed, storySelected, showMarks, filtering, terms, tags, locale]);
   // the chosen one stays drawn when a search or a tag would hide it
   const chosen = useMemo(() => {
     if (!selectedHit || !filtering) return [];
-    // every mark of the selected hit stays, not only the one that was pressed
-    const marks = annotationsOfSelection(annotations, selectedHit).filter((x) => x.region.type !== 'canvas' && !x.layer);
+    // every mark of the selected hit stays, not only the one that was pressed (with the marks switched off, only search marks)
+    const marks = annotationsOfSelection(annotations, selectedHit).filter(
+      (x) => x.region.type !== 'canvas' && !x.layer && (showMarks || isSearchHit(x)),
+    );
     return groupByRegion(marks.filter((x) => !drawn.some((g) => g.annotations.some((m) => m.id === x.id))));
-  }, [selectedHit, filtering, drawn, annotations]);
+  }, [selectedHit, filtering, showMarks, drawn, annotations]);
   const toggle = useCallback((id: string, isSel: boolean) => setSelected(isSel ? null : id), [setSelected]);
   const all = useMemo(
     () => [...drawn, ...chosen].map((g) => ({ group: g, box: boxOfRegion(g.annotations[0]) })),
