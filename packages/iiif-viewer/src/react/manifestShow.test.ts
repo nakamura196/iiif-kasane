@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createStore } from 'jotai';
-import { annotationsAtom, manifestUrlAtom, sceneIdAtom, shownManifestAtom } from './atoms';
+import { annotationsAtom, manifestAtom, manifestUrlAtom, pickedPageAtom, sceneIdAtom, shownManifestAtom } from './atoms';
+import { readScene } from './displays/readScene';
 import { loadContent, prepareShow, reparseAnnotations, showManifest, tryPrepareShow } from './useManifest';
-import { goBack, openManifest, pickedPageAtom, trailAtom, focusAtom } from './displays/structureState';
+import { goBack, openManifest, trailAtom, focusAtom } from './displays/structureState';
 import { convertToV4 } from '../core';
 
 // A Presentation 4 manifest with Scenes; each carries one note labelled after the Scene
@@ -47,38 +48,56 @@ const stubFetch = (served: Record<string, unknown>) =>
   vi.stubGlobal('fetch', async (u: string) => ({ ok: u in served, json: async () => served[u] }) as unknown as Response);
 
 describe('reparseAnnotations (a new locale)', () => {
-  it('reads the Scene on display, not the first one', () => {
+  const showTwoScenes = (id: string) => {
     const store = createStore();
+    const manifest = convertToV4(manifestJson(id));
+    showManifest(store, id, { raw: manifestJson(id), manifest }, 'content', prepareShow(manifest, 'ja'));
+    return store;
+  };
+
+  it('leaves the notes alone when a Scene is on display (SceneDisplay reads that Scene for the locale)', () => {
     const id = url('two');
-    const manifest = convertToV4(manifestJson(id));
-    showManifest(store, id, { raw: manifestJson(id), manifest }, 'content', prepareShow(manifest, 'ja'));
-    expect(store.get(annotationsAtom)[0]?.title).toBe(`${id}/scene/1 (ja)`);
-    // SceneDisplay, showing Scene 2, did this
-    store.set(sceneIdAtom, `${id}/scene/2`);
+    const store = showTwoScenes(id);
+    // the reader is on Scene 2 (the second page); SceneDisplay put its notes there
+    store.set(pickedPageAtom, { shown: store.get(shownManifestAtom)?.seq ?? 0, index: 1 });
+    store.set(annotationsAtom, []);
     reparseAnnotations(store, 'en');
-    expect(store.get(annotationsAtom).map((a) => a.title)).toEqual([`${id}/scene/2 note`]);
+    expect(store.get(annotationsAtom)).toEqual([]);
   });
 
-  it('forgets the Scene id of the manifest shown before when another is shown', () => {
-    const store = createStore();
-    const a = url('a');
-    const b = url('b');
-    const ma = convertToV4(manifestJson(a));
-    showManifest(store, a, { raw: manifestJson(a), manifest: ma }, 'content', prepareShow(ma, 'ja'));
-    store.set(sceneIdAtom, `${a}/scene/2`);
-    const mb = convertToV4(manifestJson(b));
-    showManifest(store, b, { raw: manifestJson(b), manifest: mb }, 'content', prepareShow(mb, 'ja'));
-    expect(store.get(sceneIdAtom)).toBeNull();
-  });
-
-  it('reads the first Scene when the Scene id is not one of this manifest (an image canvas is shown)', () => {
-    const store = createStore();
+  it('reads the first Scene again when an image page is on display', () => {
     const id = url('img');
-    const manifest = convertToV4(manifestJson(id));
-    showManifest(store, id, { raw: manifestJson(id), manifest }, 'content', prepareShow(manifest, 'ja'));
-    store.set(sceneIdAtom, 'https://example.org/other/scene');
+    const raw = manifestJson(id);
+    const withCanvas = { ...raw, items: [{ id: `${id}/canvas/1`, type: 'Canvas', width: 10, height: 10, items: [] }, ...raw.items] };
+    const store = createStore();
+    const manifest = convertToV4(withCanvas);
+    showManifest(store, id, { raw: withCanvas, manifest }, 'content', prepareShow(manifest, 'ja'));
+    store.set(pickedPageAtom, { shown: store.get(shownManifestAtom)?.seq ?? 0, index: 0 });
     reparseAnnotations(store, 'en');
     expect(store.get(annotationsAtom).map((a) => a.title)).toEqual([`${id}/scene/1 note`]);
+  });
+
+  it('keeps the Scene id when the same manifest is shown again (SceneDisplay does not set it again)', () => {
+    const id = url('again');
+    const store = showTwoScenes(id);
+    store.set(sceneIdAtom, `${id}/scene/2`);
+    const shown = store.get(shownManifestAtom)!;
+    showManifest(store, id, { raw: shown.raw, manifest: shown.manifest }, 'content', prepareShow(shown.manifest, 'ja'));
+    expect(store.get(sceneIdAtom)).toBe(`${id}/scene/2`);
+  });
+});
+
+describe('readScene', () => {
+  it('reads a Scene of the manifest, and gives null (not a throw) for a Scene that cannot be parsed', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const id = url('rs');
+    const raw = manifestJson(id);
+    // Scene 1 is good, Scene 2 has a note that cannot be parsed
+    raw.items[1] = broken(id).items[1];
+    const manifest = convertToV4(raw);
+    expect(readScene(manifest, `${id}/scene/1`, 'en')?.annotations).toHaveLength(1);
+    expect(() => prepareShow(manifest, 'en')).not.toThrow();
+    expect(readScene(manifest, `${id}/scene/2`, 'en')).toBeNull();
   });
 });
 
@@ -107,7 +126,27 @@ describe('a manifest that cannot be parsed', () => {
     expect(store.get(shownManifestAtom)).toBe(before);
   });
 
-  it('does not go back to a trail item that cannot be parsed, and keeps the trail', () => {
+  it('drops a trail item that cannot be parsed and goes back to the one before it', () => {
+    const store = createStore();
+    const good = url('bgood');
+    const bad = url('bbad');
+    const mg = convertToV4(manifestJson(good));
+    const mb = convertToV4(broken(bad));
+    store.set(manifestUrlAtom, 'https://example.org/top');
+    store.set(trailAtom, {
+      owner: 'https://example.org/top',
+      items: [
+        { url: good, manifest: mg, raw: manifestJson(good), index: 0 },
+        { url: bad, manifest: mb, raw: broken(bad), index: 0 },
+      ],
+    });
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(goBack(store, 'en')).toBe(true);
+    expect(store.get(shownManifestAtom)?.url).toBe(good);
+    expect(store.get(trailAtom).items).toEqual([]);
+  });
+
+  it('does not go back to a trail item that cannot be parsed, and drops it from the trail', () => {
     const store = createStore();
     const id = url('back');
     const raw = broken(id);
@@ -117,7 +156,7 @@ describe('a manifest that cannot be parsed', () => {
     store.set(pickedPageAtom, { shown: 0, index: 0 });
     vi.spyOn(console, 'error').mockImplementation(() => {});
     expect(goBack(store, 'en')).toBe(false);
-    expect(store.get(trailAtom).items).toHaveLength(1);
+    expect(store.get(trailAtom).items).toHaveLength(0);
     expect(store.get(shownManifestAtom)).toBeNull();
   });
 
@@ -131,12 +170,15 @@ describe('a manifest that cannot be parsed', () => {
     await expect(loadContent(store, bad, () => 'en')).resolves.toBe('failed');
     expect(store.get(manifestUrlAtom)).toBe(bad);
     expect(store.get(trailAtom)).toEqual({ owner: bad, items: [] });
+    // nothing of A stays under B's URL
+    expect(store.get(shownManifestAtom)).toBeNull();
+    expect(store.get(manifestAtom)).toBeNull();
   });
 
-  it('tryPrepareShow gives null for it, and the prepared value (with its locale) for a good one', () => {
+  it('tryPrepareShow gives null for it, and the prepared value for a good one', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     expect(tryPrepareShow(convertToV4(broken(url('t'))), 'en')).toBeNull();
-    expect(tryPrepareShow(convertToV4(manifestJson(url('g'))), 'en')?.locale).toBe('en');
+    expect(tryPrepareShow(convertToV4(manifestJson(url('g'))), 'en')?.annotations).toHaveLength(1);
   });
 
   it('prepareShow throws for it (the guard has something to catch)', () => {

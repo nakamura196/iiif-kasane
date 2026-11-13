@@ -19,7 +19,7 @@ import {
   type SequenceInfo,
   type ViewingInfo,
 } from '../../core';
-import { manifestUrlAtom, shownManifestAtom, type ShownOrigin } from '../atoms';
+import { manifestUrlAtom, pickedPageAtom, shownManifestAtom, type ShownOrigin } from '../atoms';
 import {
   isContentLoading,
   loadManifest,
@@ -68,11 +68,7 @@ export { trailAtom, type OpenResult, type TrailItem };
 /** How an opened manifest counts: part of the iiif-content (its content state), or a move from what was shown. */
 type OpenOrigin = Exclude<ShownOrigin, 'back'>;
 
-/**
- * The page picked by the reader, and the shown manifest (ShownManifest.seq) it belongs to. Another manifest
- * shown starts at its first page, unless going back restores the page saved on the trail.
- */
-export const pickedPageAtom = atom<{ shown: number; index: number }>({ shown: 0, index: 0 });
+export { pickedPageAtom };
 
 let seqCounter = 0;
 export const nextSeq = (): number => ++seqCounter;
@@ -150,15 +146,24 @@ export function goBack(store: Store, locale: string): boolean {
   const owner = store.get(manifestUrlAtom);
   const trail = store.get(trailAtom);
   const items = trail.owner === owner ? trail.items : [];
-  const prev = items[items.length - 1];
-  if (!prev) return false;
-  const prepared = tryPrepareShow(prev.manifest, locale);
-  if (!prepared) return false;
-  store.set(trailAtom, { owner, items: items.slice(0, -1) });
-  leaveViewState(store);
-  showManifest(store, prev.url, { raw: prev.raw, manifest: prev.manifest }, 'back', prepared);
-  store.set(pickedPageAtom, { shown: store.get(shownManifestAtom)?.seq ?? 0, index: prev.index });
-  return true;
+  // an item that cannot be parsed again is dropped from the trail (Back would do nothing forever otherwise)
+  // and the one before it is tried
+  let rest = items;
+  while (rest.length > 0) {
+    const prev = rest[rest.length - 1];
+    const prepared = tryPrepareShow(prev.manifest, locale);
+    if (!prepared) {
+      rest = rest.slice(0, -1);
+      continue;
+    }
+    store.set(trailAtom, { owner, items: rest.slice(0, -1) });
+    leaveViewState(store);
+    showManifest(store, prev.url, { raw: prev.raw, manifest: prev.manifest }, 'back', prepared);
+    store.set(pickedPageAtom, { shown: store.get(shownManifestAtom)?.seq ?? 0, index: prev.index });
+    return true;
+  }
+  if (rest.length !== items.length) store.set(trailAtom, { owner, items: rest });
+  return false;
 }
 
 /**

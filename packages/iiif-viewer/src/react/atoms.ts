@@ -103,3 +103,17 @@ export const showGridAtom = atom<boolean>(false);
 
 // Whether "measure" is on in 3D. While on, clicks on the model measure distances and annotation marks are hidden
 export const measuringAtom = atom<boolean>(false);
+
+/**
+ * The page picked by the reader, and the shown manifest (ShownManifest.seq) it belongs to. Another manifest
+ * shown starts at its first page, unless going back restores the page saved on the trail.
+ */
+export const pickedPageAtom = atom<{ shown: number; index: number }>({ shown: 0, index: 0 });
+
+/**
+ * Index of the shown container: the picked one while the same manifest is shown, else the first.
+ * Kept within the containers.
+ */
+export function pickedIndex(picked: { shown: number; index: number }, shownSeq: number, count: number): number {
+  return Math.min(picked.shown === shownSeq ? picked.index : 0, Math.max(count - 1, 0));
+}

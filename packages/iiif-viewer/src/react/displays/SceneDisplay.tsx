@@ -2,7 +2,8 @@
 
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
-import { authorizedUrl, chosenOption, paintedModelsOf, parseManifestV4, probeServiceOf, sceneOf } from '../../core';
+import { authorizedUrl, chosenOption, probeServiceOf } from '../../core';
+import { readScene } from './readScene';
 import {
   annotationsAtom,
   modelChoicesAtom,
@@ -35,12 +36,14 @@ function SceneDisplay({ container, manifest, iiifContent, shownUrl, renderAction
   // The 3D display reads the Scene that is shown (not always the first one): its models,
   // its notes, and (through sceneIdAtom) its default Camera and Camera buttons.
   const sceneId = container.id;
+  // a Scene that cannot be parsed shows a notice instead of taking the viewer down
+  const read = useMemo(() => readScene(manifest, sceneId, locale), [manifest, sceneId, locale]);
   useEffect(() => {
     setSceneId(sceneId);
-    setPaintedModels(paintedModelsOf(sceneOf(manifest, sceneId)));
-    setAnnotations(parseManifestV4(manifest, sceneId, locale).annotations);
+    setPaintedModels(read?.paintedModels ?? []);
+    setAnnotations(read?.annotations ?? []);
     setSelectedAnnotation(null);
-  }, [manifest, sceneId, setSceneId, setPaintedModels, setAnnotations, setSelectedAnnotation, locale]);
+  }, [read, sceneId, setSceneId, setPaintedModels, setAnnotations, setSelectedAnnotation]);
 
   // The first painted model is the main one (framing, annotation occlusion);
   // the others are drawn alongside. A Choice shows its chosen (default: first) Model.
@@ -81,6 +84,14 @@ function SceneDisplay({ container, manifest, iiifContent, shownUrl, renderAction
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  if (!read) {
+    return (
+      <div ref={box} className="p-4 text-sm text-[var(--ds-fg)]" role="alert">
+        {t('manifestError')}
+      </div>
+    );
+  }
 
   return (
     <div ref={box} className="relative flex-1 min-h-0 min-w-0">

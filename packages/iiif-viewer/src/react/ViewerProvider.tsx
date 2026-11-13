@@ -13,8 +13,8 @@ import {
 } from 'react';
 import { Provider, createStore, useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { containersOf, type ContainerInfo, type ManifestV4 } from '../core';
-import { manifestAtom, modelChoicesAtom, shownManifestAtom } from './atoms';
-import { navRequestAtom, nextSeq, pickedPageAtom } from './displays/structureState';
+import { manifestAtom, modelChoicesAtom, pickedIndex, pickedPageAtom, shownManifestAtom } from './atoms';
+import { navRequestAtom, nextSeq } from './displays/structureState';
 import { ViewerEnv, type ResolvedTheme } from './env';
 import {
   CanvasNavigationContext,
@@ -128,14 +128,6 @@ export function ViewerProvider({
       </ViewerEnv>
     </Provider>
   );
-}
-
-/**
- * Index of the shown container: the picked one while the same manifest is shown, else the first.
- * Kept within the containers.
- */
-function pickedIndex(picked: { shown: number; index: number }, shownSeq: number, count: number): number {
-  return Math.min(picked.shown === shownSeq ? picked.index : 0, Math.max(count - 1, 0));
 }
 
 function ViewerStateRoot({

@@ -82,18 +82,15 @@ export function storedEntriesFor(
   return shown && shown.manifest === manifest ? collectionEntriesOf(shown.raw) : null;
 }
 
-/** The entries of the Collection read by its id (a host page may set manifestAtom itself). */
+/** The entries of the Collection read by its id (a host page may set manifestAtom itself). [] when it cannot be read. */
 export async function fetchedEntriesFor(manifest: { id: string }): Promise<CollectionEntry[]> {
-  const raw = await fetchManifest(manifest.id);
-  return raw ? collectionEntriesOf(raw) : [];
-}
-
-/** The entries of a Collection: the ones kept with the shown manifest, else read by the Collection's id. */
-export async function collectionEntriesFor(
-  shown: { manifest: unknown; raw: unknown } | null,
-  manifest: { id: string },
-): Promise<CollectionEntry[]> {
-  return storedEntriesFor(shown, manifest) ?? fetchedEntriesFor(manifest);
+  try {
+    const raw = await fetchManifest(manifest.id);
+    return raw ? collectionEntriesOf(raw) : [];
+  } catch (e) {
+    console.error('Error reading manifest:', e);
+    return [];
+  }
 }
 
 // A Collection (a manifest whose items are Manifests): choose one to open.
@@ -119,14 +116,9 @@ function CollectionDisplay(props: DisplayProps) {
   useEffect(() => {
     if (!isCollection || hasStored || !manifest.id) return;
     let cancelled = false;
-    fetchedEntriesFor(manifest)
-      .then((entries) => {
-        if (!cancelled) setRead({ manifest, entries });
-      })
-      .catch((e) => {
-        console.error('Error reading manifest:', e);
-        if (!cancelled) setRead({ manifest, entries: [] });
-      });
+    void fetchedEntriesFor(manifest).then((entries) => {
+      if (!cancelled) setRead({ manifest, entries });
+    });
     return () => {
       cancelled = true;
     };
