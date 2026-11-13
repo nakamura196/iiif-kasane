@@ -18,10 +18,14 @@ const CONTEXT_CHARS = 30;
 
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
 
-/** 本文の文字（HTML ならタグを外す）。 */
+/**
+ * 本文の文字（HTML ならタグを外す）。タグ（purpose か motivation が tagging）は資料の文字ではなく分類なので含めない。
+ * The body text (tags stripped from HTML). Tags (purpose or sole motivation tagging) are a classification, not the
+ * document's text, so they are left out: a search for "fig" should not hit every region tagged block_fig.
+ */
 export const annotationPlainText = (a: CanvasAnnotation): string =>
   a.bodies
-    .filter((b) => b.kind === 'text' && b.value)
+    .filter((b) => b.kind === 'text' && b.value && !b.tagging)
     .map((b) =>
       /html/i.test(b.format ?? '') || /<[a-z][^>]*>/i.test(b.value!)
         ? b
