@@ -1,0 +1,60 @@
+# Checks the npm package iiif-kasane (packages/iiif-viewer) as users receive it:
+# builds it, packs it, installs the tarball into a clean project, and opens the <iiif-kasane> tag in Chromium.
+# Run it locally with `npm run test:package`. publish-npm.yml runs the same script before `npm publish`.
+name: Package smoke test
+
+on:
+  pull_request:
+    branches: ['main']
+    paths:
+      - 'packages/iiif-viewer/**'
+      - 'scripts/gen-registries.mjs' # the package build calls it
+      - 'scripts/smoke-package.mjs'
+      - 'scripts/lib/mime-types.mjs'
+      - 'e2e-package/**'
+      - 'playwright.package.config.ts'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/package-smoke.yml'
+      - '.github/workflows/publish-npm.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: package-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Smoke test the packed package
+        run: npm run test:package
+
+      - name: Upload Playwright traces
+        if: failure()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: package-smoke-traces
+          path: test-results/
+          retention-days: 3

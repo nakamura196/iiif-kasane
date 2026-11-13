@@ -3,35 +3,11 @@
 import { createServer } from 'node:http';
 import { createReadStream } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
+import { mimeTypes as types } from './lib/mime-types.mjs';
 import { extname, join, normalize, resolve, sep } from 'node:path';
 
 const port = Number(process.argv[2] ?? 3862);
 const root = resolve('out');
-const types = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript',
-  '.mjs': 'text/javascript',
-  '.css': 'text/css',
-  '.json': 'application/json',
-  '.geojson': 'application/geo+json',
-  '.map': 'application/json',
-  '.txt': 'text/plain; charset=utf-8',
-  '.md': 'text/markdown; charset=utf-8',
-  '.xml': 'application/xml',
-  '.vtt': 'text/vtt; charset=utf-8',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.webp': 'image/webp',
-  '.svg': 'image/svg+xml',
-  '.ico': 'image/x-icon',
-  '.mp4': 'video/mp4',
-  '.glb': 'model/gltf-binary',
-  '.gltf': 'model/gltf+json',
-  '.wasm': 'application/wasm',
-  '.woff': 'font/woff',
-  '.woff2': 'font/woff2',
-};
 
 async function kind(f) {
   try {

@@ -29,6 +29,7 @@
     "test:live": "node scripts/check-live.mjs",
     "test:e2e": "playwright test",
     "test:e2e:ci": "playwright test --grep-invert @external",
+    "test:package": "node scripts/smoke-package.mjs",
     "serve:export": "node scripts/serve-export.mjs 3862",
     "auth-mock": "node scripts/auth-mock-server.mjs"
   },
