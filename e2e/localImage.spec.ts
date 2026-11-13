@@ -21,51 +21,31 @@ async function textImage(page: Page): Promise<Buffer> {
 interface Seen {
   url: string;
   method: string;
-  body: string;
+  hasBody: boolean;
 }
 
-function recordRequests(page: Page) {
+// The production site adds page-view analytics (Google Analytics; they need NEXT_PUBLIC_GA_ID, so a local build has none).
+// Block them here so that the check below can stay strict for every other request.
+const ANALYTICS =
+  /^https:\/\/([\w-]+\.)*(googletagmanager\.com|google-analytics\.com|analytics\.google\.com|stats\.g\.doubleclick\.net|google\.[a-z.]+\/(ads|ccm)\/)/;
+
+async function recordRequests(page: Page) {
   const seen: Seen[] = [];
-  page.on('request', (r) => seen.push({ url: r.url(), method: r.method(), body: r.postData() ?? '' }));
+  await page.route((url) => ANALYTICS.test(url.href), (route) => route.abort());
+  page.on('request', (r) => {
+    if (!ANALYTICS.test(r.url())) seen.push({ url: r.url(), method: r.method(), hasBody: !!r.postDataBuffer()?.length });
+  });
   return seen;
 }
 
-// Page-view analytics (Google Analytics) are on the production site only (they need NEXT_PUBLIC_GA_ID) and use POST beacons.
-// They may go to their own hosts, but must not carry the image: no file or folder name, blob: URL or image data
-// in the address or the body, whether raw, percent-encoded or form-encoded.
-const ANALYTICS = /^https:\/\/([\w-]+\.)*(googletagmanager\.com|google-analytics\.com|analytics\.google\.com)\//;
-// The names of every file and folder these tests open
-const OPENED_NAMES = ['猫.png', '猫', 'p1.png', 'p2.png', 'p10.png', 'p1', 'p2', 'p10', 'memo.txt', 'a.txt', '銘尽'];
-const escapeRe = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const IMAGE_TRACES = new RegExp(
-  ['blob:', 'iVBOR', 'data:image', ...OPENED_NAMES.flatMap((n) => [n, encodeURIComponent(n)])].map(escapeRe).join('|'),
-  'i',
-);
-
-function safeDecode(t: string) {
-  try {
-    return decodeURIComponent(t);
-  } catch {
-    return t;
-  }
-}
-
-function carriesImage(r: Seen) {
-  // The page address ("dl=") legitimately names this site's own URL, so leave it out of the address
-  const address = r.url.replace(/[?&]dl=[^&]*/, '');
-  return [address, r.body].some((t) => [t, safeDecode(t), safeDecode(t.replace(/\+/g, ' '))].some((v) => IMAGE_TRACES.test(v)));
-}
-
-function expectNothingSent(all: Seen[], origin: string) {
-  const analytics = all.filter((r) => ANALYTICS.test(r.url));
-  const seen = all.filter((r) => !ANALYTICS.test(r.url));
+function expectNothingSent(seen: Seen[], origin: string) {
+  // The model host (Hugging Face) and the host of the onnxruntime-web runtime (jsDelivr) may be fetched
   const allowed = /^https:\/\/((huggingface\.co|[\w.-]+\.(hf\.co|huggingface\.co))\/|cdn\.jsdelivr\.net\/npm\/onnxruntime-web@)/;
   const outside = seen.filter(
     (r) => !r.url.startsWith(origin) && !r.url.startsWith('blob:') && !r.url.startsWith('data:') && !allowed.test(r.url),
   );
   expect(outside, 'requests to other hosts').toEqual([]);
-  expect(seen.filter((r) => r.body !== '' || !['GET', 'HEAD'].includes(r.method)), 'requests that send data').toEqual([]);
-  expect(analytics.filter(carriesImage), 'analytics requests carrying the image').toEqual([]);
+  expect(seen.filter((r) => r.hasBody || !['GET', 'HEAD'].includes(r.method)), 'requests that send data').toEqual([]);
 }
 
 async function openLocal(page: Page, png: Buffer) {
@@ -76,7 +56,7 @@ async function openLocal(page: Page, png: Buffer) {
 
 test('opens a local image without putting it in the address', async ({ page, baseURL }) => {
   const png = await textImage(page);
-  const seen = recordRequests(page);
+  const seen = await recordRequests(page);
   await openLocal(page, png);
 
   // The image is shown from a blob: URL
@@ -118,7 +98,7 @@ test('opens several images as one book, in number order', async ({ page, baseURL
   // They are drawn on the same page, so one at a time.
   const pages: { n: number; png: Buffer }[] = [];
   for (const n of [10, 2, 1]) pages.push({ n, png: await pageImage(page, n) });
-  const seen = recordRequests(page);
+  const seen = await recordRequests(page);
   await page.goto('/ja/viewer/');
   await page.getByTestId('local-image-input').setInputFiles([
     ...pages.map(({ n, png }) => ({ name: `p${n}.png`, mimeType: 'image/png', buffer: png })),
@@ -142,25 +122,27 @@ test('opens several images as one book, in number order', async ({ page, baseURL
   expectNothingSent(seen, new URL(baseURL!).origin);
 });
 
-test('opens a folder, named after the folder', async ({ page }, testInfo) => {
+test('opens a folder, named after the folder', async ({ page, baseURL }, testInfo) => {
   const dir = testInfo.outputPath('銘尽');
   await mkdir(dir, { recursive: true });
   for (const n of [2, 1]) await writeFile(`${dir}/${n}.png`, await pageImage(page, n));
   // A hidden file that gets mixed in when a folder is opened
   await writeFile(`${dir}/.DS_Store`, 'x');
+  const seen = await recordRequests(page);
   await page.goto('/ja/viewer/');
   await page.getByTestId('local-folder-input').setInputFiles(dir);
   const banner = page.getByRole('status').filter({ hasText: '「銘尽」（2 枚）' });
   await expect(banner).toBeVisible();
   await expect(banner).not.toContainText('開いていません');
   await expect.poll(() => page.locator('img[src^="blob:"]').first().evaluate((el: HTMLImageElement) => el.naturalWidth)).toBe(301);
+  expectNothingSent(seen, new URL(baseURL!).origin);
 });
 
 // Downloads the model (about 150 MB) from Hugging Face, so it takes a while (@external)
 test('reads the text of a local image in the browser', { tag: '@external' }, async ({ page, baseURL }) => {
   test.setTimeout(600_000);
   const png = await textImage(page);
-  const seen = recordRequests(page);
+  const seen = await recordRequests(page);
   await openLocal(page, png);
 
   const card = page.locator('li').filter({ has: page.getByRole('heading', { name: 'NDLOCR-Lite', exact: true }) });

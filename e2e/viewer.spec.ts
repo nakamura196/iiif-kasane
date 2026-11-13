@@ -49,53 +49,56 @@ async function loadedTracks(page: Page, expected: number): Promise<TrackInfo[]> 
 
 const byLanguage = (a: TrackInfo, b: TrackInfo) => a.language.localeCompare(b.language);
 
-test('3D モデルを描く（0608 v4）', { tag: '@external' }, async ({ page }) => {
-  const errors: string[] = [];
-  page.on('pageerror', (e) => errors.push(e.message));
-  await open(page, v4('0608-mvm-3d'));
-  const canvas = page.locator('canvas').first();
-  await expect(canvas).toBeVisible();
-  const box = await canvas.boundingBox();
-  expect(box?.width ?? 0).toBeGreaterThan(100);
-  expect(box?.height ?? 0).toBeGreaterThan(100);
-  expect(errors).toEqual([]);
-});
+// Every test here reads an outside site (iiif.io), so the whole file is tagged @external.
+test.describe('viewer with Cookbook data', { tag: '@external' }, () => {
+  test('3D モデルを描く（0608 v4）', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await open(page, v4('0608-mvm-3d'));
+    const canvas = page.locator('canvas').first();
+    await expect(canvas).toBeVisible();
+    const box = await canvas.boundingBox();
+    expect(box?.width ?? 0).toBeGreaterThan(100);
+    expect(box?.height ?? 0).toBeGreaterThan(100);
+    expect(errors).toEqual([]);
+  });
 
-test('字幕ファイルを読む（0219 v4）', { tag: '@external' }, async ({ page }) => {
-  await open(page, v4('0219-using-caption-file'));
-  const tracks = await loadedTracks(page, 1);
-  expect(tracks[0].kind).toBe('captions');
-});
+  test('字幕ファイルを読む（0219 v4）', async ({ page }) => {
+    await open(page, v4('0219-using-caption-file'));
+    const tracks = await loadedTracks(page, 1);
+    expect(tracks[0].kind).toBe('captions');
+  });
 
-test('複数言語の字幕を読む（0074 v3）', { tag: '@external' }, async ({ page }) => {
-  await open(page, v3('0074-multiple-language-captions'));
-  const tracks = await loadedTracks(page, 2);
-  expect(tracks.map((t) => t.language).sort()).toEqual(['en', 'it']);
-});
+  test('複数言語の字幕を読む（0074 v3）', async ({ page }) => {
+    await open(page, v3('0074-multiple-language-captions'));
+    const tracks = await loadedTracks(page, 2);
+    expect(tracks.map((t) => t.language).sort()).toEqual(['en', 'it']);
+  });
 
-test('provides で字幕の種類を見分ける（0074 v4、preview）', { tag: '@external' }, async ({ page }) => {
-  await allowCors(page, PREVIEW);
-  await open(page, v4Preview0074);
-  const tracks = (await loadedTracks(page, 2)).sort(byLanguage);
-  expect(tracks.map((t) => t.language)).toEqual(['en', 'it']);
-  // 0074 v4 uses provides: English is subtitles (a translation), Italian is closedCaptions (the original language)
-  expect(tracks.map((t) => t.kind)).toEqual(['subtitles', 'captions']);
-});
+  test('provides で字幕の種類を見分ける（0074 v4、preview）', async ({ page }) => {
+    await allowCors(page, PREVIEW);
+    await open(page, v4Preview0074);
+    const tracks = (await loadedTracks(page, 2)).sort(byLanguage);
+    expect(tracks.map((t) => t.language)).toEqual(['en', 'it']);
+    // 0074 v4 uses provides: English is subtitles (a translation), Italian is closedCaptions (the original language)
+    expect(tracks.map((t) => t.kind)).toEqual(['subtitles', 'captions']);
+  });
 
-test('注釈で書かれた字幕を読む（0079 v4、preview）', { tag: '@external' }, async ({ page }) => {
-  await allowCors(page, PREVIEW);
-  await open(page, v4Preview0079);
-  const tracks = await loadedTracks(page, 1);
-  expect(tracks[0].cues).toBeGreaterThan(1);
-});
+  test('注釈で書かれた字幕を読む（0079 v4、preview）', async ({ page }) => {
+    await allowCors(page, PREVIEW);
+    await open(page, v4Preview0079);
+    const tracks = await loadedTracks(page, 1);
+    expect(tracks[0].cues).toBeGreaterThan(1);
+  });
 
-test('Collection を navDate の年代順に並べる（0230）', { tag: '@external' }, async ({ page }) => {
-  await open(page, 'https://iiif.io/api/cookbook/recipe/0230-navdate/navdate-collection.json');
-  await page.getByRole('button', { name: '年代順' }).click();
-  const timeline = page.getByRole('list', { name: '年表' });
-  await expect(timeline.getByRole('heading', { level: 3 })).toHaveText(['1986', '1987']);
-  // the items carry no thumbnail: the picture comes from the image service of each Manifest
-  await expect(timeline.locator('img[src*="/full/,192/0/default.jpg"]')).toHaveCount(2);
-  await page.getByRole('button', { name: 'コレクションの順' }).click();
-  await expect(timeline).toHaveCount(0);
+  test('Collection を navDate の年代順に並べる（0230）', async ({ page }) => {
+    await open(page, 'https://iiif.io/api/cookbook/recipe/0230-navdate/navdate-collection.json');
+    await page.getByRole('button', { name: '年代順' }).click();
+    const timeline = page.getByRole('list', { name: '年表' });
+    await expect(timeline.getByRole('heading', { level: 3 })).toHaveText(['1986', '1987']);
+    // the items carry no thumbnail: the picture comes from the image service of each Manifest
+    await expect(timeline.locator('img[src*="/full/,192/0/default.jpg"]')).toHaveCount(2);
+    await page.getByRole('button', { name: 'コレクションの順' }).click();
+    await expect(timeline).toHaveCount(0);
+  });
 });

@@ -49,7 +49,7 @@ async function find(pathname) {
   const k = await kind(base);
   if (k === 'file') return { file: base };
   if (k === 'dir') {
-    if (!pathname.endsWith('/')) return { redirect: `${pathname}/` }; // the export uses trailingSlash: true
+    if (!pathname.endsWith('/')) return { redirect: true }; // the export uses trailingSlash: true
     if ((await kind(join(base, 'index.html'))) === 'file') return { file: join(base, 'index.html') };
   }
   if ((await kind(`${base}.html`)) === 'file') return { file: `${base}.html` };
@@ -109,10 +109,10 @@ createServer(async (req, res) => {
       res.end('bad request');
       return;
     }
-    const search = new URL(req.url, 'http://localhost').search;
+    const { pathname: rawPath, search } = new URL(req.url, 'http://localhost');
     const { file, redirect } = await find(pathname);
     if (redirect) {
-      res.writeHead(308, { location: encodeURI(redirect) + search }); // keep the query; encode non-ASCII for the header
+      res.writeHead(308, { location: `${rawPath}/${search}` }); // still percent-encoded, with the query
       res.end();
       return;
     }
