@@ -31,6 +31,7 @@
     "back": "ひとつ前のコレクションに戻る",
     "opening": "開いています…",
     "openError": "開けませんでした",
+    "backError": "戻れませんでした（前のページを読み込めません）",
     "dropHint": "iiif-content のリンクをここに落とすと開きます",
     "region": "指定された場所",
     "clearRegion": "枠を消す（Esc）",

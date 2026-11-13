@@ -31,6 +31,7 @@
     "back": "Back to the previous collection",
     "opening": "Opening...",
     "openError": "Could not open it",
+    "backError": "Could not go back: the earlier pages could not be read",
     "dropHint": "Drop an iiif-content link here to open it",
     "region": "Target region",
     "clearRegion": "Hide the box (Esc)",

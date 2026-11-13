@@ -21,6 +21,7 @@ import {
   type ContainerInfo,
 } from '../core';
 import { manifestAtom, shownManifestAtom } from './atoms';
+import { backFailedAtom } from './internalState';
 import {
   compareAtom,
   compareMultiAtom,
@@ -69,6 +70,7 @@ export default function ContainerList({ containers, selected, onSelect, pager = 
   const multiRun = useRef(0);
   const locale = useLocale();
   const { open, back, canGoBack } = useManifestSwitch();
+  const backFailed = useAtomValue(backFailedAtom);
   const { viewing, groups } = usePageOrder(manifest, containers);
   const sentinel = useRef<HTMLSpanElement>(null);
   // targets that wait for the manifest being opened (a content state, a drop)
@@ -299,7 +301,7 @@ export default function ContainerList({ containers, selected, onSelect, pager = 
   const showPager = pager && !isCollection && containers.length >= 2;
   const showBack = canGoBack;
 
-  if (!showPager && !showBack) {
+  if (!showPager && !showBack && !backFailed) {
     return (
       <div hidden>
         <span ref={sentinel} />
@@ -329,6 +331,11 @@ export default function ContainerList({ containers, selected, onSelect, pager = 
             {`‹ ${t('back')}`}
           </button>
         </div>
+      )}
+      {backFailed && (
+        <p className="px-2 py-1 text-sm text-[var(--ds-fg)]" role="alert">
+          {t('backError')}
+        </p>
       )}
       {showPager && (
         <div className="flex items-center justify-center gap-2 p-1.5" role="group" aria-label={t('pager')}>

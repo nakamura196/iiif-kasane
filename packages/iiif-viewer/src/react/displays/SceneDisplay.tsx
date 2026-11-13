@@ -1,17 +1,10 @@
 'use client';
 
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { useAtomValue, useSetAtom } from 'jotai';
+import { useAtomValue } from 'jotai';
 import { authorizedUrl, chosenOption, probeServiceOf } from '../../core';
 import { tryPrepareShow } from '../useManifest';
-import { notesSceneAtom } from '../internalState';
-import {
-  annotationsAtom,
-  modelChoicesAtom,
-  paintedModelsAtom,
-  sceneIdAtom,
-  selectedAnnotationIdAtom,
-} from '../atoms';
+import { modelChoicesAtom, paintedModelsAtom } from '../atoms';
 import { useLocale, useTranslations } from '../env';
 import AuthPrompt from '../auth/AuthPrompt';
 import { useAuthStates } from '../auth/authStore';
@@ -28,25 +21,13 @@ function SceneDisplay({ container, manifest, iiifContent, shownUrl, renderAction
   const t = useTranslations('Viewer');
   const locale = useLocale();
   const paintedModels = useAtomValue(paintedModelsAtom);
-  const setPaintedModels = useSetAtom(paintedModelsAtom);
-  const setAnnotations = useSetAtom(annotationsAtom);
-  const setSceneId = useSetAtom(sceneIdAtom);
-  const setNotesScene = useSetAtom(notesSceneAtom);
-  const setSelectedAnnotation = useSetAtom(selectedAnnotationIdAtom);
   const modelChoices = useAtomValue(modelChoicesAtom);
 
-  // The 3D display reads the Scene that is shown (not always the first one): its models,
-  // its notes, and (through sceneIdAtom) its default Camera and Camera buttons.
+  // The notes, painted models and Scene id of this Scene are set by useShownNotes (in the provider), from the
+  // same manifest. Here the Scene is only checked, to show a notice for a Scene that cannot be parsed
+  // (the read is remembered, so it is not parsed again).
   const sceneId = container.id;
-  // a Scene that cannot be parsed shows a notice instead of taking the viewer down
-  const read = useMemo(() => tryPrepareShow(manifest, locale, sceneId), [manifest, sceneId, locale]);
-  useEffect(() => {
-    setSceneId(sceneId);
-    setPaintedModels(read?.paintedModels ?? []);
-    setAnnotations(read?.annotations ?? []);
-    setNotesScene(sceneId);
-    setSelectedAnnotation(null);
-  }, [read, sceneId, setSceneId, setPaintedModels, setAnnotations, setNotesScene, setSelectedAnnotation]);
+  const broken = useMemo(() => tryPrepareShow(manifest, locale, sceneId) === null, [manifest, sceneId, locale]);
 
   // The first painted model is the main one (framing, annotation occlusion);
   // the others are drawn alongside. A Choice shows its chosen (default: first) Model.
@@ -88,26 +69,25 @@ function SceneDisplay({ container, manifest, iiifContent, shownUrl, renderAction
     return () => ro.disconnect();
   }, []);
 
-  if (!read) {
-    return (
-      <div ref={box} className="p-4 text-sm text-[var(--ds-fg)]" role="alert">
-        {t('manifestError')}
-      </div>
-    );
-  }
-
   return (
     <div ref={box} className="relative flex-1 min-h-0 min-w-0">
-      {glbUrl && (
+      {broken && (
+        <div className="p-4 text-sm text-[var(--ds-fg)]" role="alert">
+          {t('manifestError')}
+        </div>
+      )}
+      {glbUrl && !broken && (
         <Suspense fallback={<div className="p-4 text-sm text-[var(--ds-fg)]">{t('loading')}</div>}>
           {/* a new 3D view per Scene, so that the camera starts again from that Scene's view */}
           <CanvasComponent key={sceneId} glbUrl={glbUrl} extraModels={extraModels} />
         </Suspense>
       )}
-      <AuthPrompt />
-      <div className="absolute inset-0 z-10 pointer-events-none">
-        <StoryLayer container={container} canvasWidth={0} canvasHeight={0} stage={stage} />
-      </div>
+      {!broken && <AuthPrompt />}
+      {!broken && (
+        <div className="absolute inset-0 z-10 pointer-events-none">
+          <StoryLayer container={container} canvasWidth={0} canvasHeight={0} stage={stage} />
+        </div>
+      )}
       <div className="absolute bottom-4 left-4 z-10 flex items-end gap-2">
         <ModelChoice />
         {renderActions?.({ iiifContent, shownUrl, hasChoices, selectedIndex })}

@@ -23,6 +23,7 @@ import {
   compareAtom,
   compareMultiAtom,
   focusAtom,
+  backFailedAtom,
   pickedPageAtom,
   resetViewState,
   sequenceIdAtom,
@@ -143,6 +144,8 @@ export function goBack(store: Store, locale: string): boolean {
     return true;
   }
   if (rest.length !== items.length) store.set(trailAtom, { owner, items: rest });
+  // the steps could not be shown: say so, rather than leave the reader pressing a button that does nothing
+  if (items.length > 0) store.set(backFailedAtom, true);
   return false;
 }
 

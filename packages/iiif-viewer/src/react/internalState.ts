@@ -21,11 +21,8 @@ export function pickedIndex(picked: { shown: number; index: number }, shownSeq: 
 /** Counts every manifest shown; it only grows (clearing what is shown does not take it back). */
 export const shownSeqAtom = atom(0);
 
-/**
- * The Scene the annotations in annotationsAtom were read from (its id), or null for the first Scene.
- * Whoever sets annotationsAtom sets this with it, so a new locale reads that same Scene again.
- */
-export const notesSceneAtom = atom<string | null>(null);
+/** Going back found nothing it could show (every step of the trail failed to parse): the reader is told. */
+export const backFailedAtom = atom(false);
 
 /** The region / time highlighted now (the result of a move). Cleared when the page changes. */
 export const focusAtom = atom<NavRequest | null>(null);

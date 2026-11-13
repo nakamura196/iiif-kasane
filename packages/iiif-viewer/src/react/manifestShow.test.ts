@@ -5,12 +5,11 @@ import {
   manifestAtom,
   manifestUrlAtom,
   modelChoicesAtom,
-  sceneIdAtom,
   selectedAnnotationIdAtom,
   shownManifestAtom,
 } from './atoms';
-import { focusAtom, notesSceneAtom, pickedPageAtom } from './internalState';
-import { loadContent, prepareShow, reparseAnnotations, showManifest, tryPrepareShow } from './useManifest';
+import { backFailedAtom, focusAtom, pickedPageAtom } from './internalState';
+import { loadContent, prepareShow, showManifest, tryPrepareShow, writeShownNotes } from './useManifest';
 import { goBack, openManifest, trailAtom } from './displays/structureState';
 import { convertToV4 } from '../core';
 
@@ -55,43 +54,60 @@ afterEach(() => {
 const stubFetch = (served: Record<string, unknown>) =>
   vi.stubGlobal('fetch', async (u: string) => ({ ok: u in served, json: async () => served[u] }) as unknown as Response);
 
-describe('reparseAnnotations (a new locale)', () => {
-  const showTwoScenes = (id: string) => {
-    const store = createStore();
-    const manifest = convertToV4(manifestJson(id));
-    showManifest(store, id, { raw: manifestJson(id), manifest }, 'content', prepareShow(manifest, 'ja'));
-    return store;
-  };
+describe('writeShownNotes (the one writer of the notes)', () => {
+  const twoScenes = (id: string) => convertToV4(manifestJson(id));
 
-  it('relabels the notes of the first Scene for a Scene drawn as an image (nothing sets notesSceneAtom)', () => {
-    const id = url('empty');
-    const store = showTwoScenes(id);
-    reparseAnnotations(store, 'en');
-    expect(store.get(annotationsAtom).map((a) => a.title)).toEqual([`${id}/scene/1 note`]);
-  });
-
-  it('keeps Scene 2 notes, relabelled, after the reader moved from Scene 2 to an image page', () => {
-    const id = url('visit');
-    const raw = manifestJson(id);
-    const withCanvas = { ...raw, items: [...raw.items, { id: `${id}/canvas/1`, type: 'Canvas', width: 10, height: 10, items: [] }] };
+  it('reads the notes from manifestAtom, also when a host set it without showing a manifest (finding: host page)', () => {
     const store = createStore();
-    const manifest = convertToV4(withCanvas);
-    showManifest(store, id, { raw: withCanvas, manifest }, 'content', prepareShow(manifest, 'ja'));
-    // SceneDisplay showed Scene 2 and set its notes; then the reader went on to the image page
-    const scene2 = prepareShow(manifest, 'ja', `${id}/scene/2`);
-    store.set(annotationsAtom, scene2.annotations);
-    store.set(notesSceneAtom, `${id}/scene/2`);
-    reparseAnnotations(store, 'en');
+    const id = url('host');
+    store.set(manifestAtom, twoScenes(id));
+    writeShownNotes(store, store.get(manifestAtom), 'en', `${id}/scene/2`);
     expect(store.get(annotationsAtom).map((a) => a.title)).toEqual([`${id}/scene/2 note`]);
   });
 
-  it('keeps the Scene id when the same manifest is shown again (SceneDisplay does not set it again)', () => {
-    const id = url('again');
-    const store = showTwoScenes(id);
-    store.set(sceneIdAtom, `${id}/scene/2`);
-    const shown = store.get(shownManifestAtom)!;
-    showManifest(store, id, { raw: shown.raw, manifest: shown.manifest }, 'content', prepareShow(shown.manifest, 'ja'));
-    expect(store.get(sceneIdAtom)).toBe(`${id}/scene/2`);
+  it('reads the first Scene when no Scene is on display, and the Scene on display otherwise, in the locale', () => {
+    const store = createStore();
+    const id = url('which');
+    const manifest = twoScenes(id);
+    writeShownNotes(store, manifest, 'ja');
+    expect(store.get(annotationsAtom).map((a) => a.title)).toEqual([`${id}/scene/1 (ja)`]);
+    writeShownNotes(store, manifest, 'en', `${id}/scene/2`);
+    expect(store.get(annotationsAtom).map((a) => a.title)).toEqual([`${id}/scene/2 note`]);
+    // back to a page that is not a Scene, with a new locale: the first Scene again, relabelled
+    writeShownNotes(store, manifest, 'ja');
+    expect(store.get(annotationsAtom).map((a) => a.title)).toEqual([`${id}/scene/1 (ja)`]);
+  });
+
+  it('clears the notes and painted models when no manifest is shown, and for a Scene that cannot be parsed', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const store = createStore();
+    const id = url('none');
+    const manifest = twoScenes(id);
+    writeShownNotes(store, manifest, 'en');
+    expect(store.get(annotationsAtom)).toHaveLength(1);
+    writeShownNotes(store, null, 'en');
+    expect(store.get(annotationsAtom)).toEqual([]);
+    writeShownNotes(store, convertToV4(broken(url('b'))), 'en');
+    expect(store.get(annotationsAtom)).toEqual([]);
+  });
+
+  it('parses a manifest once for the same locale and Scene (the guard before showing and the display share it)', () => {
+    const manifest = twoScenes(url('once'));
+    expect(tryPrepareShow(manifest, 'en')).toBe(tryPrepareShow(manifest, 'en'));
+    expect(tryPrepareShow(manifest, 'ja')).not.toBe(tryPrepareShow(manifest, 'en'));
+  });
+});
+
+describe('showManifest resets what belongs to the manifest shown', () => {
+  it('forgets the selected annotation and the model choices of the one shown before', () => {
+    const store = createStore();
+    const id = url('sel');
+    const manifest = convertToV4(manifestJson(id));
+    store.set(selectedAnnotationIdAtom, 'x');
+    store.set(modelChoicesAtom, { m: 1 } as never);
+    showManifest(store, id, { raw: manifestJson(id), manifest }, 'content', prepareShow(manifest, 'ja'));
+    expect(store.get(selectedAnnotationIdAtom)).toBeNull();
+    expect(store.get(modelChoicesAtom)).toEqual({});
   });
 });
 
@@ -117,7 +133,6 @@ describe('a failed iiif-content after another was shown', () => {
     stubFetch({ [a]: manifestJson(a), [bad]: broken(bad) });
     vi.spyOn(console, 'error').mockImplementation(() => {});
     await loadContent(store, a, () => 'en');
-    store.set(sceneIdAtom, `${a}/scene/2`);
     store.set(selectedAnnotationIdAtom, 'x');
     store.set(modelChoicesAtom, { m: 1 } as never);
     store.set(focusAtom, { seq: 1, target: { canvasId: 'x' } } as never);
@@ -127,11 +142,9 @@ describe('a failed iiif-content after another was shown', () => {
 
   it('leaves nothing of the old iiif-content (selection, choices, focus, Scene)', async () => {
     const { store } = await failAfterGood();
-    expect(store.get(sceneIdAtom)).toBeNull();
     expect(store.get(selectedAnnotationIdAtom)).toBeNull();
     expect(store.get(modelChoicesAtom)).toEqual({});
     expect(store.get(focusAtom)).toBeNull();
-    expect(store.get(annotationsAtom)).toEqual([]);
   });
 
   it('does not reuse the number of a manifest shown before for the next one', async () => {
@@ -188,6 +201,7 @@ describe('a manifest that cannot be parsed', () => {
     expect(goBack(store, 'en')).toBe(true);
     expect(store.get(shownManifestAtom)?.url).toBe(good);
     expect(store.get(trailAtom).items).toEqual([]);
+    expect(store.get(backFailedAtom)).toBe(false);
   });
 
   it('does not go back to a trail item that cannot be parsed, and drops it from the trail', () => {
@@ -201,6 +215,8 @@ describe('a manifest that cannot be parsed', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     expect(goBack(store, 'en')).toBe(false);
     expect(store.get(trailAtom).items).toHaveLength(0);
+    // the reader is told (ContainerList shows the notice)
+    expect(store.get(backFailedAtom)).toBe(true);
     expect(store.get(shownManifestAtom)).toBeNull();
   });
 
