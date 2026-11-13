@@ -46,5 +46,8 @@ jobs:
       - name: Test the package
         run: npx vitest run packages/iiif-viewer
 
+      - name: Check the public API
+        run: npm run typecheck
+
       - name: Publish
         run: npm publish -w iiif-kasane
