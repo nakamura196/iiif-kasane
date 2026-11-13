@@ -29,10 +29,10 @@
   },
   "value": {
    "ja": [
-    "IIIF 3D TSG のリポジトリ（github.com/IIIF/3d）の assets/astronaut を参照して読み込んでいます"
+    "「Astronaut」Poly by Google（CC-BY）。IIIF 3D TSG のリポジトリ（github.com/IIIF/3d）の assets/astronaut を参照して読み込んでいます"
    ],
    "en": [
-    "Loaded by reference from assets/astronaut in the IIIF 3D TSG repository (github.com/IIIF/3d)"
+    "\"Astronaut\" by Poly by Google (CC-BY). Loaded by reference from assets/astronaut in the IIIF 3D TSG repository (github.com/IIIF/3d)"
    ]
   }
  },
