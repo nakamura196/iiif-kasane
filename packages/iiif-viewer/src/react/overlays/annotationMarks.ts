@@ -9,8 +9,8 @@ export interface Box {
   h: number;
 }
 
-// 注釈の印をいくつまで押せる印（DOM）で描くか。これを超えると 1 枚の canvas にまとめて描く。
-// 2 万件を DOM で描くと、拡大 1 段ごとに 190ms かかった（線の太さが拡大率で決まるため、全部を描き直す）。
+// Up to this many annotation marks are drawn as clickable DOM elements; beyond it, they are drawn together on one canvas.
+// 20,000 marks in the DOM took 190ms per zoom step (the line width depends on the zoom, so every mark is redrawn).
 export const DOM_MARK_LIMIT = 500;
 
 /**
@@ -75,3 +75,10 @@ export function annotationNumbers(annotations: readonly { id: string }[]): Map<s
   if (annotations.length > NUMBER_LIMIT) return null;
   return new Map(annotations.map((a, i) => [a.id, i + 1]));
 }
+
+/**
+ * Where the number of a box goes, outside the box so that it does not cover what the box marks: above a tall box
+ * (a vertical line of text) and to the left of a wide or square one (a horizontal line, a figure).
+ */
+export type NumberSide = 'top' | 'left';
+export const numberSideOf = (w: number, h: number): NumberSide => (h > w ? 'top' : 'left');

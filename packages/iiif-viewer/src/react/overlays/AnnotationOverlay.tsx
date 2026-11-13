@@ -3,7 +3,6 @@
 import { useAtom, useAtomValue } from 'jotai';
 import { memo, useCallback, useDeferredValue, useLayoutEffect, useMemo, useRef } from 'react';
 import {
-  bboxOf,
   annotationsOfSelection,
   groupByRegion,
   isSearchHit,
@@ -32,7 +31,17 @@ import {
   selectedCanvasAnnotationAtom,
 } from './canvasAnnotationState';
 import { storyFrameAtom, storyOpenAtom } from './storyState';
-import { DOM_MARK_LIMIT, annotationNumbers, boxOfRegion, overlaps, pixelsPerUnit, visibleBoxOf, type Box } from './annotationMarks';
+import {
+  DOM_MARK_LIMIT,
+  annotationNumbers,
+  boxOfRegion,
+  numberSideOf,
+  type NumberSide,
+  overlaps,
+  pixelsPerUnit,
+  visibleBoxOf,
+  type Box,
+} from './annotationMarks';
 import type { Overlay, OverlayProps } from './types';
 import { useCanvasAnnotations } from './useCanvasAnnotations';
 
@@ -48,20 +57,68 @@ const areaOf = (a: CanvasAnnotation): number => {
 
 const STROKE = '#2563eb';
 
-// The number of a mark, at the top left of its box (the same number as its card in the list).
-// It keeps its size on screen at any zoom.
-function NumberBadge({ n, selected, left, top }: { n: number; selected: boolean; left: string; top: string }) {
+// The gap between a box and its number, in screen pixels.
+const NUMBER_GAP = 2;
+// How close (percent of the Canvas) a box may come to the top or left edge and still get its number outside.
+const EDGE_ROOM = 3;
+
+// The number of a mark (the same number as its card in the list). It keeps its size on screen at any zoom.
+// A point's number sits on the point. A box's number sits outside the box, so that it does not cover what the box
+// marks: above a tall box, centred, and to the left of a wide or square one, centred (numberSideOf).
+function NumberBadge({
+  n,
+  selected,
+  box,
+  side,
+  onSelect,
+}: {
+  n: number;
+  selected: boolean;
+  /** The box in percent of the Canvas; a point has no width or height. */
+  box: { left: number; top: number; width?: number; height?: number };
+  /** The side of a box (from its size in Canvas units, as percents of the two axes do not compare); none for a point. */
+  side?: NumberSide;
+  /** Selects the mark, as a click on its box does (the number stands for the box). */
+  onSelect: (e: { stopPropagation: () => void }) => void;
+}) {
+  const w = box.width ?? 0;
+  const h = box.height ?? 0;
+  // With no room outside (a box at the edge of the Canvas), the number goes just inside the box instead, so that
+  // the viewport does not cut it off.
+  const inside = (side === 'top' && box.top < EDGE_ROOM) || (side === 'left' && box.left < EDGE_ROOM);
+  // The anchor is a point of the box's edge; the badge is moved off it by its own size (translate, inside the scale,
+  // so the gap stays NUMBER_GAP pixels on screen) and scaled around the anchor (transform-origin 0 0).
+  const anchor =
+    side === 'top'
+      ? {
+          left: box.left + w / 2,
+          top: box.top,
+          shift: inside ? `translate(-50%, ${NUMBER_GAP}px)` : `translate(-50%, calc(-100% - ${NUMBER_GAP}px))`,
+        }
+      : side === 'left'
+        ? {
+            left: box.left,
+            top: box.top + h / 2,
+            shift: inside ? `translate(${NUMBER_GAP}px, -50%)` : `translate(calc(-100% - ${NUMBER_GAP}px), -50%)`,
+          }
+        : { left: box.left, top: box.top, shift: 'translate(-50%, -50%)' };
   return (
     <span
       aria-hidden
-      className={`absolute pointer-events-none rounded-full px-1 min-w-[1.25rem] text-center text-white font-medium leading-5 tabular-nums shadow ${
+      data-number-side={side ?? 'point'}
+      data-number-inside={inside || undefined}
+      onClick={onSelect}
+      onPointerDown={(e) => e.stopPropagation()}
+      // drawn above the marks, so that a smaller neighbouring box (drawn later) does not cover it
+      className={`absolute z-10 pointer-events-auto cursor-pointer rounded-full px-1 min-w-[1.25rem] text-center text-white font-medium leading-5 tabular-nums shadow ${
         selected ? 'bg-orange-500' : 'bg-blue-600'
       }`}
       style={{
-        left,
-        top,
+        left: `${anchor.left}%`,
+        top: `${anchor.top}%`,
         fontSize: '11px',
-        transform: 'translate(-50%, -50%) scale(calc(1 / var(--image-scale, 1)))',
+        transformOrigin: '0 0',
+        transform: `scale(calc(1 / var(--image-scale, 1))) ${anchor.shift}`,
       }}
     >
       {n}
@@ -220,7 +277,6 @@ const Mark = memo(function Mark({
     return (
       <>
       <button
-        key={g.key}
         type="button"
         {...common}
         onClick={toggle}
@@ -237,19 +293,18 @@ const Mark = memo(function Mark({
           transform: 'translate(-50%, -50%) scale(calc(1 / var(--image-scale, 1)))',
         }}
       />
-      {number !== undefined ? <NumberBadge n={number} selected={isSel} left={`${p.left}%`} top={`${p.top}%`} /> : null}
+      {number !== undefined ? <NumberBadge n={number} selected={isSel} box={p} onSelect={toggle} /> : null}
       </>
     );
   }
   if (r.type === 'polygon') {
     const b = regionBoxPercent(r, canvasWidth, canvasHeight)!;
     // draw in the Canvas's own coordinates inside a box that covers only the bounding box
-    const box = bboxOf(r.rings);
+    const box = r.bbox;
     const pad = 0;
     return (
       <>
       <svg
-        key={g.key}
         className="absolute pointer-events-none overflow-visible"
         style={{ left: `${b.left}%`, top: `${b.top}%`, width: `${b.width}%`, height: `${b.height}%` }}
         viewBox={`${box.x - pad} ${box.y - pad} ${box.w || 1} ${box.h || 1}`}
@@ -272,7 +327,7 @@ const Mark = memo(function Mark({
           />
         ))}
       </svg>
-      {number !== undefined ? <NumberBadge n={number} selected={isSel} left={`${b.left}%`} top={`${b.top}%`} /> : null}
+      {number !== undefined ? <NumberBadge n={number} selected={isSel} box={b} side={numberSideOf(r.bbox.w, r.bbox.h)} onSelect={toggle} /> : null}
       </>
     );
   }
@@ -282,8 +337,8 @@ const Mark = memo(function Mark({
       ? pickBodies(a.bodies, locale).find((x) => x.kind === 'text')?.value
       : undefined;
     return (
+      <>
       <div
-        key={g.key}
         {...common}
         role="button"
         tabIndex={0}
@@ -314,15 +369,7 @@ const Mark = memo(function Mark({
           ...(html ? { containerType: 'size' as const } : {}),
         }}
       >
-        {number !== undefined ? (
-          <span
-            aria-hidden
-            className={`absolute left-0 top-0 rounded-br px-1 text-white font-medium leading-tight tabular-nums ${isSel ? 'bg-orange-500' : 'bg-blue-600'}`}
-            style={{ fontSize: '12px', transformOrigin: 'top left', scale: 'calc(1 / var(--image-scale, 1))' }}
-          >
-            {number}
-          </span>
-        ) : count > 1 ? (
+        {number === undefined && count > 1 ? (
           <span
             className="absolute left-0 top-0 rounded-br bg-blue-600 px-1 text-white leading-tight"
             style={{ fontSize: '12px', transformOrigin: 'top left', scale: 'calc(1 / var(--image-scale, 1))' }}
@@ -338,6 +385,8 @@ const Mark = memo(function Mark({
           />
         ) : null}
       </div>
+      {number !== undefined ? <NumberBadge n={number} selected={isSel} box={b} side={numberSideOf(r.w, r.h)} onSelect={toggle} /> : null}
+      </>
     );
   }
   return null;
