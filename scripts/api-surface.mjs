@@ -44,7 +44,7 @@ const TYPE_DECL = (d) =>
   ts.isInterfaceDeclaration(d) || ts.isTypeAliasDeclaration(d) || ts.isEnumDeclaration(d);
 
 const referenced = new Map(); // "file#Name" -> declaration
-function collectRefs(node, sf) {
+function collectRefs(node) {
   const visit = (n) => {
     if (ts.isIdentifier(n)) {
       const s = checker.getSymbolAtLocation(n);
@@ -60,7 +60,7 @@ function addRef(d) {
   const key = `${rel(d.getSourceFile().fileName)}#${d.name.text}`;
   if (referenced.has(key)) return;
   referenced.set(key, d);
-  collectRefs(d, d.getSourceFile());
+  collectRefs(d);
 }
 
 function describe(name, sym) {
@@ -71,7 +71,7 @@ function describe(name, sym) {
     if (TYPE_DECL(d)) {
       kinds.push(ts.isEnumDeclaration(d) ? 'enum' : 'type');
       out.push(printer.printNode(ts.EmitHint.Unspecified, d, sf).replace(/^export /, ''));
-      collectRefs(d, sf);
+      collectRefs(d);
     } else if (ts.isClassDeclaration(d)) {
       kinds.push('class');
       const inst = checker.getDeclaredTypeOfSymbol(sym);
@@ -82,8 +82,8 @@ function describe(name, sym) {
       out.push(`${name}: ${typeStr(checker.getTypeOfSymbolAtLocation(sym, d))}`);
       // types written in the signature (not in the body)
       if (ts.isFunctionDeclaration(d)) {
-        [...d.parameters, d.type, ...(d.typeParameters ?? [])].filter(Boolean).forEach((p) => collectRefs(p, sf));
-      } else if (ts.isVariableDeclaration(d) && d.type) collectRefs(d.type, sf);
+        [...d.parameters, d.type, ...(d.typeParameters ?? [])].filter(Boolean).forEach((p) => collectRefs(p));
+      } else if (ts.isVariableDeclaration(d) && d.type) collectRefs(d.type);
     }
   }
   return `[${[...new Set(kinds)].join('+')}] ${[...new Set(out)].join('\n')}`;
