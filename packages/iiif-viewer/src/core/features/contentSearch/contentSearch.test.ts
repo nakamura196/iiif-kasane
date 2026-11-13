@@ -9,6 +9,8 @@ import {
   fetchContentSearchTerms,
   findContentSearchService,
   groupMatchesByCanvas,
+  hitUnionXywh,
+  isHitAnnotation,
   parseAutocompleteResponse,
   parseContentSearchResponse,
   runContentSearch,
@@ -239,5 +241,26 @@ describe('contentSearchAnnotationPage', () => {
       ['https://example.org/book1/annotation/word-12', 'https://example.org/book1/canvas/p2#xywh=200,300,40,18', 'word', 'highlighting'],
       ['https://example.org/book1/annotation/word-12#1', 'https://example.org/book1/canvas/p2#xywh=60,320,38,18', 'word', 'highlighting'],
     ]);
+  });
+});
+
+describe('hitUnionXywh', () => {
+  const c = 'https://example.org/book1/canvas/p2';
+  it('covers every region of the hit on the Canvas, ignoring other Canvases and regions without a box', () => {
+    const { matches } = parseContentSearchResponse(fixture('search2-handmade.json'));
+    const phrase = matches.find((m) => m.match === 'blue bird')!;
+    // blue (200,300,40,18) and bird (60,320,38,18)
+    expect(hitUnionXywh(phrase.regions, c)).toEqual([60, 300, 180, 38]);
+    expect(hitUnionXywh(phrase.regions, 'https://example.org/book1/canvas/p1')).toBeUndefined();
+    expect(hitUnionXywh([{ annotationId: 'a', canvasId: c }], c)).toBeUndefined();
+  });
+});
+
+describe('isHitAnnotation', () => {
+  it('matches the hit itself and its numbered extra regions only', () => {
+    expect(isHitAnnotation('w12', 'w12')).toBe(true);
+    expect(isHitAnnotation('w12#1', 'w12')).toBe(true);
+    expect(isHitAnnotation('w12#x', 'w12')).toBe(false);
+    expect(isHitAnnotation('w123', 'w12')).toBe(false);
   });
 });
