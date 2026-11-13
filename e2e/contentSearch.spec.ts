@@ -95,9 +95,9 @@ test('Content Search 2.0: 当たりの一覧・単位の絞り込み・候補語
   await expect(page.getByText('2 / 2')).toBeVisible();
 });
 
-// FIXME(#341): broken on main since the dependency bump in #320 (passes on 3fe5e06, fails on 1872afe).
-// After clicking the two-word hit "blue bird", page 2 shows one overlay mark (word-12...) instead of two.
-// Re-enable (test.fixme -> test) once #341 is fixed.
+// FIXME(#341): clicking a multi-word hit zooms to the first word's box, and AnnotationOverlay culls marks outside
+// the view, so the second word's mark ("bird") disappears after the zoom animation (page 2 shows one mark, not two).
+// Not caused by #320. Re-enable (test.fixme -> test) once the zoom covers the union of the hit's boxes.
 test.fixme('Content Search 2.0: a hit spanning two words draws two marks on page 2', async ({ page }) => {
   await serveBook(page);
   await page.goto(`/ja/viewer/?iiif-content=${encodeURIComponent(`${BASE}/manifest`)}&tab=contentSearch&q=bird`);
