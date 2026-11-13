@@ -14,7 +14,7 @@ import {
 import { Provider, createStore, useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { containersOf, type ContainerInfo, type ManifestV4 } from '../core';
 import { manifestAtom, modelChoicesAtom, shownManifestAtom } from './atoms';
-import { pickedIndex, pickedPageAtom } from './internalState';
+import { backFailedAtom, drawsModel, pickedIndex, pickedPageAtom } from './internalState';
 import { navRequestAtom, nextSeq } from './displays/structureState';
 import { ViewerEnv, type ResolvedTheme } from './env';
 import {
@@ -151,8 +151,13 @@ function ViewerStateRoot({
   const [picked, setPicked] = useAtom(pickedPageAtom);
   const selected = pickedIndex(picked, shownSeq, containers.length);
   const container: ContainerInfo | undefined = containers[selected];
-  // the notes follow the Scene on display (any other page: the first Scene)
-  const { failed } = useManifest(iiifContent, container?.kind === 'Scene' ? container.id : undefined);
+  // the notes follow the Scene drawn by the 3D display (any other page, a model-less Scene included: the first Scene)
+  // a notice about Back goes when the reader moves on to another page or manifest
+  const setBackFailed = useSetAtom(backFailedAtom);
+  useEffect(() => {
+    setBackFailed(false);
+  }, [selected, shownSeq, setBackFailed]);
+  const { failed } = useManifest(iiifContent, container && drawsModel(container) ? container.id : undefined);
 
   // The playback position of video and audio. The transcript (right panel) and the media display follow it.
   // A time given from outside (target.t) is applied when the player of that Canvas is attached.

@@ -20,7 +20,6 @@ import {
   modelChoicesAtom,
   paintedModelsAtom,
   selectedAnnotationIdAtom,
-  sceneIdAtom,
   shownManifestAtom,
   type ShownOrigin,
 } from './atoms';
@@ -85,15 +84,17 @@ export function prepareShow(manifest: ManifestV4, locale: string, sceneId?: stri
 }
 
 // What was parsed for a manifest, by locale and Scene (null: it could not be parsed). The guard before showing
-// parses the first Scene and the display reads the same result: a manifest is parsed once per show and once per
-// locale (or Scene) wanted, and a failure is reported once.
+// parses the first Scene and the writer and the display read the same result (the key is the Scene read, so
+// 'no id' and the first Scene's id are one entry): a manifest is parsed once per show and once per locale (or
+// other Scene) wanted, and a failure is reported once.
 const parsedCache = new WeakMap<ManifestV4, Map<string, PreparedShow | null>>();
 
 /** prepareShow, or null (reported on the console) when the manifest cannot be parsed. Remembered per manifest. */
 export function tryPrepareShow(manifest: ManifestV4, locale: string, sceneId?: string): PreparedShow | null {
   let byKey = parsedCache.get(manifest);
   if (!byKey) parsedCache.set(manifest, (byKey = new Map()));
-  const key = `${locale}\n${sceneId ?? ''}`;
+  // the Scene actually read (no id, or an id the manifest does not have, is the first Scene)
+  const key = `${locale}\n${sceneOf(manifest, sceneId)?.id ?? ''}`;
   if (byKey.has(key)) return byKey.get(key) ?? null;
   let result: PreparedShow | null = null;
   try {
@@ -123,12 +124,13 @@ function clearShown(store: Store): void {
   store.set(manifestAtom, null);
   resetShownState(store);
   resetViewState(store);
+  store.set(backFailedAtom, false);
 }
 
 /**
  * Put a manifest (or Collection) into the store as the shown one: the manifest, its URL and served JSON,
- * and reset model choices, layer settings and the selected annotation. The notes and painted 3D models
- * are read from manifestAtom by useShownNotes.
+ * its first Scene's notes and painted 3D models, and reset model choices, layer settings and the selected
+ * annotation.
  * Loads still in flight are dropped (what is shown now is the latest request).
  * The only way a manifest is shown: the first load, the moves inside a Collection and going back all use it,
  * so the parts that need the served JSON always get the one of what is shown.
@@ -150,23 +152,28 @@ export function showManifest(
   store.set(shownSeqAtom, seq);
   store.set(shownManifestAtom, { url, raw, manifest, seq, origin, hasGeo });
   store.set(manifestAtom, manifest);
-  // the notes and painted models are read from manifestAtom by useShownNotes
+  // the first Scene's notes and models go in with the manifest (no frame shows the new Scene with the old
+  // manifest's models); useShownNotes only follows a change of the Scene on display or of the locale
+  store.set(annotationsAtom, prepared.annotations);
+  store.set(paintedModelsAtom, prepared.paintedModels);
 }
 
 /**
- * The one place that sets the notes (annotationsAtom) and the painted models: they are read from the manifest the
- * displays use (manifestAtom), for the Scene on display (else the first Scene) and the locale.
+ * Set the notes (annotationsAtom) and painted models for the Scene on display (else the first Scene) and the
+ * locale. Acts only on the manifest the viewer itself showed (shownManifestAtom): a manifest a host set in
+ * manifestAtom is the host's, with its own notes, and is left alone.
  */
 export function writeShownNotes(store: Store, manifest: ManifestV4 | null, locale: string, sceneId?: string): void {
-  const read = manifest ? tryPrepareShow(manifest, locale, sceneId) : null;
+  if (!manifest || store.get(shownManifestAtom)?.manifest !== manifest) return;
+  const read = tryPrepareShow(manifest, locale, sceneId);
   store.set(annotationsAtom, read?.annotations ?? []);
   store.set(paintedModelsAtom, read?.paintedModels ?? []);
 }
 
 /**
- * Keep the notes, painted models and Scene id of the store in step with what is on display. `sceneId` is the id
- * of the Scene on display (undefined for any other page).
- * A host that writes annotationsAtom itself keeps its value until the manifest, the Scene or the locale changes.
+ * Follow the Scene on display and the locale (`sceneId`: the Scene drawn by the 3D display, else undefined):
+ * the notes and painted models are read again for it. A host that writes annotationsAtom itself keeps its
+ * value while the viewer shows nothing (see writeShownNotes).
  */
 export function useShownNotes(sceneId?: string): void {
   const store = useStore();
@@ -175,11 +182,13 @@ export function useShownNotes(sceneId?: string): void {
   useEffect(() => {
     writeShownNotes(store, manifest, locale, sceneId);
   }, [store, manifest, locale, sceneId]);
-  // a notes' selection and the Scene id belong to the Scene on display
+  // moving to another Scene: a selection of the one left does not apply (a show resets it in showManifest)
+  const lastScene = useRef(sceneId);
   useEffect(() => {
-    store.set(sceneIdAtom, sceneId ?? null);
+    if (lastScene.current === sceneId) return;
+    lastScene.current = sceneId;
     store.set(selectedAnnotationIdAtom, null);
-  }, [store, manifest, sceneId]);
+  }, [store, sceneId]);
 }
 
 /** Result of loading a manifest: shown, could not be read, or dropped because a later request replaced it. */

@@ -8,7 +8,7 @@ import {
   selectedAnnotationIdAtom,
   shownManifestAtom,
 } from './atoms';
-import { backFailedAtom, focusAtom, pickedPageAtom } from './internalState';
+import { backFailedAtom, drawsModel, focusAtom, pickedPageAtom } from './internalState';
 import { loadContent, prepareShow, showManifest, tryPrepareShow, writeShownNotes } from './useManifest';
 import { goBack, openManifest, trailAtom } from './displays/structureState';
 import { convertToV4 } from '../core';
@@ -54,47 +54,72 @@ afterEach(() => {
 const stubFetch = (served: Record<string, unknown>) =>
   vi.stubGlobal('fetch', async (u: string) => ({ ok: u in served, json: async () => served[u] }) as unknown as Response);
 
-describe('writeShownNotes (the one writer of the notes)', () => {
-  const twoScenes = (id: string) => convertToV4(manifestJson(id));
-
-  it('reads the notes from manifestAtom, also when a host set it without showing a manifest (finding: host page)', () => {
+describe('writeShownNotes (the one writer of the notes after a show)', () => {
+  const showTwoScenes = (id: string) => {
     const store = createStore();
-    const id = url('host');
-    store.set(manifestAtom, twoScenes(id));
-    writeShownNotes(store, store.get(manifestAtom), 'en', `${id}/scene/2`);
-    expect(store.get(annotationsAtom).map((a) => a.title)).toEqual([`${id}/scene/2 note`]);
+    const manifest = convertToV4(manifestJson(id));
+    showManifest(store, id, { raw: manifestJson(id), manifest }, 'content', prepareShow(manifest, 'ja'));
+    return { store, manifest };
+  };
+
+  it('sets the first Scene notes together with the manifest, with no later effect needed', () => {
+    const id = url('sync');
+    const { store } = showTwoScenes(id);
+    expect(store.get(manifestAtom)).not.toBeNull();
+    expect(store.get(annotationsAtom).map((a) => a.title)).toEqual([`${id}/scene/1 (ja)`]);
   });
 
-  it('reads the first Scene when no Scene is on display, and the Scene on display otherwise, in the locale', () => {
-    const store = createStore();
+  it('reads the Scene on display, and the first Scene otherwise, in the locale', () => {
     const id = url('which');
-    const manifest = twoScenes(id);
-    writeShownNotes(store, manifest, 'ja');
-    expect(store.get(annotationsAtom).map((a) => a.title)).toEqual([`${id}/scene/1 (ja)`]);
+    const { store, manifest } = showTwoScenes(id);
     writeShownNotes(store, manifest, 'en', `${id}/scene/2`);
     expect(store.get(annotationsAtom).map((a) => a.title)).toEqual([`${id}/scene/2 note`]);
-    // back to a page that is not a Scene, with a new locale: the first Scene again, relabelled
     writeShownNotes(store, manifest, 'ja');
     expect(store.get(annotationsAtom).map((a) => a.title)).toEqual([`${id}/scene/1 (ja)`]);
   });
 
-  it('clears the notes and painted models when no manifest is shown, and for a Scene that cannot be parsed', () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {});
+  it('keeps what a host set itself (the georef pattern: manifestAtom, notes and selection set by hand)', () => {
     const store = createStore();
+    const id = url('georef');
+    const manifest = convertToV4(manifestJson(id));
+    const mine = [{ id: 'mine' }] as never;
+    store.set(manifestAtom, manifest);
+    store.set(annotationsAtom, mine);
+    store.set(selectedAnnotationIdAtom, 'mine');
+    writeShownNotes(store, manifest, 'en', `${id}/scene/2`);
+    expect(store.get(annotationsAtom)).toBe(mine);
+    expect(store.get(selectedAnnotationIdAtom)).toBe('mine');
+  });
+
+  it('gives no notes for a Scene on display that cannot be parsed', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
     const id = url('none');
-    const manifest = twoScenes(id);
-    writeShownNotes(store, manifest, 'en');
-    expect(store.get(annotationsAtom)).toHaveLength(1);
-    writeShownNotes(store, null, 'en');
-    expect(store.get(annotationsAtom)).toEqual([]);
-    writeShownNotes(store, convertToV4(broken(url('b'))), 'en');
+    const raw = manifestJson(id);
+    raw.items[1] = broken(id).items[1];
+    const store = createStore();
+    const manifest = convertToV4(raw);
+    showManifest(store, id, { raw, manifest }, 'content', prepareShow(manifest, 'en'));
+    writeShownNotes(store, manifest, 'en', `${id}/scene/2`);
     expect(store.get(annotationsAtom)).toEqual([]);
   });
 
-  it('parses a manifest once for the same locale and Scene (the guard before showing and the display share it)', () => {
-    const manifest = twoScenes(url('once'));
+  it('parses a manifest once for the same locale and Scene, the first Scene included', () => {
+    const id = url('once');
+    const manifest = convertToV4(manifestJson(id));
     expect(tryPrepareShow(manifest, 'en')).toBe(tryPrepareShow(manifest, 'en'));
+    expect(tryPrepareShow(manifest, 'en', `${id}/scene/1`)).toBe(tryPrepareShow(manifest, 'en'));
     expect(tryPrepareShow(manifest, 'ja')).not.toBe(tryPrepareShow(manifest, 'en'));
+  });
+});
+
+describe('drawsModel', () => {
+  it('is true for a Scene that paints a model only (a model-less Scene is a 2D page)', () => {
+    const model = { kind: 'Scene', painting: [{ options: [{ kind: 'Model' }] }] } as never;
+    const empty = { kind: 'Scene', painting: [] } as never;
+    const image = { kind: 'Canvas', painting: [{ options: [{ kind: 'Image' }] }] } as never;
+    expect(drawsModel(model)).toBe(true);
+    expect(drawsModel(empty)).toBe(false);
+    expect(drawsModel(image)).toBe(false);
   });
 });
 
@@ -145,6 +170,14 @@ describe('a failed iiif-content after another was shown', () => {
     expect(store.get(selectedAnnotationIdAtom)).toBeNull();
     expect(store.get(modelChoicesAtom)).toEqual({});
     expect(store.get(focusAtom)).toBeNull();
+  });
+
+  it('forgets a notice about Back', async () => {
+    const { store } = await failAfterGood();
+    store.set(backFailedAtom, true);
+    stubFetch({ [url('x')]: broken(url('x')) });
+    await loadContent(store, url('x'), () => 'en');
+    expect(store.get(backFailedAtom)).toBe(false);
   });
 
   it('does not reuse the number of a manifest shown before for the next one', async () => {

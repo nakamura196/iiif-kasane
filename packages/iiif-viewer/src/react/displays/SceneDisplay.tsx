@@ -1,10 +1,10 @@
 'use client';
 
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { useAtomValue } from 'jotai';
+import { useAtomValue, useSetAtom } from 'jotai';
 import { authorizedUrl, chosenOption, probeServiceOf } from '../../core';
 import { tryPrepareShow } from '../useManifest';
-import { modelChoicesAtom, paintedModelsAtom } from '../atoms';
+import { modelChoicesAtom, paintedModelsAtom, sceneIdAtom } from '../atoms';
 import { useLocale, useTranslations } from '../env';
 import AuthPrompt from '../auth/AuthPrompt';
 import { useAuthStates } from '../auth/authStore';
@@ -23,10 +23,14 @@ function SceneDisplay({ container, manifest, iiifContent, shownUrl, renderAction
   const paintedModels = useAtomValue(paintedModelsAtom);
   const modelChoices = useAtomValue(modelChoicesAtom);
 
-  // The notes, painted models and Scene id of this Scene are set by useShownNotes (in the provider), from the
-  // same manifest. Here the Scene is only checked, to show a notice for a Scene that cannot be parsed
+  // The notes and painted models of this Scene are set by useShownNotes (in the provider). Here the Scene is only checked, to show a notice for a Scene that cannot be parsed
   // (the read is remembered, so it is not parsed again).
   const sceneId = container.id;
+  // its default Camera and Camera buttons (the 3D parts below) read the Scene id
+  const setSceneId = useSetAtom(sceneIdAtom);
+  useEffect(() => {
+    setSceneId(sceneId);
+  }, [sceneId, setSceneId]);
   const broken = useMemo(() => tryPrepareShow(manifest, locale, sceneId) === null, [manifest, sceneId, locale]);
 
   // The first painted model is the main one (framing, annotation occlusion);
@@ -89,7 +93,7 @@ function SceneDisplay({ container, manifest, iiifContent, shownUrl, renderAction
         </div>
       )}
       <div className="absolute bottom-4 left-4 z-10 flex items-end gap-2">
-        <ModelChoice />
+        {!broken && <ModelChoice />}
         {renderActions?.({ iiifContent, shownUrl, hasChoices, selectedIndex })}
       </div>
     </div>
