@@ -12,7 +12,9 @@
 // Comments and formatting of the sources do not matter; anything else does: removed names, optional ->
 // required, narrowed unions, changed callback signatures. Additions change the baseline too, on purpose.
 // Union members are printed sorted (the checker orders them by creation, which is not stable).
-// Known limit: classes are listed by member names and types only (the package exports none today).
+// Known limits: import qualifiers are dropped from printed types (two types of the same name from different
+// files print alike); types are followed 6 levels deep; a TypeScript or @types update can change the printed
+// text without an API change (review the diff, then run `npm run api:update`); classes are listed by member names and types only (the package exports none today).
 // Run through npm (`typecheck`, `typecheck:package`, `api:update`): their pre-hooks generate the *.generated.ts
 // registries the sources import. Run alone without them, the script stops with the type errors that causes.
 import ts from 'typescript';
@@ -64,6 +66,13 @@ const scratch = ts.createSourceFile('type.ts', '', ts.ScriptTarget.Latest);
 const sortUnions = (ctx) => {
   const visit = (n) => {
     const v = ts.visitEachChild(n, visit, ctx);
+    // A destructured parameter prints as its binding pattern ({ a, b }); that is the implementation, not the API.
+    if (ts.isParameter(v) && ts.isObjectBindingPattern(v.name)) {
+      return ctx.factory.updateParameterDeclaration(v, v.modifiers, v.dotDotDotToken, ctx.factory.createIdentifier('props'), v.questionToken, v.type, v.initializer);
+    }
+    if (ts.isParameter(v) && ts.isArrayBindingPattern(v.name)) {
+      return ctx.factory.updateParameterDeclaration(v, v.modifiers, v.dotDotDotToken, ctx.factory.createIdentifier('args'), v.questionToken, v.type, v.initializer);
+    }
     if (!ts.isUnionTypeNode(v)) return v;
     const sorted = [...v.types].sort((x, y) => {
       const a = printer.printNode(ts.EmitHint.Unspecified, x, scratch);
@@ -196,7 +205,16 @@ if (process.argv.includes('--update')) {
     console.log('Public API matches the baseline.');
   } else {
     const d = spawnSync('diff', ['-u', '--label', 'baseline', '--label', 'current', baselinePath, '-'], { input: current, encoding: 'utf8' });
-    console.error(d.stdout);
+    if (d.error || !d.stdout) {
+      // diff is not available: show the first lines that differ instead
+      const a = base.split('\n');
+      const b = current.split('\n');
+      const shown = [];
+      for (let i = 0; i < Math.max(a.length, b.length) && shown.length < 20; i++) {
+        if (a[i] !== b[i]) shown.push(`line ${i + 1}\n- ${a[i] ?? '(none)'}\n+ ${b[i] ?? '(none)'}`);
+      }
+      console.error(shown.join('\n'));
+    } else console.error(d.stdout);
     console.error(
       'The public API of iiif-kasane differs from packages/iiif-viewer/api/public-api.txt.\n' +
         'If the change is intended, update the baseline with `npm run api:update` and commit it.\n' +

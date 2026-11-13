@@ -42,13 +42,17 @@ describe('<iiif-kasane> tag', () => {
   });
 
   it('reads these keys of the options attribute, and passes them to the viewer', () => {
-    // keys parseOptions takes out of the JSON
+    // keys parseOptions takes out of the JSON: the object binding pattern inside parseOptions' own body
     const parsedKeys: string[] = [];
     // keys the element uses from parseOptions(...) results (these are what reach <Viewer>)
     const usedKeys = new Set<string>();
     walk(element, (n) => {
-      if (ts.isVariableDeclaration(n) && ts.isObjectBindingPattern(n.name) && n.initializer && ts.isAsExpression(n.initializer)) {
-        n.name.elements.forEach((e) => parsedKeys.push(e.propertyName?.getText() ?? e.name.getText()));
+      if (ts.isFunctionDeclaration(n) && n.name?.text === 'parseOptions' && n.body) {
+        walk(n.body, (m) => {
+          if (ts.isVariableDeclaration(m) && ts.isObjectBindingPattern(m.name)) {
+            m.name.elements.forEach((e) => parsedKeys.push(e.propertyName?.getText() ?? e.name.getText()));
+          }
+        });
       }
       if (ts.isPropertyAccessExpression(n) && ts.isCallExpression(n.expression) && n.expression.expression.getText() === 'parseOptions') {
         usedKeys.add(n.name.text);
@@ -74,7 +78,7 @@ describe('<iiif-kasane> tag', () => {
     });
     expect(sorted(tabs ?? []), 'Tabs accepted in options.tab changed').toEqual(['annotations', 'metadata']);
     expect(sorted([...themes]), 'Values accepted in the theme attribute changed').toEqual(['auto', 'dark', 'light']);
-    for (const c of ['panelOpen:boolean', 'pager:boolean', 'environment:string']) {
+    for (const c of ['panelOpen:boolean', 'pager:boolean', 'environment:string', 'tab:string']) {
       expect([...typeofChecks], `The check "${c}" for the options value is gone`).toContain(c);
     }
   });
