@@ -4,6 +4,7 @@ import type { AddressInfo } from 'node:net';
 import { extname, join } from 'node:path';
 import { crc32, deflateSync } from 'node:zlib';
 import { test, expect } from '@playwright/test';
+import { mimeTypes } from '../scripts/lib/mime-types.mjs';
 
 // The <iiif-kasane> tag bundle as shipped in the npm package (dist/iiif-kasane.js from the installed tarball).
 // A local server (any free port) stands in for a user's website: the page, the bundle, a manifest and an image.
@@ -64,18 +65,6 @@ const pageHtml = () => `<!doctype html><html><head><meta charset="utf-8"><style>
 <iiif-kasane iiif-content="${origin}/manifest.json" locale="en" theme="light"></iiif-kasane>
 <script type="module" src="/dist/iiif-kasane.js"></script></body></html>`;
 
-const MIME: Record<string, string> = {
-  '.js': 'text/javascript',
-  '.mjs': 'text/javascript',
-  '.css': 'text/css',
-  '.json': 'application/json',
-  '.wasm': 'application/wasm',
-  '.png': 'image/png',
-  '.svg': 'image/svg+xml',
-  '.woff': 'font/woff',
-  '.woff2': 'font/woff2',
-  '.html': 'text/html',
-};
 
 let server: Server;
 test.beforeAll(async () => {
@@ -90,7 +79,7 @@ test.beforeAll(async () => {
     if (url === '/') return send('text/html', pageHtml());
     if (url === '/manifest.json') return send('application/json', JSON.stringify(manifest()));
     if (url === '/image.png') return send('image/png', image);
-    const type = MIME[extname(url)];
+    const type = mimeTypes[extname(url)];
     if (url.startsWith('/dist/') && !url.includes('..') && type) {
       try {
         return send(type, readFileSync(join(PKG!, url)));
@@ -114,8 +103,17 @@ test.afterAll(() => server?.close());
 test('the <iiif-kasane> tag from the packed package shows a manifest', async ({ page }) => {
   const errors: string[] = [];
   const missing: string[] = [];
+  const outside: string[] = [];
+  const failed: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('response', (r) => r.status() >= 400 && missing.push(`${r.status()} ${r.url()}`));
+  // Nothing outside the local server may be read: abort and record such requests.
+  await page.route('**/*', (route) => {
+    if (route.request().url().startsWith(origin + '/')) return route.continue();
+    outside.push(route.request().url());
+    return route.abort();
+  });
+  page.on('requestfailed', (r) => failed.push(`${r.url()} ${r.failure()?.errorText}`));
   await page.goto(origin + '/');
   const tag = page.locator('iiif-kasane');
   // The viewer shows the painted image as an <img> on its stage, and the manifest label in the About panel.
@@ -125,4 +123,6 @@ test('the <iiif-kasane> tag from the packed package shows a manifest', async ({ 
   await expect(tag.getByText('Smoke test manifest').first()).toBeAttached();
   expect(errors).toEqual([]);
   expect(missing).toEqual([]);
+  expect(outside).toEqual([]);
+  expect(failed).toEqual([]);
 });

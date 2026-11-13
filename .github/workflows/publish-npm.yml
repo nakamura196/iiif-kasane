@@ -59,6 +59,7 @@ jobs:
         with:
           name: iiif-kasane-tarball
           path: ${{ runner.temp }}/pack/*.tgz
+          overwrite: true # "Re-run all jobs" uploads under the same name again
           if-no-files-found: error
           retention-days: 3
 
@@ -67,6 +68,7 @@ jobs:
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: package-smoke-traces
+          overwrite: true
           path: test-results/
           retention-days: 3
 

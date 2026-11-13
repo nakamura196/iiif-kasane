@@ -8,16 +8,23 @@
 // --no-browser) the <iiif-kasane> tag bundle in a real browser. It needs no outside network
 // beyond the npm registry for the install (which prefers the local npm cache).
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync,  mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
+const ts = createRequire(import.meta.url)('typescript');
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const pkgDir = join(root, 'packages', 'iiif-viewer');
 const argv = process.argv.slice(2);
 const args = new Set(argv);
-const packDirArg = argv.indexOf('--pack-dir') >= 0 ? resolve(argv[argv.indexOf('--pack-dir') + 1]) : null;
+const packIdx = argv.indexOf('--pack-dir');
+if (packIdx >= 0 && (!argv[packIdx + 1] || argv[packIdx + 1].startsWith('--'))) {
+  console.error('--pack-dir needs a directory');
+  process.exit(2);
+}
+const packDirArg = packIdx >= 0 ? resolve(argv[packIdx + 1]) : null;
 const started = Date.now();
 const failures = [];
 
@@ -29,13 +36,27 @@ const check = (ok, msg) => {
   if (!ok) failures.push(msg);
 };
 
-// 1. Build and pack. `npm pack` runs "prepack", which builds, so build once explicitly to show errors early.
+// 1. Build and pack. The package is built explicitly and packed with --ignore-scripts, so the tarball is
+// exactly the build output of this step. The publish workflow publishes this tarball file, so the lifecycle
+// scripts of `npm publish` (prepack, prepublishOnly, ...) do not run on that path. Fail if the package
+// defines any that would then be skipped.
 step('Build the package');
+const manifestPkg = JSON.parse(readFileSync(join(pkgDir, 'package.json'), 'utf8'));
+for (const hook of ['prepack', 'prepublishOnly', 'prepare', 'prepublish', 'postpack']) {
+  if (manifestPkg.scripts?.[hook] && hook !== 'prepack') {
+    console.error(`package.json defines "${hook}", which does not run when a tarball is published: move that work into the build.`);
+    process.exit(2);
+  }
+}
 run('npm', ['run', 'build', '-w', 'iiif-kasane'], root);
 
 const work = mkdtempSync(join(tmpdir(), 'kasane-smoke-'));
 const packDir = packDirArg ?? work;
 mkdirSync(packDir, { recursive: true });
+if (packDirArg && readdirSync(packDir).length > 0) {
+  console.error(`--pack-dir ${packDir} must be empty, so that only the tested tarball is in it`);
+  process.exit(2);
+}
 try {
 step(`Pack into ${packDir}`);
 const packOut = run('npm', ['pack', '--ignore-scripts', '--json', '--pack-destination', packDir], pkgDir, { quiet: true });
@@ -56,21 +77,27 @@ check(![...tarFiles].some((p) => p.startsWith('src/') || p.endsWith('.map')), 't
 
 // 3. Install the tarball into a consumer project.
 step('Install into a consumer project');
-const consumer = join(work, 'consumer');
-mkdirSync(consumer);
 const lock = JSON.parse(readFileSync(join(root, 'package-lock.json'), 'utf8'));
 const locked = (name) => lock.packages[`node_modules/${name}`].version;
-writeFileSync(
-  join(consumer, 'package.json'),
-  JSON.stringify({
-    name: 'kasane-smoke-consumer',
-    private: true,
-    type: 'module',
-    dependencies: { 'iiif-kasane': `file:${tarball}`, react: locked('react'), 'react-dom': locked('react-dom'), jotai: locked('jotai') },
-    devDependencies: { typescript: locked('typescript'), '@types/react': locked('@types/react') },
-  }),
-);
-run('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', '--prefer-offline'], consumer);
+const makeConsumer = (name, deps, devDeps, extraNpmArgs = []) => {
+  const dir = join(work, name);
+  mkdirSync(dir);
+  const pin = (names) => Object.fromEntries(names.map((n) => [n, locked(n)]));
+  writeFileSync(
+    join(dir, 'package.json'),
+    JSON.stringify({
+      name: `kasane-smoke-${name}`,
+      private: true,
+      type: 'module',
+      dependencies: { 'iiif-kasane': `file:${tarball}`, ...pin(deps) },
+      devDependencies: pin(devDeps),
+    }),
+  );
+  run('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', '--prefer-offline', ...extraNpmArgs], dir);
+  return dir;
+};
+// "consumer" has only the required peers. "consumer3d" also has the optional 3D peers that iiif-kasane/scene needs.
+const consumer = makeConsumer('consumer', ['react', 'react-dom', 'jotai'], ['typescript', '@types/react', '@types/react-dom']);
 const installed = join(consumer, 'node_modules', 'iiif-kasane');
 check(!existsSync(join(consumer, 'node_modules', 'three')), 'three.js is not installed (optional peer)');
 
@@ -87,10 +114,14 @@ check(coreOut === 'function undefined', `iiif-kasane/core imports without a DOM 
 // 5. The main entry must not pull three.js, even through its own chunks (static imports only; the 3D part is a lazy import).
 step('Main entry does not need 3D packages');
 const THREE = /^(three|three-stdlib|gsap|@react-three\/.+)(\/|$)/;
-// Static import/export specifiers, in readable and in minified syntax: `import a from "x"`, `import{a}from"x"`,
-// `export*from"x"`, `import"x"`. Dynamic imports (`import("x")`) are lazy chunks and are left out on purpose.
+// Static import/export specifiers, read with TypeScript's scanner so that comments, strings and minified
+// syntax (`import{a}from"x"`, `export*from"x"`, `import"x"`) are handled. Dynamic imports (`import("x")`)
+// and require() are lazy chunks and are left out on purpose.
 const staticImports = (src) =>
-  [...src.matchAll(/(?:^|[;\n}])\s*(?:import|export)\s*(?:[^'"();]*?\s*from\s*|(?=["']))["']([^"']+)["']/g)].map((m) => m[1]);
+  ts
+    .preProcessFile(src, true, true)
+    .importedFiles.filter((f) => !src.slice(0, f.pos).trimEnd().endsWith('('))
+    .map((f) => f.fileName);
 const walk = (entryAbs) => {
   const seen = new Set();
   const bare = new Set();
@@ -111,35 +142,56 @@ console.log(`  main entry: ${main.files} files, bare imports: ${main.bare.join('
 check(!main.bare.some((s) => THREE.test(s)), 'main entry does not statically import three.js, @react-three/*, gsap');
 check(main.bare.includes('react') && main.bare.includes('jotai'), 'react and jotai stay external (peers, not bundled)');
 const core = walk(join(installed, pkg.exports['./core'].default));
-check(!core.bare.some((s) => /^(react|react-dom|jotai|three)/.test(s)), `core entry needs no React/jotai/three (${core.bare.join(', ') || 'none'})`);
+check(!core.bare.some((s) => THREE.test(s) || /^(react|react-dom|jotai)(\/|$)/.test(s)), `core entry needs no React, jotai or 3D packages (${core.bare.join(', ') || 'none'})`);
 const tag = walk(join(installed, 'dist', 'iiif-kasane.js'));
 check(tag.bare.length === 0, `tag bundle and its chunks (${tag.files} files) have no bare imports (self-contained) ${tag.bare.join(', ')}`);
 check(readFileSync(join(installed, 'dist', 'iiif-viewer.js'), 'utf8').includes('iiif-kasane.js'), 'legacy iiif-viewer.js loads iiif-kasane.js');
 check(readFileSync(join(installed, 'dist', 'style.css'), 'utf8').length > 1000, 'style.css is not empty');
 
-// 6. Types resolve for a TypeScript consumer.
-step('Types resolve (tsc --noEmit)');
-writeFileSync(
-  join(consumer, 'check.ts'),
-  [
+// 6. Types resolve for a TypeScript consumer, with skipLibCheck off so that a broken .d.ts is reported.
+// All entries are checked in a consumer that has the 3D peers and @types/three: dist/types/core/types/main.d.ts
+// imports types from 'three', so a TypeScript consumer without three.js fails with skipLibCheck off (known gap).
+step('Types resolve (tsc --noEmit, skipLibCheck off)');
+const tsc = (dir, source) => {
+  writeFileSync(join(dir, 'check.ts'), source.join('\n'));
+  writeFileSync(
+    join(dir, 'tsconfig.json'),
+    JSON.stringify({ compilerOptions: { module: 'esnext', moduleResolution: 'bundler', target: 'es2022', jsx: 'react-jsx', strict: true, noEmit: true, skipLibCheck: false, types: [] }, files: ['check.ts'] }),
+  );
+  try {
+    run('node', [join(dir, 'node_modules', 'typescript', 'bin', 'tsc'), '-p', dir], dir);
+    return true;
+  } catch {
+    return false;
+  }
+};
+const consumer3d = makeConsumer(
+  'consumer3d',
+  ['react', 'react-dom', 'jotai', 'three', '@react-three/fiber', '@react-three/drei', 'three-stdlib', 'gsap'],
+  ['typescript', '@types/react', '@types/react-dom', '@types/three'],
+  // The lockfile has three 0.187, which the package's peer range ("^0.178.0 || ^0.186.0") does not list, so npm would refuse.
+  ['--legacy-peer-deps'],
+);
+check(
+  tsc(consumer3d, [
     "import { Viewer, type ViewerState } from 'iiif-kasane';",
-    "import { fetchManifest } from 'iiif-kasane/core';",
-    "import 'iiif-kasane/scene';",
+    "import { fetchManifest, containersOf } from 'iiif-kasane/core';",
     'export const v: typeof Viewer = Viewer;',
     'export const f: typeof fetchManifest = fetchManifest;',
+    'export const c: typeof containersOf = containersOf;',
     'export type S = ViewerState;',
-  ].join('\n'),
+  ]),
+  'main and core entries type-check against the installed package',
 );
-writeFileSync(
-  join(consumer, 'tsconfig.json'),
-  JSON.stringify({ compilerOptions: { module: 'esnext', moduleResolution: 'bundler', target: 'es2022', jsx: 'react-jsx', strict: true, noEmit: true, skipLibCheck: true, types: [] }, files: ['check.ts'] }),
+// The 3D entry is checked separately only to keep the failure message specific.
+check(
+  tsc(consumer3d, [
+    "import { Scene, type PlacedModel } from 'iiif-kasane/scene';",
+    'export const s: typeof Scene = Scene;',
+    'export type P = PlacedModel;',
+  ]),
+  'the scene entry type-checks against the installed package (with the 3D peers)',
 );
-try {
-  run('node', [join(consumer, 'node_modules', 'typescript', 'bin', 'tsc'), '-p', consumer], consumer);
-  check(true, 'a TypeScript consumer type-checks against the installed package');
-} catch {
-  check(false, 'a TypeScript consumer type-checks against the installed package');
-}
 
 // 7. The tag bundle in a real browser.
 if (!args.has('--no-browser') && failures.length === 0) {
