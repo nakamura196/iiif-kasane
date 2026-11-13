@@ -1,13 +1,10 @@
-# お知らせ（1 件 1 ファイル）
+# News (one item per file)
 
-`content/news/<id>.md` を 1 つ置くと、トップの「お知らせ」（新しい 5 件）、`/news` の一覧、
-`/news/<id>` の詳細ページに出る。一覧のファイルは書き換えなくてよい。
-以前は `src/lib/news.ts` の配列の先頭に足していたが、並行する PR が毎回そこでぶつかったので分けた。
+Add one file `content/news/<id>.md` and it appears in "News" on the top page (the newest 5), in the list at `/news`, and on its own page at `/news/<id>`. You do not need to edit any list file. News used to be added at the top of an array in `src/lib/news.ts`, but parallel PRs collided there every time, so it was split.
 
-`npm run dev`・`build`・`test`・`lint` の前に `scripts/build-news.mjs` が全ファイルを読み、
-`src/lib/news.generated.json`（git に入れない）にまとめる。`npx next dev` などを直接流すときは、先に `npm run news`。
+Before `npm run dev`, `build`, `test` and `lint`, `scripts/build-news.mjs` reads all files and writes `src/lib/news.generated.json` (not in git). When you run `npx next dev` or similar directly, run `npm run news` first.
 
-## 書き方
+## Format
 
 ```
 ---
@@ -24,23 +21,23 @@ usecases: ueno
 
 ## en
 
-Body.
+Body (2–3 sentences: what you can do now).
 ```
 
-- ファイル名が id（`/news/<id>` の URL）。英小文字・数字・ハイフン。公開後は変えない
-- 先頭の `---` の間は「key: value」の 1 行ずつ。`.` で入れ子になる（`title.ja` → `title: { ja }`）
-- `date` は YYYY-MM-DD。新しい順に並ぶ。同じ日に複数あるときは `order:`（数字。大きいほど上）
-- 「試す」の行き先（どれか 1 つ）
-  - `action.usecase: <ユースケースの id>` … そのユースケースの開き方で開く
-  - `action.viewer: <マニフェストの URL>` と、必要なら `action.params: tab=contentSearch&q=...`
-  - `action.href: /samples`（サイト内のパス）。言語で違うときは `action.href.ja` と `action.href.en`
-  - 外部の記事なら `action.external: true` と `action.label: readArticle`
-- `video.ja` / `video.en` … YouTube の videoId。片方だけなら両方の言語でそれを出す。`video: cookbook` は Cookbook の動画
-- `usecases: a, b` … 関連するユースケースの id（カンマ区切り）
-- `note:` … 書き手向けの覚え書き。サイトには出ない（何行でも）
+- The file name is the id (the URL `/news/<id>`): lowercase letters, digits and hyphens. Do not change it after publishing.
+- Between the `---` lines, one `key: value` per line. A `.` nests (`title.ja` → `title: { ja }`).
+- `date` is YYYY-MM-DD. Newest first. For several items on the same day, use `order:` (a number; larger goes higher).
+- Where "Try it" goes (one of these):
+  - `action.usecase: <use case id>` opens the item as that use case does.
+  - `action.viewer: <manifest URL>`, plus `action.params: tab=contentSearch&q=...` if needed.
+  - `action.href: /samples` (a path on the site). If it differs by language, `action.href.ja` and `action.href.en`.
+  - For an outside article, `action.external: true` and `action.label: readArticle`.
+- `video.ja` / `video.en`: a YouTube videoId. If only one is given, it is shown for both languages. `video: cookbook` is the Cookbook video.
+- `usecases: a, b`: ids of related use cases (comma-separated).
+- `note:`: a note for writers. Not shown on the site (any number of lines).
 
-書き漏れ（片方の言語、存在しないユースケース、videoId の形）は `src/lib/news.test.ts` が見つける。
+`src/lib/news.test.ts` catches omissions (a missing language, a use case that does not exist, a malformed videoId).
 
-## 載せていないもの
+## Not published
 
-- 同じ場所の注釈・キー付きタグ（研究段階、2026-09-28）の告知。掲載の了承が得られたら戻す
+- The announcement of shared-region annotations and keyed tags (at the research stage, 2026-09-28). Add it back once publication is agreed.
