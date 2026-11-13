@@ -123,14 +123,19 @@ describe('輪郭のある領域の注釈', () => {
     generator: { id: 'https://huggingface.co/x', name: 'Model' },
   });
 
-  it('輪郭があれば SvgSelector、無ければこれまでどおり xywh', () => {
+  it('輪郭があれば SvgSelector、無ければ xywh の FragmentSelector。どちらも区分名の styleClass と色を持つ', () => {
     const items = page.items as Record<string, unknown>[];
     expect(items[0].target).toEqual({
       type: 'SpecificResource',
       source: { id: canvasId, type: 'Canvas' },
       selector: { type: 'SvgSelector', value: "<svg xmlns='http://www.w3.org/2000/svg'><polygon points='100,100 300,100 200,300'/></svg>" },
+      styleClass: 'face',
     });
-    expect(items[1].target).toBe(`${canvasId}#xywh=500,500,100,100`);
+    expect(items[1].target).toMatchObject({
+      selector: { type: 'FragmentSelector', value: 'xywh=500,500,100,100' },
+      styleClass: 'face',
+    });
+    expect(items[0].stylesheet).toEqual({ type: 'CssStylesheet', value: '.face { border-color: #2563eb; background-color: transparent; }' });
   });
 
   it('ビューアの注釈の読み取りで、多角形として読める', () => {

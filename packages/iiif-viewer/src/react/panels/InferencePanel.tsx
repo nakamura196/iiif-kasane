@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
-import { imageLayerCount, toAnnotationPage, toPlainText, type ContainerInfo, type ImageRegion, type ManifestV4 } from '../../core';
+import { classColorOf, hasAnnotationBody, imageLayerCount, toAnnotationPage, toPlainText, type ContainerInfo, type ImageRegion, type ManifestV4 } from '../../core';
 import { useLocale, useTranslations, type Translator } from '../env';
 import { runModel } from '../inference/client';
 import { downloadModel, modelStatus, removeModel, totalBytes, type ModelStatus } from '../inference/modelStore';
@@ -111,25 +111,31 @@ function ResultView({ result, container, t }: { result: InferenceResult; contain
         : null}
       {result.output.kind === 'lines' && items.length > 0 ? (
         <ol className="max-h-72 overflow-auto rounded border border-gray-200 dark:border-gray-700 text-sm divide-y divide-gray-100 dark:divide-gray-800">
-          {result.output.items
-            .filter((d) => d.text)
-            .map((d, i) => {
-              const id = items[i]?.id;
-              const on = !!id && selected === id;
-              return (
-                <li key={id ?? i}>
-                  <button
-                    type="button"
-                    disabled={!shown}
-                    onClick={() => setSelected(on ? null : id)}
-                    className={`w-full text-left px-2 py-1 ${on ? 'bg-blue-50 dark:bg-blue-950' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}
-                  >
-                    <span className="mr-2 text-xs text-gray-400 tabular-nums">{i + 1}</span>
-                    {d.text}
-                  </button>
-                </li>
-              );
-            })}
+          {/* page.items line up with the items that have a text or a class name (toAnnotationPage) */}
+          {result.output.items.filter(hasAnnotationBody).map((d, i) => {
+            const id = items[i]?.id;
+            const on = !!id && selected === id;
+            const color = classColorOf(result.output, d.label);
+            return (
+              <li key={id ?? i}>
+                <button
+                  type="button"
+                  disabled={!shown}
+                  onClick={() => setSelected(on ? null : id)}
+                  className={`w-full text-left px-2 py-1 ${on ? 'bg-blue-50 dark:bg-blue-950' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+                >
+                  <span className="mr-2 text-xs text-gray-400 tabular-nums">{i + 1}</span>
+                  {d.text || !d.label ? d.text : null}
+                  {d.label ? (
+                    <span className={`${d.text ? 'ml-2 ' : ''}inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 align-middle`}>
+                      <span aria-hidden="true" className="inline-block w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: color }} />
+                      {d.label}
+                    </span>
+                  ) : null}
+                </button>
+              </li>
+            );
+          })}
         </ol>
       ) : null}
     </div>
