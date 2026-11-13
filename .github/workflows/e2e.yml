@@ -1,0 +1,57 @@
+# Browser (Playwright) tests on every pull request.
+# Only tests that need no outside website run here: the ones tagged @external (they read
+# iiif.io, Hugging Face, ...) are skipped. Run everything locally with `npm run test:e2e`.
+name: E2E
+
+on:
+  pull_request:
+    branches: ['main']
+    paths-ignore: ['**/*.md', 'docs/**']
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build static export
+        run: npm run build
+
+      - name: Run browser tests (without @external)
+        env:
+          E2E_BASE_URL: http://localhost:3862
+        run: |
+          node scripts/serve-export.mjs 3862 &
+          for i in $(seq 1 30); do curl -sf -o /dev/null http://localhost:3862/ja/ && break; sleep 1; done
+          curl -sf -o /dev/null http://localhost:3862/ja/ || { echo "::error::the static server did not start"; exit 1; }
+          npm run test:e2e:ci
+
+      - name: Upload Playwright traces
+        if: failure()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: playwright-traces
+          path: test-results/
+          retention-days: 3

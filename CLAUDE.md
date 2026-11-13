@@ -47,7 +47,7 @@ Also say whether a how-to video (a use case's `video`) would help. The maintaine
 
 Opening `/georef` and similar pages without a manifest shows their entry screen. Feature checks easily miss it: in PR #180 a heading ran off the top of the screen, and a reference to a video that did not exist broke the export check in CI.
 
-When you add a page or change an entry screen, run this before opening the PR. The page list is read from `src/app/[locale]/`, so no test needs to be added (dynamic pages such as `[id]` are not covered).
+When you add a page or change an entry screen, check it with `e2e/entryPages.spec.ts`. The page list is read from `src/app/[locale]/`, so no test needs to be added (dynamic pages such as `[id]` are not covered). CI runs this test (and the rest of the e2e tests that need no outside site) on every pull request. To reproduce it locally, follow "End-to-end tests" in CONTRIBUTING.md, for example:
 
     npx next dev -p <port>   # in another terminal; in a worktree, avoid 3838
     E2E_BASE_URL=http://localhost:<port> npx playwright test e2e/entryPages.spec.ts
