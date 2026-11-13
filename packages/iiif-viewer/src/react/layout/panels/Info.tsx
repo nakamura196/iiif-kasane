@@ -8,7 +8,7 @@ import { withExtraPanels } from '../../panels/registry';
 import type { Panel } from '../../panels/types';
 import { annotationsAtom } from '../../atoms';
 import { inferenceResultsAtom } from '../../inference/state';
-import { localAnnotationPagesAtom } from '../../overlays/canvasAnnotationState';
+import { localAnnotationPagesAtom, localPageCountOn } from '../../overlays/canvasAnnotationState';
 import { CONTENT_SEARCH_SOURCE } from '../../panels/ContentSearchPanel';
 
 // 既知のタブ名。機能を足すと増えるので、任意の文字列も受ける。
@@ -42,7 +42,9 @@ const Info = ({ tab, onTabChange, container, manifest, extraPanels, hiddenPanels
   const inferenceCount = Object.keys(useAtomValue(inferenceResultsAtom)).length;
   // 文字の検索の印そのものは数えない（印だけが残ってタブが消えなくなるため）
   const localAnnotationCount = localPages.filter((l) => l.source !== CONTENT_SEARCH_SOURCE).length + inferenceCount;
-  const ctx = { container, manifest, annotationCount, localAnnotationCount };
+  // 注釈タブの一覧は今の Canvas の分だけなので、出すかどうかも今の Canvas の分で決める
+  const containerLocalAnnotationCount = localPageCountOn(localPages, container?.id, CONTENT_SEARCH_SOURCE);
+  const ctx = { container, manifest, annotationCount, localAnnotationCount, containerLocalAnnotationCount };
   const available = withExtraPanels(extraPanels).filter((p) => !hiddenPanels?.includes(p.id) && p.available(ctx));
   const ids = available.map((p) => p.id);
   // 「資料情報」は前の「資料情報（about）」タブも兼ねる。古いリンクの ?tab=about はそこへ

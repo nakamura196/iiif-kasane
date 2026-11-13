@@ -18,6 +18,11 @@ export interface LocalAnnotationPage {
 
 export const localAnnotationPagesAtom = atom<LocalAnnotationPage[]>([]);
 
+// その Canvas の画像に重ねている、手元で作った AnnotationPage の数。ignore の作り手（文字の検索の印など）は数えない。
+// 推論の結果は、画像に重ねている間だけここに入る（推論タブで隠すと抜ける）。
+export const localPageCountOn = (pages: LocalAnnotationPage[], canvasId: string | undefined, ignore: string): number =>
+  canvasId ? pages.filter((l) => l.canvasId === canvasId && l.source !== ignore).length : 0;
+
 // 右パネルの注釈の検索欄の文字。画像の上の印も、当たった注釈だけに絞る。
 export const canvasAnnotationQueryAtom = atom<string>('');
 
