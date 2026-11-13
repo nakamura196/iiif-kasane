@@ -107,7 +107,7 @@ export default function ContainerList({ containers, selected, onSelect, pager = 
   const hasPrev = groupAt > 0;
   const hasNext = groupAt >= 0 && groupAt < groups.length - 1;
 
-  // 0540: target が別のマニフェストの Canvas も指すとき、そのマニフェストを読んで並べて見せる
+  // 0540: when a target points to a Canvas of another manifest, read that manifest and show them side by side
   const startMulti = useCallback(
     (targets: ContentStateTargets['targets'], anchor: number) => {
       if (!manifest) return;
@@ -187,9 +187,9 @@ export default function ContainerList({ containers, selected, onSelect, pager = 
       if (target) matched = [target];
     }
     if (matched.length > 0) {
-      // リンク（content state・canvas=・pos=）や読み込み時の start で開いたときは、動きを付けずにその場所を出す
+      // opened from a link (content state, canvas=, pos=) or the manifest's start: show the place at once, without the glide
       go(matched[0].index, matched[0], undefined, true);
-      // 0540: 複数の Canvas を指すときは、並べて見せる
+      // 0540: several Canvases are pointed to: show them side by side
       setCompare(compareIndexesOf(matched));
       startMulti(allTargets, matched[0].index);
       return;

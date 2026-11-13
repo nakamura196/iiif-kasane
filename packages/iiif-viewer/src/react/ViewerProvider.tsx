@@ -159,8 +159,8 @@ function ViewerStateRoot({
   const selected = pickedIndex(picked, shownSeq, containers.length);
   const container: ContainerInfo | undefined = containers[selected];
 
-  // 動画・音声の再生位置。文字起こし（右パネル）と動画・音声の表示がこれで連動する。
-  // 外から指定された時刻（target.t）。その Canvas の再生の部品が付いたときに、そこへ動かす。
+  // The playback position of video and audio. The transcript (right panel) and the media display follow it.
+  // A time given from outside (target.t) is applied when the player of that Canvas is attached.
   const pendingSeek = useRef<{ canvasId: string; t: number; play: boolean } | null>(null);
   const shownCanvas = useRef<string | undefined>(undefined);
   const [currentTime, setCurrentTime] = useState(0);
@@ -177,7 +177,7 @@ function ViewerStateRoot({
         /* the reader can still move the position by hand */
       }
     };
-    // <video> / <audio> は長さが分かるまで動かせない。YouTube や合成の舞台の受け口は readyState を持たないので、すぐ動かす
+    // <video> / <audio> cannot seek before the duration is known. YouTube and the composite stage have no readyState, so seek at once
     if (typeof el.readyState === 'number' && el.readyState < 1 && typeof el.addEventListener === 'function') {
       el.addEventListener('loadedmetadata', go, { once: true });
     } else go();
@@ -187,7 +187,7 @@ function ViewerStateRoot({
     shownCanvas.current = container?.id;
     applySeekRef.current = applySeek;
   });
-  // 再生の部品（MediaView・YouTubeView・合成の舞台）は mediaRef.current に自分を入れる。入った時点で、待っている時刻へ動かす
+  // Players (MediaView, YouTubeView, the composite stage) put themselves in mediaRef.current; then the waiting time is applied
   const mediaRef = useMemo(() => {
     let el: HTMLMediaElement | null = null;
     return {
@@ -196,7 +196,7 @@ function ViewerStateRoot({
       },
       set current(v: HTMLMediaElement | null) {
         el = v;
-        // 新しい Canvas の部品は、この部品の useLayoutEffect（shownCanvas の更新）より先に入るので、描画が終わってから見る
+        // the player of a new Canvas arrives before this component's useLayoutEffect (which updates shownCanvas), so check after rendering
         if (v) queueMicrotask(() => applySeekRef.current(v));
       },
     };
@@ -234,9 +234,9 @@ function ViewerStateRoot({
     [containers, shownSeq, setPicked, setModelChoices],
   );
 
-  // 外（使う側のページ）から指定された Canvas・範囲へ移る。マニフェストが読めてから、値が変わったときだけ。
-  // 移り終わるまでは、途中で出た最初の頁（start など）を onSelect で知らせない。
-  // 知らせると、使う側がそれを target に戻して、指定した頁に着かなくなるため。
+  // Move to the Canvas / region given by the host page: once the manifest is read, and when the value changes.
+  // Until the move is done, the first page shown on the way (start etc.) is not reported through onSelect:
+  // the host would put it back into target, and the viewer would never reach the page asked for.
   const setNavRequest = useSetAtom(navRequestAtom);
   const key = targetKey(target);
   const targetRef = useRef(target);
@@ -270,7 +270,7 @@ function ViewerStateRoot({
       pendingSeek.current = { canvasId, t: next.t, play: !!next.play };
     }
     if (next.canvasId == null && !next.xywh) {
-      // 時刻だけの指定: 頁は動かさない。再生の部品がもう付いていれば、ここで動かす
+      // only a time: the page stays. If the player is already attached, seek here
       waitingFor.current = null;
       applySeekRef.current(mediaRef.current);
       return;

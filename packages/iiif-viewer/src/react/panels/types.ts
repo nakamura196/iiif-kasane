@@ -1,8 +1,8 @@
 import type { ComponentType } from 'react';
 import type { ContainerInfo, ManifestV4 } from '../../core';
 
-// 右パネルのタブ 1 つ分の契約。新しいタブは、このファイルの型で panels/ に 1 ファイルを足す
-// （一覧には自動で入る）。文言は messages/features/<機能>.{ja,en}.json の Info.<id> に書く。
+// The contract of one tab of the right panel. A new tab adds one file to panels/ with these types
+// (it joins the list by itself). Its text goes in Info.<id> of messages/features/<feature>.{ja,en}.json.
 export interface PanelContext {
   container?: ContainerInfo;
   manifest?: ManifestV4 | null;

@@ -3,8 +3,8 @@
 import { createContext, useContext } from 'react';
 import type { Xywh } from '../core';
 
-// パネルから「この Canvas へ移動する」を呼ぶための口。
-// 注釈のリンク本文が同じ資料の Canvas id のとき、クリックでそこへ移る。
+// The way panels ask "move to this Canvas".
+// When an annotation's link body is a Canvas id of the same item, a click moves there.
 export interface CanvasNavigation {
   /** Move to the Canvas with this id. Returns false when the id is not a Canvas of this item. */
   goToCanvas: (canvasId: string) => boolean;

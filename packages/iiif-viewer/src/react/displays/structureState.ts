@@ -1,7 +1,7 @@
 'use client';
 
-// structure 機能の状態。Viewer ごとの jotai store に載る（グローバルな変数は作らない）。
-// 右パネルの目次・ページ送り・表示が、これを通してつながる。
+// State of the structure feature. It lives in each Viewer's jotai store (no global variables).
+// The table of contents in the right panel, the page navigation and the displays are connected through it.
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { usePlayback } from '../playback';
@@ -22,7 +22,7 @@ import {
 import { manifestUrlAtom, shownManifestAtom } from '../atoms';
 import { isContentLoading, loadManifest, showManifest, useLocaleRef } from '../useManifest';
 
-/** 移動の依頼（右パネルの目次などが出し、ContainerList が受ける）。 */
+/** A request to move (sent by the table of contents etc., received by ContainerList). */
 export interface NavRequest {
   seq: number;
   target: CanvasTarget;
@@ -34,15 +34,15 @@ export interface NavRequest {
 
 export const navRequestAtom = atom<NavRequest | null>(null);
 
-/** いま強調する領域・時間（移動の結果）。ページを変えると消える。 */
+/** The region / time highlighted now (the result of a move). Cleared when the page changes. */
 export const focusAtom = atom<NavRequest | null>(null);
 
-/** 0540: content state が複数の Canvas を指すとき、並べて見せる container の番号（先頭が選択中）。 */
+/** 0540: when a content state points to several Canvases, the containers shown side by side (the first is selected). */
 export const compareAtom = atom<number[]>([]);
 
 /**
- * 0540: content state が別々のマニフェストの Canvas を指すとき、並べて見せるもの。
- * anchor は開いているマニフェストの Canvas の番号（ここから離れたら解除）。failed は読めなかったマニフェスト。
+ * 0540: when a content state points to Canvases of different manifests, what is shown side by side.
+ * anchor is the Canvas index in the open manifest (moving away ends it). failed lists manifests that could not be read.
  */
 export interface CompareMulti {
   anchor: number;
@@ -51,7 +51,7 @@ export interface CompareMulti {
 }
 export const compareMultiAtom = atom<CompareMulti | null>(null);
 
-/** 選ばれている代替のページ順（sequence の Range の id）。null は元の順。 */
+/** The alternative page order chosen (the id of a sequence Range). null: the original order. */
 export const sequenceIdAtom = atom<string | null>(null);
 
 /** One step of the trail: what was shown, its URL, its served JSON and the page the reader was on. */
@@ -87,13 +87,13 @@ export const nextSeq = (): number => ++seqCounter;
 export interface PageOrder {
   viewing: ViewingInfo;
   sequences: SequenceInfo[];
-  /** 表示順の container の番号 */
+  /** container indexes in display order */
   order: number[];
-  /** 見開きなどの組（表示順） */
+  /** groups such as spreads (in display order) */
   groups: number[][];
 }
 
-/** マニフェストの見せ方・ページ順・見開きの組を決める。 */
+/** Work out how the manifest is viewed: page order and spreads. */
 export function usePageOrder(manifest: ManifestV4 | null | undefined, containers: ContainerInfo[]): PageOrder {
   const sequenceId = useAtomValue(sequenceIdAtom);
   return useMemo(() => {
