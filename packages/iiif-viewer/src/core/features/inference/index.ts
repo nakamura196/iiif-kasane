@@ -12,3 +12,4 @@ export * from './contour';
 export * from './sam2';
 export * from './ppocr';
 export * from './region';
+export * from './pageMarks';
