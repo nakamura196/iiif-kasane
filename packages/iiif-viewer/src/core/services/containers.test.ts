@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import type { ManifestV4 } from '../types/iiif';
-import { containersOf, defaultChoiceIndex, firstSceneOf, pagePlaceholderOf } from './containers';
+import { containersOf, defaultChoiceIndex, firstSceneOf, pageMediaOf, pagePlaceholderOf } from './containers';
 import { convertToV4 } from './manifestConverter';
 import { parseManifestV4, sceneCamerasOf } from './manifestParser';
 
@@ -258,6 +258,42 @@ describe('Choice bodies and empty pages', () => {
     expect(c.label).toEqual({ en: ['f. 1v — MISSING'] });
     expect(pagePlaceholderOf(c)).toBe('empty');
     expect(pagePlaceholderOf(containersOf(convertToV4(choiceManifest('Sound')))[0])).toBe('Canvas');
+  });
+
+  it('names the media a page shows, for the page list icon', () => {
+    const m = convertToV4({
+      '@context': 'http://iiif.io/api/presentation/3/context.json',
+      id: 'https://e.org/m',
+      type: 'Manifest',
+      items: [
+        { id: 'https://e.org/e', type: 'Canvas', items: [] },
+        ...(['Image', 'Video'] as const).map((type) => ({
+          id: `https://e.org/${type}`,
+          type: 'Canvas',
+          width: 100,
+          height: 100,
+          duration: type === 'Video' ? 10 : undefined,
+          items: [
+            {
+              id: `https://e.org/${type}/p`,
+              type: 'AnnotationPage',
+              items: [
+                {
+                  id: `https://e.org/${type}/a`,
+                  type: 'Annotation',
+                  motivation: 'painting',
+                  target: `https://e.org/${type}`,
+                  body: { id: `https://e.org/${type}.bin`, type },
+                },
+              ],
+            },
+          ],
+        })),
+      ],
+    });
+    expect(containersOf(m).map(pageMediaOf)).toEqual(['empty', 'Image', 'Video']);
+    expect(pageMediaOf(containersOf(convertToV4(choiceManifest('Sound')))[0])).toBe('Audio');
+    expect(pageMediaOf({ kind: 'Scene', painting: [{ id: 'x', label: undefined, options: [] }] })).toBe('Model');
   });
 });
 
