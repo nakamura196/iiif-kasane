@@ -1,0 +1,1345 @@
+{
+ "@context": "http://iiif.io/api/presentation/4/context.json",
+ "id": "https://kasane.ldas.jp/manifests/si-triceratops.json",
+ "type": "Manifest",
+ "label": {
+  "en": [
+   "Triceratops horridus Marsh, 1889"
+  ]
+ },
+ "rights": "http://creativecommons.org/publicdomain/zero/1.0/",
+ "requiredStatement": {
+  "label": {
+   "en": [
+    "Source"
+   ]
+  },
+  "value": {
+   "en": [
+    "Converted from a Smithsonian Voyager scene (https://3d-api.si.edu/content/document/3d_package:d8c623be-4ebc-11ea-b77f-2e728ce88125/document.json) by Kasane's svx-to-iiif.mjs. (c) Smithsonian Institution. All rights reserved."
+   ]
+  }
+ },
+ "seeAlso": [
+  {
+   "id": "https://3d-api.si.edu/content/document/3d_package:d8c623be-4ebc-11ea-b77f-2e728ce88125/document.json",
+   "type": "Dataset",
+   "format": "application/json",
+   "label": {
+    "en": [
+     "Voyager scene (svx)"
+    ]
+   }
+  }
+ ],
+ "items": [
+  {
+   "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
+   "type": "Scene",
+   "label": {
+    "en": [
+     "Scene"
+    ]
+   },
+   "items": [
+    {
+     "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/page/1",
+     "type": "AnnotationPage",
+     "items": [
+      {
+       "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/model/1",
+       "type": "Annotation",
+       "motivation": [
+        "painting"
+       ],
+       "body": {
+        "type": "SpecificResource",
+        "source": {
+         "id": "https://3d-api.si.edu/content/document/3d_package:d8c623be-4ebc-11ea-b77f-2e728ce88125/Triceratops_20M-150k-2048-medium.glb",
+         "type": "Model",
+         "format": "model/gltf-binary",
+         "label": {
+          "en": [
+           "Triceratops_20M"
+          ]
+         }
+        },
+        "transform": [
+         {
+          "type": "RotateTransform",
+          "x": -89.152235,
+          "y": 0,
+          "z": 0
+         },
+         {
+          "type": "TranslateTransform",
+          "x": -0.385899,
+          "y": -1.051707,
+          "z": -0.569382
+         }
+        ]
+       },
+       "target": {
+        "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
+        "type": "Scene"
+       }
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/1",
+       "type": "Annotation",
+       "motivation": [
+        "painting"
+       ],
+       "body": {
+        "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/1/body",
+        "type": "PerspectiveCamera",
+        "fieldOfView": 52,
+        "lookAt": {
+         "type": "PointSelector",
+         "x": 0.003289,
+         "y": 0.001922,
+         "z": 0.006293
+        }
+       },
+       "target": {
+        "type": "SpecificResource",
+        "source": {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
+         "type": "Scene"
+        },
+        "selector": [
+         {
+          "type": "PointSelector",
+          "x": 2.784904,
+          "y": -6.107583,
+          "z": 0.418807
+         }
+        ]
+       }
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/2",
+       "type": "Annotation",
+       "motivation": [
+        "painting"
+       ],
+       "behavior": [
+        "hidden"
+       ],
+       "body": {
+        "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/2/body",
+        "type": "PerspectiveCamera",
+        "fieldOfView": 52,
+        "lookAt": {
+         "type": "PointSelector",
+         "x": 0.002534,
+         "y": 0.002033,
+         "z": 0.006744
+        }
+       },
+       "target": {
+        "type": "SpecificResource",
+        "source": {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
+         "type": "Scene"
+        },
+        "selector": [
+         {
+          "type": "PointSelector",
+          "x": 2.08199,
+          "y": -4.727917,
+          "z": 0.651317
+         }
+        ]
+       }
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/3",
+       "type": "Annotation",
+       "motivation": [
+        "painting"
+       ],
+       "behavior": [
+        "hidden"
+       ],
+       "body": {
+        "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/3/body",
+        "type": "PerspectiveCamera",
+        "fieldOfView": 52,
+        "lookAt": {
+         "type": "PointSelector",
+         "x": -0.508113,
+         "y": 0.10849,
+         "z": 1.70296
+        }
+       },
+       "target": {
+        "type": "SpecificResource",
+        "source": {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
+         "type": "Scene"
+        },
+        "selector": [
+         {
+          "type": "PointSelector",
+          "x": 1.192095,
+          "y": -3.94245,
+          "z": 2.468326
+         }
+        ]
+       }
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/4",
+       "type": "Annotation",
+       "motivation": [
+        "painting"
+       ],
+       "behavior": [
+        "hidden"
+       ],
+       "body": {
+        "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/4/body",
+        "type": "PerspectiveCamera",
+        "fieldOfView": 52,
+        "lookAt": {
+         "type": "PointSelector",
+         "x": -0.235347,
+         "y": 0.334928,
+         "z": 0.715825
+        }
+       },
+       "target": {
+        "type": "SpecificResource",
+        "source": {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
+         "type": "Scene"
+        },
+        "selector": [
+         {
+          "type": "PointSelector",
+          "x": 1.428056,
+          "y": -3.481024,
+          "z": 3.048161
+         }
+        ]
+       }
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/5",
+       "type": "Annotation",
+       "motivation": [
+        "painting"
+       ],
+       "behavior": [
+        "hidden"
+       ],
+       "body": {
+        "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/5/body",
+        "type": "PerspectiveCamera",
+        "fieldOfView": 52,
+        "lookAt": {
+         "type": "PointSelector",
+         "x": -0.115113,
+         "y": 0.357384,
+         "z": 1.584108
+        }
+       },
+       "target": {
+        "type": "SpecificResource",
+        "source": {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
+         "type": "Scene"
+        },
+        "selector": [
+         {
+          "type": "PointSelector",
+          "x": 0.199361,
+          "y": -3.691585,
+          "z": 2.52043
+         }
+        ]
+       }
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/6",
+       "type": "Annotation",
+       "motivation": [
+        "painting"
+       ],
+       "behavior": [
+        "hidden"
+       ],
+       "body": {
+        "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/6/body",
+        "type": "PerspectiveCamera",
+        "fieldOfView": 52,
+        "lookAt": {
+         "type": "PointSelector",
+         "x": -0.522054,
+         "y": 0.016586,
+         "z": 1.968396
+        }
+       },
+       "target": {
+        "type": "SpecificResource",
+        "source": {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
+         "type": "Scene"
+        },
+        "selector": [
+         {
+          "type": "PointSelector",
+          "x": 0.088908,
+          "y": -3.494919,
+          "z": 2.160023
+         }
+        ]
+       }
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/7",
+       "type": "Annotation",
+       "motivation": [
+        "painting"
+       ],
+       "behavior": [
+        "hidden"
+       ],
+       "body": {
+        "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/7/body",
+        "type": "PerspectiveCamera",
+        "fieldOfView": 52,
+        "lookAt": {
+         "type": "PointSelector",
+         "x": 0.004694,
+         "y": 0.002033,
+         "z": 0.005466
+        }
+       },
+       "target": {
+        "type": "SpecificResource",
+        "source": {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
+         "type": "Scene"
+        },
+        "selector": [
+         {
+          "type": "PointSelector",
+          "x": 2.43875,
+          "y": -5.292771,
+          "z": -0.115331
+         }
+        ]
+       }
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/8",
+       "type": "Annotation",
+       "motivation": [
+        "painting"
+       ],
+       "behavior": [
+        "hidden"
+       ],
+       "body": {
+        "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/8/body",
+        "type": "PerspectiveCamera",
+        "fieldOfView": 52,
+        "lookAt": {
+         "type": "PointSelector",
+         "x": -0.314257,
+         "y": 0.155223,
+         "z": 1.583837
+        }
+       },
+       "target": {
+        "type": "SpecificResource",
+        "source": {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
+         "type": "Scene"
+        },
+        "selector": [
+         {
+          "type": "PointSelector",
+          "x": 0.537698,
+          "y": -5.305439,
+          "z": 2.288047
+         }
+        ]
+       }
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/9",
+       "type": "Annotation",
+       "motivation": [
+        "painting"
+       ],
+       "behavior": [
+        "hidden"
+       ],
+       "body": {
+        "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/9/body",
+        "type": "PerspectiveCamera",
+        "fieldOfView": 52,
+        "lookAt": {
+         "type": "PointSelector",
+         "x": -0.228071,
+         "y": -0.060729,
+         "z": -1.693196
+        }
+       },
+       "target": {
+        "type": "SpecificResource",
+        "source": {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
+         "type": "Scene"
+        },
+        "selector": [
+         {
+          "type": "PointSelector",
+          "x": 1.39788,
+          "y": -3.598978,
+          "z": -1.785304
+         }
+        ]
+       }
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/10",
+       "type": "Annotation",
+       "motivation": [
+        "painting"
+       ],
+       "behavior": [
+        "hidden"
+       ],
+       "body": {
+        "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/10/body",
+        "type": "PerspectiveCamera",
+        "fieldOfView": 52,
+        "lookAt": {
+         "type": "PointSelector",
+         "x": -0.015483,
+         "y": -0.027144,
+         "z": -0.814066
+        }
+       },
+       "target": {
+        "type": "SpecificResource",
+        "source": {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
+         "type": "Scene"
+        },
+        "selector": [
+         {
+          "type": "PointSelector",
+          "x": 4.531864,
+          "y": -2.563613,
+          "z": -0.815976
+         }
+        ]
+       }
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/11",
+       "type": "Annotation",
+       "motivation": [
+        "painting"
+       ],
+       "behavior": [
+        "hidden"
+       ],
+       "body": {
+        "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/11/body",
+        "type": "PerspectiveCamera",
+        "fieldOfView": 52,
+        "lookAt": {
+         "type": "PointSelector",
+         "x": 0.067107,
+         "y": 0.01651,
+         "z": 0.023718
+        }
+       },
+       "target": {
+        "type": "SpecificResource",
+        "source": {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
+         "type": "Scene"
+        },
+        "selector": [
+         {
+          "type": "PointSelector",
+          "x": 1.336962,
+          "y": -5.918431,
+          "z": 0.562021
+         }
+        ]
+       }
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/12",
+       "type": "Annotation",
+       "motivation": [
+        "painting"
+       ],
+       "behavior": [
+        "hidden"
+       ],
+       "body": {
+        "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/12/body",
+        "type": "PerspectiveCamera",
+        "fieldOfView": 52,
+        "lookAt": {
+         "type": "PointSelector",
+         "x": 0.002534,
+         "y": 0.002033,
+         "z": 0.006744
+        }
+       },
+       "target": {
+        "type": "SpecificResource",
+        "source": {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
+         "type": "Scene"
+        },
+        "selector": [
+         {
+          "type": "PointSelector",
+          "x": 2.08199,
+          "y": -4.727917,
+          "z": 0.651317
+         }
+        ]
+       }
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/13",
+       "type": "Annotation",
+       "motivation": [
+        "painting"
+       ],
+       "behavior": [
+        "hidden"
+       ],
+       "body": {
+        "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/13/body",
+        "type": "PerspectiveCamera",
+        "fieldOfView": 52,
+        "lookAt": {
+         "type": "PointSelector",
+         "x": 0.002534,
+         "y": 0.002033,
+         "z": 0.006744
+        }
+       },
+       "target": {
+        "type": "SpecificResource",
+        "source": {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
+         "type": "Scene"
+        },
+        "selector": [
+         {
+          "type": "PointSelector",
+          "x": 2.08199,
+          "y": -4.727917,
+          "z": 0.651317
+         }
+        ]
+       }
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/14",
+       "type": "Annotation",
+       "motivation": [
+        "painting"
+       ],
+       "behavior": [
+        "hidden"
+       ],
+       "body": {
+        "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/14/body",
+        "type": "PerspectiveCamera",
+        "fieldOfView": 52,
+        "lookAt": {
+         "type": "PointSelector",
+         "x": -0.508113,
+         "y": 0.10849,
+         "z": 1.70296
+        }
+       },
+       "target": {
+        "type": "SpecificResource",
+        "source": {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
+         "type": "Scene"
+        },
+        "selector": [
+         {
+          "type": "PointSelector",
+          "x": 1.192095,
+          "y": -3.94245,
+          "z": 2.468326
+         }
+        ]
+       }
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/15",
+       "type": "Annotation",
+       "motivation": [
+        "painting"
+       ],
+       "behavior": [
+        "hidden"
+       ],
+       "body": {
+        "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/15/body",
+        "type": "PerspectiveCamera",
+        "fieldOfView": 52,
+        "lookAt": {
+         "type": "PointSelector",
+         "x": -0.115113,
+         "y": 0.357384,
+         "z": 1.584108
+        }
+       },
+       "target": {
+        "type": "SpecificResource",
+        "source": {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
+         "type": "Scene"
+        },
+        "selector": [
+         {
+          "type": "PointSelector",
+          "x": 0.199361,
+          "y": -3.691585,
+          "z": 2.52043
+         }
+        ]
+       }
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/16",
+       "type": "Annotation",
+       "motivation": [
+        "painting"
+       ],
+       "behavior": [
+        "hidden"
+       ],
+       "body": {
+        "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/16/body",
+        "type": "PerspectiveCamera",
+        "fieldOfView": 52,
+        "lookAt": {
+         "type": "PointSelector",
+         "x": -0.235347,
+         "y": 0.334928,
+         "z": 0.715825
+        }
+       },
+       "target": {
+        "type": "SpecificResource",
+        "source": {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
+         "type": "Scene"
+        },
+        "selector": [
+         {
+          "type": "PointSelector",
+          "x": 1.428056,
+          "y": -3.481024,
+          "z": 3.048161
+         }
+        ]
+       }
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/17",
+       "type": "Annotation",
+       "motivation": [
+        "painting"
+       ],
+       "behavior": [
+        "hidden"
+       ],
+       "body": {
+        "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/17/body",
+        "type": "PerspectiveCamera",
+        "fieldOfView": 52,
+        "lookAt": {
+         "type": "PointSelector",
+         "x": -0.522054,
+         "y": 0.016586,
+         "z": 1.968396
+        }
+       },
+       "target": {
+        "type": "SpecificResource",
+        "source": {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
+         "type": "Scene"
+        },
+        "selector": [
+         {
+          "type": "PointSelector",
+          "x": 0.088908,
+          "y": -3.494919,
+          "z": 2.160023
+         }
+        ]
+       }
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/18",
+       "type": "Annotation",
+       "motivation": [
+        "painting"
+       ],
+       "behavior": [
+        "hidden"
+       ],
+       "body": {
+        "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/18/body",
+        "type": "PerspectiveCamera",
+        "fieldOfView": 52,
+        "lookAt": {
+         "type": "PointSelector",
+         "x": -0.068022,
+         "y": -0.120112,
+         "z": -0.301599
+        }
+       },
+       "target": {
+        "type": "SpecificResource",
+        "source": {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
+         "type": "Scene"
+        },
+        "selector": [
+         {
+          "type": "PointSelector",
+          "x": 3.574531,
+          "y": -4.884568,
+          "z": 0.774312
+         }
+        ]
+       }
+      }
+     ]
+    }
+   ],
+   "annotations": [
+    {
+     "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/annotations",
+     "type": "AnnotationPage",
+     "items": [
+      {
+       "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/annotations/ll064WOo8byC",
+       "type": "Annotation",
+       "motivation": [
+        "commenting"
+       ],
+       "label": {
+        "en": [
+         "About the Skeleton"
+        ]
+       },
+       "body": {
+        "type": "TextualBody",
+        "value": "This is a composite specimen, assembled from the remains of several Triceratops individuals. The bones are casts made from real bones and 3D prints. The skeleton is 21 feet long and 8.5 feet tall.",
+        "format": "text/plain",
+        "language": "en"
+       },
+       "target": {
+        "type": "SpecificResource",
+        "source": {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
+         "type": "Scene"
+        },
+        "selector": [
+         {
+          "type": "PointSelector",
+          "x": 1.187572,
+          "y": 0.059101,
+          "z": -0.026922
+         }
+        ]
+       },
+       "scope": [
+        {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/2",
+         "type": "Annotation"
+        }
+       ]
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/annotations/tqjzgacSelwY",
+       "type": "Annotation",
+       "motivation": [
+        "commenting"
+       ],
+       "label": {
+        "en": [
+         "Skull"
+        ]
+       },
+       "body": {
+        "type": "TextualBody",
+        "value": "As with most horned dinosaurs, the skull is large (7 feet long) compared to the body. It sat on a short neck and was held low to the ground, indicating Triceratops probably fed on low-growing plants.",
+        "format": "text/plain",
+        "language": "en"
+       },
+       "target": {
+        "type": "SpecificResource",
+        "source": {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
+         "type": "Scene"
+        },
+        "selector": [
+         {
+          "type": "PointSelector",
+          "x": -0.266619,
+          "y": -0.634053,
+          "z": 1.679338
+         }
+        ]
+       },
+       "scope": [
+        {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/3",
+         "type": "Annotation"
+        }
+       ]
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/annotations/TmVEppHX8kNr",
+       "type": "Annotation",
+       "motivation": [
+        "commenting"
+       ],
+       "label": {
+        "en": [
+         "Frill"
+        ]
+       },
+       "body": {
+        "type": "TextualBody",
+        "value": "The bony frill was formed from two of the bones at the back of the skull and offered protection for the neck. In life, it may have been colorful and used for displays.",
+        "format": "text/plain",
+        "language": "en"
+       },
+       "target": {
+        "type": "SpecificResource",
+        "source": {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
+         "type": "Scene"
+        },
+        "selector": [
+         {
+          "type": "PointSelector",
+          "x": 0.027766,
+          "y": -0.610851,
+          "z": 0.930793
+         }
+        ]
+       },
+       "scope": [
+        {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/4",
+         "type": "Annotation"
+        }
+       ]
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/annotations/zCJUDh72bnj8",
+       "type": "Annotation",
+       "motivation": [
+        "commenting"
+       ],
+       "label": {
+        "en": [
+         "Horns"
+        ]
+       },
+       "body": {
+        "type": "TextualBody",
+        "value": "Triceratops means \"three-horned face,\" and it had two long brow horns over the eyes and a smaller nose horn. Different species of horned dinosaurs had very different sizes and arrangements of horns.",
+        "format": "text/plain",
+        "language": "en"
+       },
+       "target": {
+        "type": "SpecificResource",
+        "source": {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
+         "type": "Scene"
+        },
+        "selector": [
+         {
+          "type": "PointSelector",
+          "x": 0.182339,
+          "y": -0.708378,
+          "z": 2.025075
+         }
+        ]
+       },
+       "scope": [
+        {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/5",
+         "type": "Annotation"
+        }
+       ]
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/annotations/xbK7h8rDuNRT",
+       "type": "Annotation",
+       "motivation": [
+        "commenting"
+       ],
+       "label": {
+        "en": [
+         "Teeth and Beak"
+        ]
+       },
+       "body": {
+        "type": "TextualBody",
+        "value": "The large size and number of teeth, and their shape, indicate the animal was able to process large amounts of tough plant matter. The deep, narrow beak was good for plucking plants.",
+        "format": "text/plain",
+        "language": "en"
+       },
+       "target": {
+        "type": "SpecificResource",
+        "source": {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
+         "type": "Scene"
+        },
+        "selector": [
+         {
+          "type": "PointSelector",
+          "x": -0.89222,
+          "y": -0.456455,
+          "z": 2.097595
+         }
+        ]
+       },
+       "scope": [
+        {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/6",
+         "type": "Annotation"
+        }
+       ]
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/annotations/JrrblE2SkLoN",
+       "type": "Annotation",
+       "motivation": [
+        "commenting"
+       ],
+       "label": {
+        "en": [
+         "Upper Arm Bone (Humerus)"
+        ]
+       },
+       "body": {
+        "type": "TextualBody",
+        "value": "The left humerus was too small. Preparators scanned the right humerus, used software to mirror it, and milled a new left humerus.",
+        "format": "text/plain",
+        "language": "en"
+       },
+       "target": {
+        "type": "SpecificResource",
+        "source": {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
+         "type": "Scene"
+        },
+        "selector": [
+         {
+          "type": "PointSelector",
+          "x": -0.135328,
+          "y": -0.691802,
+          "z": 0.408198
+         }
+        ]
+       },
+       "scope": [
+        {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/7",
+         "type": "Annotation"
+        }
+       ]
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/annotations/dvPZJQgJfTvL",
+       "type": "Annotation",
+       "motivation": [
+        "commenting"
+       ],
+       "label": {
+        "en": [
+         "Comparing the Skulls"
+        ]
+       },
+       "body": {
+        "type": "TextualBody",
+        "value": "The skull was too small for the body. When the 3D scan was made, preparators used software to enlarge the skull by 15 percent.",
+        "format": "text/plain",
+        "language": "en"
+       },
+       "target": {
+        "type": "SpecificResource",
+        "source": {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
+         "type": "Scene"
+        },
+        "selector": [
+         {
+          "type": "PointSelector",
+          "x": -0.313735,
+          "y": -0.6535,
+          "z": 1.582826
+         }
+        ]
+       },
+       "scope": [
+        {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/8",
+         "type": "Annotation"
+        }
+       ]
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/annotations/E1LItfOPZ8rD",
+       "type": "Annotation",
+       "motivation": [
+        "commenting"
+       ],
+       "label": {
+        "en": [
+         "Rear Foot"
+        ]
+       },
+       "body": {
+        "type": "TextualBody",
+        "value": "By 1905, scientists had not found Triceratops rear feet, so they used those from a duck-billed dinosaur. The new mount has casts of Triceratops feet.",
+        "format": "text/plain",
+        "language": "en"
+       },
+       "target": {
+        "type": "SpecificResource",
+        "source": {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
+         "type": "Scene"
+        },
+        "selector": [
+         {
+          "type": "PointSelector",
+          "x": 0.078037,
+          "y": -0.590084,
+          "z": -2.087719
+         }
+        ]
+       },
+       "scope": [
+        {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/9",
+         "type": "Annotation"
+        }
+       ]
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/annotations/pH7U2yeiLUkT",
+       "type": "Annotation",
+       "motivation": [
+        "commenting"
+       ],
+       "label": {
+        "en": [
+         "Ilium"
+        ]
+       },
+       "body": {
+        "type": "TextualBody",
+        "value": "In 1905, preparators sculpted missing bones. For the new model, they used software to make a mirror-image copy of the right ilium to use on the left.",
+        "format": "text/plain",
+        "language": "en"
+       },
+       "target": {
+        "type": "SpecificResource",
+        "source": {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
+         "type": "Scene"
+        },
+        "selector": [
+         {
+          "type": "PointSelector",
+          "x": 1.248278,
+          "y": -0.476532,
+          "z": -0.427657
+         }
+        ]
+       },
+       "scope": [
+        {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/10",
+         "type": "Annotation"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/tour",
+     "type": "AnnotationPage",
+     "label": {
+      "en": [
+       "About the Skeleton"
+      ]
+     },
+     "behavior": [
+      "sequence"
+     ],
+     "items": [
+      {
+       "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/tour/dDGmF6",
+       "type": "Annotation",
+       "motivation": [
+        "describing"
+       ],
+       "body": [
+        {
+         "type": "TextualBody",
+         "value": "<h2>Introduction to the Skeleton</h2>",
+         "format": "text/html",
+         "language": "en"
+        }
+       ],
+       "target": {
+        "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
+        "type": "Scene"
+       },
+       "scope": [
+        {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/11",
+         "type": "Annotation"
+        }
+       ]
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/tour/q9BxZE",
+       "type": "Annotation",
+       "motivation": [
+        "describing"
+       ],
+       "body": [
+        {
+         "type": "TextualBody",
+         "value": "<h2>About the Skeleton</h2><p>This is a composite specimen, assembled from the remains of several Triceratops individuals. The bones are casts made from real bones and 3D prints. The skeleton is 21 feet long and 8.5 feet tall.</p>",
+         "format": "text/html",
+         "language": "en"
+        }
+       ],
+       "target": {
+        "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
+        "type": "Scene"
+       },
+       "scope": [
+        {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/12",
+         "type": "Annotation"
+        },
+        {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/annotations/ll064WOo8byC",
+         "type": "Annotation"
+        }
+       ]
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/tour/bsjvMQ",
+       "type": "Annotation",
+       "motivation": [
+        "describing"
+       ],
+       "body": [
+        {
+         "type": "TextualBody",
+         "value": "<h2>Are These Fossils Real?</h2><p>Did you know the Triceratops you see today in the David H. Koch Hall of Fossils – Deep Time at the Smithsonian National Museum of Natural History is not made of real fossils?</p><p><a href=\"https://3d-api.si.edu/content/document/3d_package:d8c623be-4ebc-11ea-b77f-2e728ce88125/articles/new-article-uTRGn3tMSDKh-0.html\">Read the article: Are These Fossils Real?</a></p>",
+         "format": "text/html",
+         "language": "en"
+        },
+        {
+         "id": "https://3d-api.si.edu/content/document/3d_package:d8c623be-4ebc-11ea-b77f-2e728ce88125/articles/new-article-uTRGn3tMSDKh-0.html",
+         "type": "Text",
+         "format": "text/html",
+         "language": "en",
+         "label": {
+          "en": [
+           "Are These Fossils Real?"
+          ]
+         }
+        }
+       ],
+       "target": {
+        "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
+        "type": "Scene"
+       },
+       "scope": [
+        {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/13",
+         "type": "Annotation"
+        },
+        {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/annotations/ll064WOo8byC",
+         "type": "Annotation"
+        }
+       ]
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/tour/pUKQbQ",
+       "type": "Annotation",
+       "motivation": [
+        "describing"
+       ],
+       "body": [
+        {
+         "type": "TextualBody",
+         "value": "<h2>Skull</h2><p>As with most horned dinosaurs, the skull is large (7 feet long) compared to the body. It sat on a short neck and was held low to the ground, indicating Triceratops probably fed on low-growing plants.</p>",
+         "format": "text/html",
+         "language": "en"
+        }
+       ],
+       "target": {
+        "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
+        "type": "Scene"
+       },
+       "scope": [
+        {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/14",
+         "type": "Annotation"
+        },
+        {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/annotations/tqjzgacSelwY",
+         "type": "Annotation"
+        }
+       ]
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/tour/q55mjO",
+       "type": "Annotation",
+       "motivation": [
+        "describing"
+       ],
+       "body": [
+        {
+         "type": "TextualBody",
+         "value": "<h2>Horns</h2><p>Triceratops means \"three-horned face,\" and it had two long brow horns over the eyes and a smaller nose horn. Different species of horned dinosaurs had very different sizes and arrangements of horns.</p>",
+         "format": "text/html",
+         "language": "en"
+        }
+       ],
+       "target": {
+        "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
+        "type": "Scene"
+       },
+       "scope": [
+        {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/15",
+         "type": "Annotation"
+        },
+        {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/annotations/zCJUDh72bnj8",
+         "type": "Annotation"
+        }
+       ]
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/tour/ASR1ww",
+       "type": "Annotation",
+       "motivation": [
+        "describing"
+       ],
+       "body": [
+        {
+         "type": "TextualBody",
+         "value": "<h2>Frill</h2><p>The bony frill was formed from two of the bones at the back of the skull and offered protection for the neck. In life, it may have been colorful and used for displays.</p>",
+         "format": "text/html",
+         "language": "en"
+        }
+       ],
+       "target": {
+        "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
+        "type": "Scene"
+       },
+       "scope": [
+        {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/16",
+         "type": "Annotation"
+        },
+        {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/annotations/TmVEppHX8kNr",
+         "type": "Annotation"
+        }
+       ]
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/tour/Dgr3Qs",
+       "type": "Annotation",
+       "motivation": [
+        "describing"
+       ],
+       "body": [
+        {
+         "type": "TextualBody",
+         "value": "<h2>Teeth and Beak</h2><p>The large size and number of teeth, and their shape, indicate the animal was able to process large amounts of tough plant matter. The deep, narrow beak was good for plucking plants.</p>",
+         "format": "text/html",
+         "language": "en"
+        }
+       ],
+       "target": {
+        "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
+        "type": "Scene"
+       },
+       "scope": [
+        {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/17",
+         "type": "Annotation"
+        },
+        {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/annotations/xbK7h8rDuNRT",
+         "type": "Annotation"
+        }
+       ]
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/tour/CFvwbs",
+       "type": "Annotation",
+       "motivation": [
+        "describing"
+       ],
+       "body": [
+        {
+         "type": "TextualBody",
+         "value": "<h2>End of Tour</h2>",
+         "format": "text/html",
+         "language": "en"
+        }
+       ],
+       "target": {
+        "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1",
+        "type": "Scene"
+       },
+       "scope": [
+        {
+         "id": "https://kasane.ldas.jp/manifests/si-triceratops.json/scene/1/cameras/18",
+         "type": "Annotation"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

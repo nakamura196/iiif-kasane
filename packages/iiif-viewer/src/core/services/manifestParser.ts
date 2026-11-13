@@ -143,6 +143,7 @@ const flattenAllPages = (pages: AnnotationPageV4[] | undefined): AnnotationV4[] 
 interface CameraView {
   position: [number, number, number];
   lookAt: [number, number, number] | null;
+  fieldOfView?: number;
 }
 
 const pointOf = (sel: unknown): [number, number, number] | null => {
@@ -184,7 +185,8 @@ const cameraIndex = (annos: AnnotationV4[]): Map<string, CameraView> => {
     if (!body) continue;
     const position = targetSelectors(anno).map(pointOf).find(Boolean);
     if (!position) continue;
-    map.set(anno.id, { position, lookAt: lookAtOf(body, annos) });
+    const fov = Number(body.fieldOfView);
+    map.set(anno.id, { position, lookAt: lookAtOf(body, annos), ...(Number.isFinite(fov) && fov > 0 ? { fieldOfView: fov } : {}) });
   }
   return map;
 };
@@ -554,3 +556,40 @@ export const geoFeaturesNamedBy = (features: GeoFeature[], annotations: Annotati
       ? { ...feature, properties: { ...feature.properties, title } }
       : feature;
   });
+
+/** A step of a story told in a Scene: a describing or commenting Annotation, and the Camera to see it from. */
+export interface SceneStoryAnnotation {
+  anno: AnnotationV4;
+  camera: DefaultCamera | null;
+  /** The notes of the Scene that the step's `scope` also names: the step selects them (opens their label). */
+  notes: string[];
+}
+
+const STORY_MOTIVATIONS = ['describing', 'commenting'];
+const isSequencePage = (page: AnnotationPageV4): boolean =>
+  [(page as { behavior?: unknown }).behavior].flat().includes('sequence');
+
+// Presentation 4.0 (Interactivity, Guided Viewing and Storytelling): the steps of a story in a Scene
+// are its non-painting Annotations, and `scope` names the Camera of a step (a short-hand for an
+// activating Annotation that shows, enables and selects that Camera). An Annotation Page with the
+// behavior `sequence` is explicitly a narrative: when the Scene has one, its Annotations are the
+// steps, with or without a Camera. Without one, only the Annotations that name a Camera are steps,
+// so that notes on a model do not become a tour unless they were given viewpoints.
+// A `scope` may also name notes of the Scene (non-painting Annotations that are not steps): the step
+// selects them, as a Voyager tour step opens its active annotation (svx `viewer/activeAnnotation`).
+export const sceneStoryAnnotationsOf = (scene: SceneV4 | undefined): SceneStoryAnnotation[] => {
+  if (!scene) return [];
+  const pages = scene.annotations ?? [];
+  const sequence = pages.filter(isSequencePage);
+  const all = [...flattenAllPages(scene.items), ...flattenAllPages(pages)];
+  const cameras = cameraIndex(all);
+  const ids = new Set(all.map((a) => a.id));
+  const steps = flattenAllPages(sequence.length > 0 ? sequence : pages)
+    .filter((a) => !cameras.has(a.id) && motivationsOf(a).some((m) => STORY_MOTIVATIONS.includes(m)))
+    .map((anno) => {
+      const scope = [anno.scope ?? []].flat().map((s) => (typeof s === 'string' ? s : s?.id));
+      const notes = scope.filter((id): id is string => !!id && id !== anno.id && ids.has(id) && !cameras.has(id));
+      return { anno, camera: cameraFor(anno, cameras) ?? null, notes };
+    });
+  return sequence.length > 0 ? steps : steps.filter((s) => s.camera);
+};

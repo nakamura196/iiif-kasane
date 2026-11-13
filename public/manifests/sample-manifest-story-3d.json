@@ -1,0 +1,399 @@
+{
+ "@context": "http://iiif.io/api/presentation/4/context.json",
+ "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json",
+ "type": "Manifest",
+ "label": {
+  "ja": [
+   "宇宙服の 3D ツアー"
+  ],
+  "en": [
+   "3D tour of a spacesuit"
+  ]
+ },
+ "summary": {
+  "ja": [
+   "IIIF 3D 作業部会の例の宇宙服の模型に、隠した視点（Camera）と順に進む注釈の頁（behavior: sequence）でツアーを書いた検証用の例。段の本文は動作確認のための仮のもの。"
+  ],
+  "en": [
+   "A test manifest: a tour over the spacesuit model from the IIIF 3D TSG examples, written with hidden Cameras and an annotation page with behavior \"sequence\". Step texts are placeholders for testing."
+  ]
+ },
+ "requiredStatement": {
+  "label": {
+   "ja": [
+    "模型"
+   ],
+   "en": [
+    "Model"
+   ]
+  },
+  "value": {
+   "ja": [
+    "「Astronaut」Poly by Google（CC-BY）。IIIF 3D TSG のリポジトリ（github.com/IIIF/3d）の assets/astronaut を参照して読み込んでいます"
+   ],
+   "en": [
+    "\"Astronaut\" by Poly by Google (CC-BY). Loaded by reference from assets/astronaut in the IIIF 3D TSG repository (github.com/IIIF/3d)"
+   ]
+  }
+ },
+ "items": [
+  {
+   "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json/scene/1",
+   "type": "Scene",
+   "label": {
+    "ja": [
+     "宇宙服"
+    ]
+   },
+   "items": [
+    {
+     "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json/scene/1/page/1",
+     "type": "AnnotationPage",
+     "items": [
+      {
+       "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json/scene/1/model",
+       "type": "Annotation",
+       "motivation": [
+        "painting"
+       ],
+       "body": {
+        "id": "https://raw.githubusercontent.com/IIIF/3d/main/assets/astronaut/astronaut.glb",
+        "type": "Model",
+        "format": "model/gltf-binary"
+       },
+       "target": {
+        "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json/scene/1",
+        "type": "Scene"
+       }
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json/scene/1/cameras/1",
+       "type": "Annotation",
+       "motivation": [
+        "painting"
+       ],
+       "body": {
+        "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json/scene/1/cameras/1/body",
+        "type": "PerspectiveCamera",
+        "lookAt": {
+         "type": "PointSelector",
+         "x": 0,
+         "y": 2.01,
+         "z": 0
+        }
+       },
+       "target": {
+        "type": "SpecificResource",
+        "source": {
+         "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json/scene/1",
+         "type": "Scene"
+        },
+        "selector": [
+         {
+          "type": "PointSelector",
+          "x": 0,
+          "y": 2.01,
+          "z": 9.1
+         }
+        ]
+       }
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json/scene/1/cameras/2",
+       "type": "Annotation",
+       "motivation": [
+        "painting"
+       ],
+       "body": {
+        "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json/scene/1/cameras/2/body",
+        "type": "PerspectiveCamera",
+        "lookAt": {
+         "type": "PointSelector",
+         "x": 1,
+         "y": 2.01,
+         "z": 0
+        }
+       },
+       "target": {
+        "type": "SpecificResource",
+        "source": {
+         "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json/scene/1",
+         "type": "Scene"
+        },
+        "selector": [
+         {
+          "type": "PointSelector",
+          "x": 1,
+          "y": 2.01,
+          "z": 3.1
+         }
+        ]
+       },
+       "behavior": [
+        "hidden"
+       ]
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json/scene/1/cameras/3",
+       "type": "Annotation",
+       "motivation": [
+        "painting"
+       ],
+       "body": {
+        "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json/scene/1/cameras/3/body",
+        "type": "PerspectiveCamera",
+        "lookAt": {
+         "type": "PointSelector",
+         "x": 0,
+         "y": 3.61,
+         "z": 0
+        }
+       },
+       "target": {
+        "type": "SpecificResource",
+        "source": {
+         "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json/scene/1",
+         "type": "Scene"
+        },
+        "selector": [
+         {
+          "type": "PointSelector",
+          "x": 0,
+          "y": 3.61,
+          "z": 3.1
+         }
+        ]
+       },
+       "behavior": [
+        "hidden"
+       ]
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json/scene/1/cameras/4",
+       "type": "Annotation",
+       "motivation": [
+        "painting"
+       ],
+       "body": {
+        "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json/scene/1/cameras/4/body",
+        "type": "PerspectiveCamera",
+        "lookAt": {
+         "type": "PointSelector",
+         "x": 0,
+         "y": 2,
+         "z": 0
+        }
+       },
+       "target": {
+        "type": "SpecificResource",
+        "source": {
+         "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json/scene/1",
+         "type": "Scene"
+        },
+        "selector": [
+         {
+          "type": "PointSelector",
+          "x": -3,
+          "y": 2.5,
+          "z": -6
+         }
+        ]
+       },
+       "behavior": [
+        "hidden"
+       ]
+      }
+     ]
+    }
+   ],
+   "annotations": [
+    {
+     "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json/scene/1/notes",
+     "type": "AnnotationPage",
+     "items": [
+      {
+       "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json/scene/1/steps/91",
+       "type": "Annotation",
+       "motivation": [
+        "commenting"
+       ],
+       "body": {
+        "type": "TextualBody",
+        "value": "手袋",
+        "format": "text/html",
+        "language": "ja"
+       },
+       "target": {
+        "type": "SpecificResource",
+        "source": {
+         "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json/scene/1",
+         "type": "Scene"
+        },
+        "selector": [
+         {
+          "type": "PointSelector",
+          "x": 1.075,
+          "y": 1.894,
+          "z": 0.204
+         }
+        ]
+       },
+       "scope": [
+        {
+         "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json/scene/1/cameras/2",
+         "type": "Annotation"
+        }
+       ]
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json/scene/1/steps/92",
+       "type": "Annotation",
+       "motivation": [
+        "commenting"
+       ],
+       "body": {
+        "type": "TextualBody",
+        "value": "胸（視点なし）",
+        "format": "text/html",
+        "language": "ja"
+       },
+       "target": {
+        "type": "SpecificResource",
+        "source": {
+         "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json/scene/1",
+         "type": "Scene"
+        },
+        "selector": [
+         {
+          "type": "PointSelector",
+          "x": 0.0,
+          "y": 2.6,
+          "z": 0.4
+         }
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json/scene/1/tour",
+     "type": "AnnotationPage",
+     "behavior": [
+      "sequence"
+     ],
+     "items": [
+      {
+       "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json/scene/1/steps/1",
+       "type": "Annotation",
+       "motivation": [
+        "describing"
+       ],
+       "body": {
+        "type": "TextualBody",
+        "value": "<h2>宇宙服の全体</h2><p>正面から全体を見ます。</p>",
+        "format": "text/html",
+        "language": "ja"
+       },
+       "target": {
+        "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json/scene/1",
+        "type": "Scene"
+       },
+       "scope": [
+        {
+         "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json/scene/1/cameras/1",
+         "type": "Annotation"
+        }
+       ]
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json/scene/1/steps/2",
+       "type": "Annotation",
+       "motivation": [
+        "describing"
+       ],
+       "body": {
+        "type": "TextualBody",
+        "value": "<h2>手袋</h2><p>右手の手袋に寄ります。</p>",
+        "format": "text/html",
+        "language": "ja"
+       },
+       "target": {
+        "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json/scene/1",
+        "type": "Scene"
+       },
+       "scope": [
+        {
+         "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json/scene/1/cameras/2",
+         "type": "Annotation"
+        }
+       ]
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json/scene/1/steps/3",
+       "type": "Annotation",
+       "motivation": [
+        "describing"
+       ],
+       "body": {
+        "type": "TextualBody",
+        "value": "<h2>ヘルメット</h2><p>ヘルメットに寄ります。</p>",
+        "format": "text/html",
+        "language": "ja"
+       },
+       "target": {
+        "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json/scene/1",
+        "type": "Scene"
+       },
+       "scope": [
+        {
+         "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json/scene/1/cameras/3",
+         "type": "Annotation"
+        }
+       ]
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json/scene/1/steps/4",
+       "type": "Annotation",
+       "motivation": [
+        "describing"
+       ],
+       "body": {
+        "type": "TextualBody",
+        "value": "<h2>背中</h2><p>後ろへ回り込みます。</p>",
+        "format": "text/html",
+        "language": "ja"
+       },
+       "target": {
+        "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json/scene/1",
+        "type": "Scene"
+       },
+       "scope": [
+        {
+         "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json/scene/1/cameras/4",
+         "type": "Annotation"
+        }
+       ]
+      },
+      {
+       "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json/scene/1/steps/5",
+       "type": "Annotation",
+       "motivation": [
+        "describing"
+       ],
+       "body": {
+        "type": "TextualBody",
+        "value": "<p>視点を変えない段です。ここから自由に動かしてください。</p>",
+        "format": "text/html",
+        "language": "ja"
+       },
+       "target": {
+        "id": "https://kasane.ldas.jp/manifests/sample-manifest-story-3d.json/scene/1",
+        "type": "Scene"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

@@ -14,6 +14,7 @@
     "pause": "Pause",
     "caption": "Show the text over the picture",
     "close": "Close the text",
-    "strip": "The whole scroll (click to go to a scene)"
+    "strip": "The whole scroll (click to go to a scene)",
+    "article": "Article"
   }
 }

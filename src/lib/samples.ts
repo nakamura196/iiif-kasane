@@ -35,6 +35,24 @@ export const SAMPLES: Sample[] = [
     manifest: withBasePath('/manifests/sample-manifest-viewpoints.json'),
   },
   {
+    id: 'spacesuit-story', media: '3d',
+    title: { ja: '宇宙服の 3D ツアー', en: '3D tour of a spacesuit' },
+    note: {
+      ja: 'IIIF 3D 作業部会の例の宇宙服に、隠した視点（Camera）と順に進む注釈の頁（behavior: sequence）でツアーを書いた検証用の例。「次へ」で視点が全体・手袋・ヘルメット・背中と移ります。段の本文は仮のものです',
+      en: 'A test of a tour on the spacesuit from the IIIF 3D TSG examples, written with hidden Cameras and an annotation page with behavior "sequence". "Next" moves the view through the whole suit, the glove, the helmet and the back. The step texts are placeholders',
+    },
+    manifest: withBasePath('/manifests/sample-manifest-story-3d.json'), tab: 'story',
+  },
+  {
+    id: 'smithsonian-triceratops', media: '3d',
+    title: { ja: 'スミソニアンのトリケラトプス（Voyager のツアー）', en: 'Smithsonian Triceratops (Voyager tour)' },
+    note: {
+      ja: 'スミソニアン（国立自然史博物館）の Voyager のシーンを、scripts/svx-to-iiif.mjs で IIIF に変換した例。8 段のツアーと 9 件の注釈が、視点ごと移ります。模型はスミソニアンの配信元から直接読みます（CC0）',
+      en: 'A Smithsonian Voyager scene (National Museum of Natural History) converted to IIIF with scripts/svx-to-iiif.mjs. The 8-step tour and 9 annotations keep their viewpoints. The model is loaded straight from the Smithsonian (CC0)',
+    },
+    manifest: withBasePath('/manifests/si-triceratops.json'), tab: 'story',
+  },
+  {
     id: 'video-transcript', media: 'video',
     title: { ja: '動画と時刻つき文字起こし', en: 'Video with timed transcript' },
     note: {

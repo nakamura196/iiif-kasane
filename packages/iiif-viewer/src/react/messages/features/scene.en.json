@@ -1,6 +1,7 @@
 {
   "Viewer": {
     "sceneNotLoaded": "This item is a 3D model. The 3D display is not loaded on this site.",
-    "sceneNotLoadedHint": "For the site's developers: add import 'iiif-kasane/scene' to show it."
+    "sceneNotLoadedHint": "For the site's developers: add import 'iiif-kasane/scene' to show it.",
+    "zoomToNote": "Zoom to this note"
   }
 }
