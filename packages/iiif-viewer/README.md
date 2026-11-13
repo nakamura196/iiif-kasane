@@ -156,7 +156,11 @@ import 'iiif-kasane/style.css';
   the viewer's parts use.
 - It takes the same `iiifContent`, `locale`, `theme`, `target`, `onSelect` and `environment` as `Viewer`.
 - `useViewer()` gives your own components the state (`manifest`, `containers`, `container`,
-  `selectedIndex`, `select(index)`). It throws outside a provider; `useOptionalViewer()` returns null there.
+  `selectedIndex`, `select(index)`, and `shownUrl`). It throws outside a provider; `useOptionalViewer()` returns null there.
+- `shownUrl` is the URL of the manifest shown now. It is the same as `iiifContent` until the reader
+  opens an entry of a Collection; then it is that entry's URL. Use it for links to what the reader sees.
+  `iiifContent` keeps the URL you passed in. Custom displays get both as `DisplayProps.iiifContent`
+  and `DisplayProps.shownUrl`.
 - Each provider has its own state, so several on one page do not interfere.
 
 ### Styles and the host page
