@@ -33,6 +33,7 @@ import { annotationsAtom, selectedAnnotationIdAtom } from '../atoms';
 import { fmt } from '../displays/TranscriptPanel';
 import { navRequestAtom, nextSeq } from '../displays/structureState';
 import { useLocale, useTranslations } from '../env';
+import { CopyButton } from '../common/CopyButton';
 import { inferenceResultsAtom } from '../inference/state';
 import { localAnnotationPagesAtom, selectedCanvasAnnotationAtom, type LocalAnnotationPage } from '../overlays/canvasAnnotationState';
 import { fetchPage } from '../overlays/useCanvasAnnotations';
@@ -214,7 +215,6 @@ export function ContentSearchPanelBody(ctx: PanelContext) {
   const scope: Scope = !service ? 'local' : !localOk ? 'service' : wantedScope;
   const [text, setText] = useState(() => current?.q ?? urlQuery());
   const [limit, setLimit] = useState(LIST_STEP);
-  const [copied, setCopied] = useState(false);
   const abort = useRef<AbortController | null>(null);
   const terms = useAutocomplete(scope === 'service' ? service : undefined, text, locale);
 
@@ -369,20 +369,13 @@ export function ContentSearchPanelBody(ctx: PanelContext) {
     setSelected(null);
   };
 
-  const copyLink = async () => {
-    if (!current) return;
+  const linkUrl = (): string => {
     const u = new URL(window.location.href);
     u.searchParams.set('tab', contentSearchPanel.id);
-    u.searchParams.set('q', current.q);
-    if (current.scope === 'local') u.searchParams.set('scope', 'local');
+    u.searchParams.set('q', current?.q ?? '');
+    if (current?.scope === 'local') u.searchParams.set('scope', 'local');
     else u.searchParams.delete('scope');
-    try {
-      await navigator.clipboard.writeText(u.toString());
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // Do nothing where the clipboard is unavailable
-    }
+    return u.toString();
   };
 
   if (!service && !localOk) return null;
@@ -480,9 +473,7 @@ export function ContentSearchPanelBody(ctx: PanelContext) {
                   {t('showOnImage')}
                 </label>
               ) : null}
-              <button type="button" className={BUTTON} onClick={copyLink}>
-                {copied ? t('copied') : t('copyLink')}
-              </button>
+              <CopyButton text={linkUrl}>{t('copyLink')}</CopyButton>
               <button type="button" className={BUTTON} onClick={clear}>
                 {t('clear')}
               </button>

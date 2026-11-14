@@ -15,6 +15,7 @@ import {
 } from '../../core';
 import { manifestAtom } from '../atoms';
 import { useTranslations, type Translator } from '../env';
+import { CopyButton } from '../common/CopyButton';
 import { baseImageLayerOf, sourceImageUrl } from '../inference/sourceImage';
 import type { Panel, PanelContext } from './types';
 
@@ -122,45 +123,6 @@ const useElapsed = (startedAt: number, finishedAt: number | null) => {
   }, [finishedAt, startedAt]);
   return (finishedAt ?? Math.max(now, startedAt)) - startedAt;
 };
-
-// 共有のリンクをコピーする。書き込めない（権限が無い・古いブラウザ）ときは、リンクを欄に出して自分で選べるようにする
-function CopyLinkButton({ url, t }: { url: string; t: Translator }) {
-  const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
-  useEffect(() => {
-    if (state !== 'copied') return;
-    const id = window.setTimeout(() => setState('idle'), 2000);
-    return () => window.clearTimeout(id);
-  }, [state]);
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(url);
-      setState('copied');
-    } catch {
-      setState('failed');
-    }
-  };
-  return (
-    <>
-      <button type="button" className={`${BUTTON} border-gray-500 text-white hover:bg-gray-800`} onClick={copy}>
-        {state === 'copied' ? t('copied') : t('copyLink')}
-      </button>
-      {state === 'failed' && (
-        <input
-          readOnly
-          value={url}
-          aria-label={t('copyFailed')}
-          title={t('copyFailed')}
-          onFocus={(e) => e.currentTarget.select()}
-          autoFocus
-          className="w-64 max-w-full rounded border border-gray-500 bg-black/40 px-1.5 py-0.5 text-xs text-white"
-        />
-      )}
-      <span className="sr-only" aria-live="polite">
-        {state === 'copied' ? t('copied') : ''}
-      </span>
-    </>
-  );
-}
 
 interface Picture {
   url: string;
@@ -366,7 +328,11 @@ function PuzzleDialog({
           <input type="checkbox" checked={showSample} onChange={(e) => setShowSample(e.target.checked)} />
           {t('sample')}
         </label>
-        {shareUrl && <CopyLinkButton url={shareUrl} t={t} />}
+        {shareUrl && (
+          <CopyButton text={shareUrl} className={`${BUTTON} border-gray-500 text-white hover:bg-gray-800`}>
+            {t('copyLink')}
+          </CopyButton>
+        )}
         <button type="button" className={PRIMARY} onClick={onClose} autoFocus>
           {t('close')}
         </button>

@@ -10,14 +10,15 @@
     "includeTime": "いまの時刻を含める（{time} 秒）",
     "jsonLabel": "Content State（JSON）",
     "encodedLabel": "Content State（符号化、base64url）",
-    "copy": "コピー",
-    "copied": "コピーしました",
     "copyJson": "Content State の JSON をコピー",
     "copyEncoded": "符号化した Content State をコピー",
     "viewerLink": "このビューアへのリンク",
     "copyViewerLink": "このビューアへのリンクをコピー",
     "dragLabel": "ドラッグして渡す",
     "dragIcon": "IIIF リンク",
-    "dragHint": "このリンクをほかの IIIF ビューアに落とすと、同じ場所を開きます。"
+    "dragHint": "このリンクをほかの IIIF ビューアに落とすと、同じ場所を開きます。",
+    "updateRegion": "範囲を更新",
+    "includeTimeNow": "いまの時刻を含める",
+    "updateTime": "いまの時刻にする"
   }
 }

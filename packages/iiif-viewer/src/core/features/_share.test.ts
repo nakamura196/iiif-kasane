@@ -4,6 +4,7 @@ import type { ContainerInfo } from '../services/containers';
 import {
   buildContentState,
   contentStateJson,
+  absoluteManifestUrl,
   dragLink,
   encodeShareState,
   shareFragment,
@@ -33,8 +34,9 @@ describe('buildContentState', () => {
       manifestUrl: MANIFEST,
       canvasId: CANVAS,
       region: { x: 10.4, y: 20, w: 300.6, h: 40 },
-    }) as { target: { id: string } };
-    expect(s.target.id).toBe(`${CANVAS}#xywh=10,20,301,40`);
+    }) as { target: { source: { id: string }; selector: { value: string } } };
+    expect(s.target.source.id).toBe(CANVAS);
+    expect(s.target.selector.value).toBe('xywh=10,20,301,40');
     expect(shareFragment(undefined, 12.345)).toBe('t=12.35');
   });
 
@@ -43,10 +45,15 @@ describe('buildContentState', () => {
     expect(s.target).toEqual({ id: MANIFEST, type: 'Manifest' });
   });
 
-  it('ignores an empty area and a bad time; strips a fragment already on the Canvas id', () => {
+  it('ignores an empty area and a bad time', () => {
     expect(shareFragment({ x: 0, y: 0, w: 0, h: 5 }, -1)).toBe('');
-    const s = buildContentState({ manifestUrl: MANIFEST, canvasId: `${CANVAS}#xywh=1,1,1,1` }) as { target: { id: string } };
-    expect(s.target.id).toBe(CANVAS);
+  });
+
+  it('uses the container type as the target type', () => {
+    for (const type of ['Scene', 'Timeline']) {
+      const s = buildContentState({ manifestUrl: MANIFEST, canvasId: CANVAS, canvasType: type }) as { target: { type: string } };
+      expect(s.target.type).toBe(type);
+    }
   });
 });
 
@@ -74,6 +81,35 @@ describe('round trip through Kasane reader', () => {
     const canvasId = 'https://example.org/資料/canvas/1';
     const state = parseContentState(enc({ manifestUrl: 'https://example.org/資料/m', canvasId }));
     expect(state?.targets[0].canvasId).toBe(canvasId);
+  });
+
+  it('keeps a Canvas id that contains # (with and without an area)', () => {
+    const hashed = 'https://example.org/iiif/m1/manifest#p2';
+    const list = [{ id: 'https://example.org/iiif/m1/manifest#p1' }, { id: hashed }] as unknown as ContainerInfo[];
+    for (const region of [undefined, { x: 5, y: 6, w: 7, h: 8 }]) {
+      const state = parseContentState(enc({ manifestUrl: MANIFEST, canvasId: hashed, region }));
+      const hit = matchTarget(state!.targets, list);
+      expect(hit?.index).toBe(1);
+      expect(hit?.xywh).toEqual(region ? [5, 6, 7, 8] : undefined);
+      const dropped = parseDroppedText(dragLink(MANIFEST, enc({ manifestUrl: MANIFEST, canvasId: hashed, region })));
+      expect(matchTarget(dropped!.targets, list)?.index).toBe(1);
+    }
+  });
+
+  it('uses the Timeline type and a time on a Timeline Canvas', () => {
+    const state = parseContentState(enc({ manifestUrl: MANIFEST, canvasId: CANVAS, canvasType: 'Timeline', time: 4 }));
+    expect(matchTarget(state!.targets, containers)).toMatchObject({ index: 1, t: [4, undefined] });
+  });
+
+  it('encodes the spec way: base64url of the percent-encoded JSON, with non-ASCII and %-ids', () => {
+    const canvasId = 'https://example.org/資料/canvas/100%25/1';
+    const json = contentStateJson({ manifestUrl: 'https://example.org/資料/m', canvasId });
+    const encoded = encodeShareState(json);
+    const b64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
+    const text = atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4));
+    expect(text).toBe(encodeURIComponent(json));
+    expect(decodeURIComponent(text)).toBe(json);
+    expect(parseContentState(encoded)?.targets[0].canvasId).toBe(canvasId);
   });
 
   it('uses no characters outside base64url', () => {
@@ -107,8 +143,31 @@ describe('viewerLinkWith', () => {
     expect(u.searchParams.get('tab')).toBe('share');
   });
 
-  it('is null without iiif-content or with a bad URL', () => {
-    expect(viewerLinkWith('https://example.org/page?manifest=x', 'ENC')).toBeNull();
+  it('replaces manifest= and curation= (and pos=) too', () => {
+    const a = new URL(viewerLinkWith('https://kasane.ldas.jp/ja/viewer?manifest=https%3A%2F%2Fe.org%2Fm&tab=share', 'ENC')!);
+    expect(a.searchParams.get('iiif-content')).toBe('ENC');
+    expect(a.searchParams.has('manifest')).toBe(false);
+    expect(a.searchParams.get('tab')).toBe('share');
+    const b = new URL(viewerLinkWith('https://kasane.ldas.jp/ja/viewer?curation=x&pos=3', 'ENC')!);
+    expect([...b.searchParams.keys()].sort()).toEqual(['iiif-content']);
+  });
+
+  it('is null without any item argument or with a bad URL', () => {
+    expect(viewerLinkWith('https://example.org/page?tab=share', 'ENC')).toBeNull();
     expect(viewerLinkWith('not a url', 'ENC')).toBeNull();
+  });
+});
+
+describe('absoluteManifestUrl', () => {
+  it('resolves a site-relative URL against the page', () => {
+    expect(absoluteManifestUrl('/manifests/a.json', 'https://kasane.ldas.jp/ja/viewer/')).toBe(
+      'https://kasane.ldas.jp/manifests/a.json',
+    );
+  });
+
+  it('refuses blob:, data: and unresolvable URLs', () => {
+    expect(absoluteManifestUrl('blob:https://kasane.ldas.jp/1234', 'https://kasane.ldas.jp/')).toBeNull();
+    expect(absoluteManifestUrl('data:application/json,{}', 'https://kasane.ldas.jp/')).toBeNull();
+    expect(absoluteManifestUrl('/manifests/a.json')).toBeNull();
   });
 });

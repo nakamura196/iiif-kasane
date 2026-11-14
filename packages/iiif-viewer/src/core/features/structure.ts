@@ -163,9 +163,15 @@ export interface CanvasTarget extends Fragment {
 //  - "canvasId#xywh=..." （文字列）
 //  - { id, type: "Canvas" } （id に断片が付くこともある）
 //  - { type: "SpecificResource", source: "canvasId" | { id }, selector: PointSelector | FragmentSelector }
+// A '#' that does not start a media fragment (xywh, t) belongs to the id: Canvas ids such as `.../manifest#p1` exist.
+function splitCanvasId(id: string): { id: string; fragment: Fragment } {
+  const split = splitId(id);
+  return id.includes('#') && Object.keys(split.fragment).length === 0 ? { id, fragment: {} } : split;
+}
+
 function canvasTargetOf(value: unknown): CanvasTarget | null {
   if (typeof value === 'string') {
-    const { id, fragment } = splitId(value);
+    const { id, fragment } = splitCanvasId(value);
     return id ? { canvasId: id, ...fragment } : null;
   }
   if (!isObject(value)) return null;
@@ -190,7 +196,7 @@ function canvasTargetOf(value: unknown): CanvasTarget | null {
   if (typeof value.type === 'string' && value.type !== 'Canvas' && value.type !== 'Scene' && value.type !== 'Timeline') {
     return null;
   }
-  const { id: canvasId, fragment } = splitId(id);
+  const { id: canvasId, fragment } = splitCanvasId(id);
   return { canvasId, ...fragment };
 }
 

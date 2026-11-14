@@ -64,7 +64,9 @@ test('builds a content state for the shown page and a link that opens it again',
 
   // The visible area is read from the image
   await page.getByLabel('Include visible area').check();
-  await expect(json).toHaveValue(/#xywh=\d+,\d+,\d+,\d+/);
+  await expect(json).toHaveValue(/"value": "xywh=\d+,\d+,\d+,\d+"/);
+  await expect(json).toHaveValue(new RegExp(`"id": "${BASE}/canvas/p2"`));
+  await expect(page.getByRole('button', { name: 'Update area' })).toBeVisible();
 
   // The drag link follows the IIIF drag-and-drop convention
   const href = await page.getByTestId('share-drag').getAttribute('href');
@@ -80,9 +82,13 @@ test('builds a content state for the shown page and a link that opens it again',
   await expect(page.getByLabel('Content State (JSON)')).toHaveValue(new RegExp(`"id": "${BASE}/canvas/p2"`));
 });
 
-test('has no viewer link when the page URL has no iiif-content', async ({ page }) => {
+test('a page opened with manifest= gets a viewer link that uses iiif-content instead', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await serve(page);
   await page.goto(`/en/viewer/?manifest=${encodeURIComponent(`${BASE}/manifest`)}&tab=share`);
   await expect(page.getByLabel('Content State (JSON)')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Copy the link to this viewer' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Copy the link to this viewer' }).click();
+  const u = new URL(await page.evaluate(() => navigator.clipboard.readText()));
+  expect(u.searchParams.has('manifest')).toBe(false);
+  expect(u.searchParams.get('iiif-content')).toMatch(/^[A-Za-z0-9_-]+$/);
 });

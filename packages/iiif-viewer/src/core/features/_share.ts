@@ -5,10 +5,12 @@
 import type { ImageRegion } from './image';
 
 export interface ShareInput {
-  /** URL of the manifest that is shown (not a Collection). */
+  /** Absolute URL of the manifest that is shown (not a Collection). */
   manifestUrl: string;
   /** The Canvas to point at. Without it the content state points at the manifest only. */
   canvasId?: string;
+  /** The type of the target: "Canvas" (default), "Scene" or "Timeline". */
+  canvasType?: string;
   /** The area of the Canvas (Canvas coordinates). Needs `canvasId`. */
   region?: ImageRegion;
   /** The time in seconds (audio and video). Needs `canvasId`. */
@@ -16,18 +18,14 @@ export interface ShareInput {
 }
 
 const CONTEXT = 'http://iiif.io/api/presentation/3/context.json';
-
-const stripFragment = (id: string): string => {
-  const hash = id.indexOf('#');
-  return hash < 0 ? id : id.slice(0, hash);
-};
+const MEDIA_FRAGMENTS = 'http://www.w3.org/TR/media-frags/';
 
 const round = (n: number, digits = 0): number => {
   const k = 10 ** digits;
   return Math.round(n * k) / k;
 };
 
-/** The `#...` fragment (without `#`) for an area and/or a time, or '' when there is neither. */
+/** The fragment (without `#`) for an area and/or a time, or '' when there is neither. */
 export function shareFragment(region?: ImageRegion, time?: number): string {
   const parts: string[] = [];
   if (region && [region.x, region.y, region.w, region.h].every(Number.isFinite) && region.w > 0 && region.h > 0) {
@@ -37,16 +35,24 @@ export function shareFragment(region?: ImageRegion, time?: number): string {
   return parts.join('&');
 }
 
-/** The content state as an object: an Annotation (motivation contentState) whose target is the Canvas. */
+/**
+ * The content state as an object: an Annotation (motivation contentState) whose target is the Canvas.
+ * An area or a time is a SpecificResource with a FragmentSelector, so a Canvas id that itself contains '#' stays whole.
+ */
 export function buildContentState(input: ShareInput): Record<string, unknown> {
   const manifest = { id: input.manifestUrl, type: 'Manifest' };
-  const target = input.canvasId
-    ? (() => {
-        const fragment = shareFragment(input.region, input.time);
-        const id = stripFragment(input.canvasId);
-        return { id: fragment ? `${id}#${fragment}` : id, type: 'Canvas', partOf: [manifest] };
-      })()
-    : manifest;
+  let target: Record<string, unknown> = manifest;
+  if (input.canvasId) {
+    const canvas = { id: input.canvasId, type: input.canvasType ?? 'Canvas', partOf: [manifest] };
+    const fragment = shareFragment(input.region, input.time);
+    target = fragment
+      ? {
+          type: 'SpecificResource',
+          source: canvas,
+          selector: { type: 'FragmentSelector', conformsTo: MEDIA_FRAGMENTS, value: fragment },
+        }
+      : canvas;
+  }
   return { '@context': CONTEXT, type: 'Annotation', motivation: ['contentState'], target };
 }
 
@@ -55,18 +61,30 @@ export function contentStateJson(input: ShareInput): string {
   return JSON.stringify(buildContentState(input), null, 2);
 }
 
-/** base64url (no padding) of the UTF-8 bytes, as the Content State spec says. */
+// TODO: share with contentState.ts once #356 lands (its toBase64Url is not exported; encodeContentState builds only a Manifest target)
+/**
+ * The encoded form, the way the Content State spec says: encodeURIComponent, then base64url without padding.
+ * Kasane's reader accepts this and the plain UTF-8 form.
+ */
 export function encodeShareState(json: string): string {
-  const bytes = new TextEncoder().encode(json);
-  let bin = '';
-  bytes.forEach((b) => (bin += String.fromCharCode(b)));
-  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return btoa(encodeURIComponent(json)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+/** The manifest URL as an absolute URL (a site-relative one is resolved against `base`); null when it is not http(s). */
+export function absoluteManifestUrl(url: string, base?: string): string | null {
+  try {
+    const u = new URL(url, base);
+    return u.protocol === 'http:' || u.protocol === 'https:' ? u.href : null;
+  } catch {
+    // a relative URL and no base: not resolvable here
+    return null;
+  }
 }
 
 /**
- * The page URL with `iiif-content` replaced by the encoded content state. A `canvas=` argument would
- * contradict the page the state points at, so it is dropped. Returns null when the URL has no `iiif-content`
- * (an embed on another site), since there is no viewer link to build.
+ * The page URL with `iiif-content` set to the encoded content state. The arguments that named the item another
+ * way (`manifest`, `curation`, `pos`) and `canvas`, which would contradict the state, are dropped.
+ * Returns null when the URL names no item at all (an embed on another site), since there is no viewer link to build.
  */
 export function viewerLinkWith(pageUrl: string, encoded: string): string | null {
   let url: URL;
@@ -75,9 +93,10 @@ export function viewerLinkWith(pageUrl: string, encoded: string): string | null 
   } catch {
     return null;
   }
-  if (!url.searchParams.has('iiif-content')) return null;
-  url.searchParams.set('iiif-content', encoded);
-  url.searchParams.delete('canvas');
+  const p = url.searchParams;
+  if (!p.has('iiif-content') && !p.has('manifest') && !p.has('curation')) return null;
+  p.set('iiif-content', encoded);
+  for (const key of ['manifest', 'curation', 'pos', 'canvas']) p.delete(key);
   return url.toString();
 }
 
