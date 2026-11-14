@@ -170,6 +170,8 @@ export [type] type ViewerLocale = 'ja' | 'en';
 export [type] type ViewerMessages = Record<string, Record<string, string>>;
 export [type] interface ViewerProps {
     iiifContent: string;
+    collection?: ViewerProviderProps['collection'];
+    onShownChange?: ViewerProviderProps['onShownChange'];
     locale?: 'ja' | 'en';
     theme?: 'light' | 'dark' | 'auto';
     tab?: InfoTab;
@@ -187,6 +189,8 @@ export [type] interface ViewerProps {
 export [value] ViewerProvider: (props: ViewerProviderProps) => Element
 export [type] interface ViewerProviderProps {
     iiifContent: string;
+    collection?: string[];
+    onShownChange?: (shown: ViewerShown) => void;
     locale?: 'ja' | 'en';
     theme?: 'light' | 'dark' | 'auto';
     target?: ViewerTarget;
@@ -198,6 +202,11 @@ export [type] interface ViewerProviderProps {
 export [type] interface ViewerSelection {
     canvasId: string;
     index: number;
+}
+export [type] interface ViewerShown {
+    url: string;
+    collections: string[];
+    origin: ShownOrigin;
 }
 export [type] interface ViewerState {
     iiifContent: string;
@@ -249,7 +258,7 @@ export [value] useAuthStates: (probes: (AuthProbeRef | undefined)[], locale: str
 export [value] useCanvasImages: (iiifContent: null | string, canvasId: string | undefined) => CanvasImages | undefined
 export [value] useCompareSources: (urls: string[], locale: string) => Found & { ready: boolean; }
 export [value] useLocale: () => string
-export [value] useManifest: (iiifContent: null | string) => { failed: boolean; }
+export [value] useManifest: (iiifContent: null | string, collection?: string[] | undefined) => { failed: boolean; }
 export [value] useOptionalViewer: () => ViewerState | null
 export [value] useSceneEnvironment: () => string | undefined
 export [value] useTheme: () => { resolvedTheme: ResolvedTheme; }

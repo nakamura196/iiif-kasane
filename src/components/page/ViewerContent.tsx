@@ -6,7 +6,7 @@ import { useAtom } from 'jotai';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useTheme } from 'next-themes';
-import { Viewer, manifestUrlAtom, type InfoTab, type ViewerTarget } from 'iiif-kasane';
+import { Viewer, manifestUrlAtom, type InfoTab, type ViewerShown, type ViewerTarget } from 'iiif-kasane';
 // Also show 3D Scenes (three.js and the rest load only when a 3D item is opened)
 import 'iiif-kasane/scene';
 import ManifestInput from '@/components/Input';
@@ -96,11 +96,34 @@ const ViewerContent: NextPage = () => {
     [router, setManifestUrl, tl],
   );
   // Read when the page opens, and when a link on the entry screen changes the item in the URL
+  // The Collections walked through to reach the item (?collection=, top first), kept with the item they belong to
+  // so that no render pairs a new item with the old Collections (that would read the item again)
+  const [collections, setCollections] = useState<{ of: string | null; urls: string[] }>({ of: null, urls: [] });
   const readUrl = useCallback(
-    (manifestParam: string | null) => {
-      if (manifestParam) setManifestUrl(manifestParam);
+    (manifestParam: string | null, collectionParams: string[] = []) => {
+      if (!manifestParam) return;
+      setManifestUrl(manifestParam);
+      setCollections({ of: manifestParam, urls: collectionParams });
     },
     [setManifestUrl],
+  );
+  const collection = collections.of === manifestUrl ? collections.urls : undefined;
+
+  // The reader opened an entry of a Collection, or went back: write where that is into the address bar, so that
+  // the link opens it (and the browser's Back returns to the place before). The arguments of the item left
+  // (canvas, pos, puzzle, ...) are dropped; only the tab stays. The viewer takes the new URL over without reading again.
+  const handleShownChange = useCallback(
+    (shown: ViewerShown) => {
+      if (shown.origin === 'content') return;
+      const params = new URLSearchParams();
+      params.set('iiif-content', shown.url);
+      for (const c of shown.collections) params.append('collection', c);
+      const tab = new URLSearchParams(window.location.search).get('tab');
+      if (tab) params.set('tab', tab);
+      const next = `?${params.toString()}`;
+      if (next !== window.location.search) router.push(next);
+    },
+    [router],
   );
 
   // the Canvas ids of the item in the URL, read only for a puzzle link (?puzzle=)
@@ -210,6 +233,8 @@ const ViewerContent: NextPage = () => {
         {manifestUrl ? (
           <Viewer
             iiifContent={manifestUrl}
+            collection={collection}
+            onShownChange={handleShownChange}
             locale={locale === 'en' ? 'en' : 'ja'}
             theme={resolvedTheme === 'dark' ? 'dark' : 'light'}
             tab={tab}
@@ -229,7 +254,7 @@ const ViewerContent: NextPage = () => {
             {/* The entry screen: centered when there is room, else the page scrolls. Up to 768px wide, close to the top page */}
             <div className="m-auto w-full max-w-3xl">
               <ManifestInput
-                onSubmit={(url: string) => setManifestUrl(url)}
+                onSubmit={(url: string) => readUrl(url)}
                 onOpenFile={(files) => void openFiles(files)}
                 fileError={fileError}
                 fileStatus={fileStatus}
