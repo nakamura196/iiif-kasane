@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   probeServiceOf,
   substituteLayer,
@@ -138,13 +138,13 @@ export default function ImageLayerView({
   // The tiles wait until the base image has come (or failed). Servers on HTTP/1.1 take 6 requests at a
   // time, so a hundred tiles asked together hold the base image back and the picture shows late.
   const [baseSettled, setBaseSettled] = useState(false);
-  // The base image as asked last that failed, and the last one that came. A failed <img> shows the
-  // browser's broken-image icon until the tiles cover it, so it is hidden; before any base image has
-  // come there is nothing to show either.
+  // The base image that failed last. A failed <img> shows the browser's broken-image icon until the
+  // tiles cover it, so it is hidden. (Only on failure: a slow base image is still drawn as it comes.)
   const [brokenBase, setBrokenBase] = useState<string | null>(null);
-  const [loadedBase, setLoadedBase] = useState<string | null>(null);
   // base tiles of a level 0 service (see `level0BaseTiles`) that failed, by key
   const [failedBaseTiles, setFailedBaseTiles] = useState<ReadonlySet<string>>(() => new Set());
+  // the same, at once (several tiles can fail before the next render)
+  const failedBaseRef = useRef(new Set<string>());
   // tiles that have come (or failed), by key
   const [settledTiles, setSettledTiles] = useState<ReadonlySet<string>>(() => new Set());
   const settleTile = (key: string) => setSettledTiles((s) => (s.has(key) ? s : new Set(s).add(key)));
@@ -279,7 +279,11 @@ export default function ImageLayerView({
       const mx = visible.x + visible.w / 2;
       const my = visible.y + visible.h / 2;
       const away = (t: { x: number; y: number; w: number; h: number }) => Math.hypot(t.x + t.w / 2 - mx, t.y + t.h / 2 - my);
-      tiles = tilesForView(service, info, scheme, screenPerSource, visible).sort((a, b) => away(a) - away(b));
+      // the base tiles already draw the coarsest level: no second <img> of the same file
+      const drawn = new Set(baseTiles?.map((tile) => tile.url));
+      tiles = tilesForView(service, info, scheme, screenPerSource, visible)
+        .filter((tile) => !drawn.has(tile.url))
+        .sort((a, b) => away(a) - away(b));
     }
   }
 
@@ -314,7 +318,12 @@ export default function ImageLayerView({
               }}
               onError={() => {
                 settleTile(key);
-                setFailedBaseTiles((s) => (s.has(key) ? s : new Set(s).add(key)));
+                const failed = failedBaseRef.current;
+                if (failed.has(key)) return;
+                failed.add(key);
+                setFailedBaseTiles(new Set(failed));
+                // the last of the base tiles failed: the image cannot be read (told once, as for the base image)
+                if (baseTileKeys.every((k) => failed.has(k))) onFailed?.();
               }}
             />
           );
@@ -327,9 +336,8 @@ export default function ImageLayerView({
         draggable={false}
         fetchPriority="high"
         className="absolute inset-0 w-full h-full"
-        style={brokenBase === baseSrc || loadedBase === null ? { visibility: 'hidden' } : undefined}
+        style={brokenBase === baseSrc ? { visibility: 'hidden' } : undefined}
         onLoad={() => {
-          setLoadedBase(baseSrc);
           setBaseSettled(true);
           onLoaded?.();
         }}
@@ -368,21 +376,9 @@ export default function ImageLayerView({
           }}
         />
       ))}
-      {baseTiles && baseTileKeys.every((k) => failedBaseTiles.has(k)) && onFailed && (
-        // none of the base tiles came: the image cannot be read
-        <TellFailed keys={baseTileKeys.join(' ')} onFailed={onFailed} />
-      )}
       {onTilesPending && <TellCount count={pending} onChange={onTilesPending} />}
     </div>
   );
-}
-
-/** Tells the parent once (per set of `keys`) that the image could not be read. */
-function TellFailed({ keys, onFailed }: { keys: string; onFailed: () => void }) {
-  useEffect(() => {
-    onFailed();
-  }, [keys, onFailed]);
-  return null;
 }
 
 /** Tells the parent a count after each change, and 0 when it goes away. */

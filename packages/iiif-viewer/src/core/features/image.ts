@@ -637,8 +637,8 @@ export const pickScaleFactor = (scaleFactors: number[], screenPxPerSourcePx: num
 const tileCountOf = (info: ImageInfo, scheme: { width: number; height: number }, scaleFactor: number, visible: ImageRegion): number => {
   const spanW = scheme.width * scaleFactor;
   const spanH = scheme.height * scaleFactor;
-  const cols = Math.min(Math.ceil(info.width / spanW) - 1, Math.floor((visible.x + visible.w) / spanW)) - Math.max(0, Math.floor(visible.x / spanW)) + 1;
-  const rows = Math.min(Math.ceil(info.height / spanH) - 1, Math.floor((visible.y + visible.h) / spanH)) - Math.max(0, Math.floor(visible.y / spanH)) + 1;
+  const cols = Math.min(Math.ceil(info.width / spanW) - 1, Math.ceil((visible.x + visible.w) / spanW) - 1) - Math.max(0, Math.floor(visible.x / spanW)) + 1;
+  const rows = Math.min(Math.ceil(info.height / spanH) - 1, Math.ceil((visible.y + visible.h) / spanH) - 1) - Math.max(0, Math.floor(visible.y / spanH)) + 1;
   return Math.max(0, cols) * Math.max(0, rows);
 };
 
@@ -702,8 +702,8 @@ export const tilesCovering = (
   const spanH = scheme.height * scaleFactor;
   const x0 = Math.max(0, Math.floor(visible.x / spanW));
   const y0 = Math.max(0, Math.floor(visible.y / spanH));
-  const x1 = Math.min(Math.ceil(info.width / spanW) - 1, Math.floor((visible.x + visible.w) / spanW));
-  const y1 = Math.min(Math.ceil(info.height / spanH) - 1, Math.floor((visible.y + visible.h) / spanH));
+  const x1 = Math.min(Math.ceil(info.width / spanW) - 1, Math.ceil((visible.x + visible.w) / spanW) - 1);
+  const y1 = Math.min(Math.ceil(info.height / spanH) - 1, Math.ceil((visible.y + visible.h) / spanH) - 1);
   const out: Tile[] = [];
   for (let ty = y0; ty <= y1; ty++) {
     for (let tx = x0; tx <= x1; tx++) {
@@ -713,13 +713,15 @@ export const tilesCovering = (
       const h = Math.min(spanH, info.height - y);
       if (w <= 0 || h <= 0) continue;
       const outW = Math.ceil(w / scaleFactor);
+      // Level 0 serves only the canonical size form, which in Image API 3 is `w,h` (2 uses `w,`)
+      const outH = info.level < 1 ? Math.ceil(h / scaleFactor) : undefined;
       out.push({
         key: `${keyPrefix}${scaleFactor}/${tx}/${ty}`,
         x,
         y,
         w,
         h,
-        url: imageRequestUrl(service, { x, y, w, h }, outW),
+        url: imageRequestUrl(service, { x, y, w, h }, outW, outH),
       });
       if (out.length >= limit) return out;
     }
@@ -746,18 +748,21 @@ export const singleImageUrl = (service: ImageServiceRef, info: ImageInfo, needed
  * The base image of a level 0 service that lists tiles but no sizes (a static tile store): the tiles of
  * its coarsest scale factor that cover `region`. Such a service has no small image of the whole, and the
  * whole image at full size can be megabytes. Null when the service has sizes, can cut regions itself, has
- * no tiles, or when more than `limit` tiles would be needed.
+ * no tiles, or when no tile or more than `limit` tiles would be needed (64 coarse tiles are still far less
+ * than the whole image at full size).
  */
-export const level0BaseTiles = (service: ImageServiceRef, info: ImageInfo, region: ImageRegion, limit = 16): Tile[] | null => {
+export const level0BaseTiles = (service: ImageServiceRef, info: ImageInfo, region: ImageRegion, limit = 64): Tile[] | null => {
   if (info.level >= 1 || info.sizes.length > 0 || info.tiles.length === 0) return null;
   const scheme = info.tiles[0];
   const coarsest = Math.max(...scheme.scaleFactors);
-  const spanW = scheme.width * coarsest;
-  const spanH = scheme.height * coarsest;
-  const across = Math.floor((region.x + region.w - 1) / spanW) - Math.floor(region.x / spanW) + 1;
-  const down = Math.floor((region.y + region.h - 1) / spanH) - Math.floor(region.y / spanH) + 1;
-  if (across * down > limit) return null;
-  return tilesCovering(service, info, scheme, coarsest, region, limit, 'base:');
+  // only the part inside the image (the manifest may give other bounds than the info.json)
+  const x = Math.max(0, region.x);
+  const y = Math.max(0, region.y);
+  const inside = { x, y, w: Math.min(info.width, region.x + region.w) - x, h: Math.min(info.height, region.y + region.h) - y };
+  if (inside.w <= 0 || inside.h <= 0) return null;
+  const count = tileCountOf(info, scheme, coarsest, inside);
+  if (count === 0 || count > limit) return null;
+  return tilesCovering(service, info, scheme, coarsest, inside, limit, 'base:');
 };
 
 /**

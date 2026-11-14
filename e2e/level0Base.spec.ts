@@ -78,7 +78,14 @@ for (const f of [1, 2, 4]) {
   }
 }
 
-async function serve(page: Page, profile: 'level0' | 'level1') {
+// a tile of scale factor 4 (a span of 2048 px, or the clipped edge of one)
+const isCoarsest = (path: string) => {
+  const [x, y, w] = path.split('/')[0].split(',').map(Number);
+  const size = Number(path.split('/')[1].replace(',', ''));
+  return x % 2048 === 0 && y % 2048 === 0 && Math.ceil(w / 4) === size;
+};
+
+async function serve(page: Page, profile: 'level0' | 'level1', { coarsest = true } = {}) {
   const service = `${BASE}/${profile}/front`;
   const asked: string[] = [];
   await page.route(`${BASE}/**`, (route) => {
@@ -92,7 +99,7 @@ async function serve(page: Page, profile: 'level0' | 'level1') {
       // base image (the whole image, by keyword or as pixels) fails
       const served =
         profile === 'level0'
-          ? tilePaths.has(path) || path === 'full/full/0/default.jpg'
+          ? (tilePaths.has(path) && (coarsest || !isCoarsest(path))) || path === 'full/full/0/default.jpg'
           : !path.startsWith('full/') && !path.startsWith(`0,0,${W},${H}/`);
       if (served) {
         return route.fulfill({ body: PNG, contentType: 'image/png', headers: cors });
@@ -150,5 +157,19 @@ test('a base image that fails while the tiles come is hidden, not shown as a bro
 
   await expect.poll(() => loadedTiles(page, service)).toBeGreaterThan(0);
   await page.waitForTimeout(1000);
+  expect(await broken(page)).toEqual([]);
+});
+
+test('when the coarsest tiles of a store are missing, the finer ones still draw and no error stays', async ({ page }) => {
+  await watchBroken(page);
+  const { service } = await serve(page, 'level0', { coarsest: false });
+  await page.goto(`/en/viewer/?iiif-content=${encodeURIComponent(`${BASE}/level0/manifest.json`)}`);
+
+  await expect.poll(() => loadedTiles(page, service)).toBeGreaterThan(0);
+  // the failure of the base tiles is cleared by the tiles that came, and is not told again on later renders
+  await page.mouse.move(640, 360);
+  await page.mouse.wheel(0, -200);
+  await page.waitForTimeout(1500);
+  await expect(page.getByText('Could not load the image')).toHaveCount(0);
   expect(await broken(page)).toEqual([]);
 });
