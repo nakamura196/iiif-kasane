@@ -3,7 +3,7 @@
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import '../style.css';
-import { collectionsFromParams, decodeContentState } from '../core';
+import { decodeContentState } from '../core';
 import { Viewer, type ViewerProps } from '../react/Viewer';
 // The tag shows every kind of item, 3D Scenes included.
 import '../react/scene';
@@ -98,7 +98,8 @@ export class IiifViewerElement extends HTMLElement {
       );
       return;
     }
-    const collection = collectionsFromParams(parseCollection(this.getAttribute('collection')));
+    // the raw values: the viewer decodes them (a content state gives its target) and drops those that are no address
+    const collection = parseCollection(this.getAttribute('collection'));
     const lang = this.getAttribute('locale') ?? document.documentElement.lang;
     const locale: ViewerProps['locale'] = lang.toLowerCase().startsWith('en') ? 'en' : 'ja';
     const themeAttr = this.getAttribute('theme');

@@ -29,7 +29,7 @@ import {
   type ShownOrigin,
 } from './atoms';
 import { useLocale } from './env';
-import { backFailedAtom, pickedPageAtom, resetViewState, sceneDisplayAtom, shownSeqAtom } from './internalState';
+import { backFailedAtom, pickedPageAtom, quietSeqAtom, resetViewState, sceneDisplayAtom, shownSeqAtom } from './internalState';
 import { useStableList } from './stableList';
 
 type Store = ReturnType<typeof createStore>;
@@ -169,7 +169,8 @@ export function showManifest(
   // shownSeqAtom only grows, also over a failed load that cleared what was shown
   const seq = Math.max(store.get(shownSeqAtom), store.get(shownManifestAtom)?.seq ?? 0) + 1;
   store.set(shownSeqAtom, seq);
-  store.set(shownManifestAtom, { url, raw, manifest, seq, origin, hasGeo, ...(quiet ? { quiet } : {}) });
+  store.set(shownManifestAtom, { url, raw, manifest, seq, origin, hasGeo });
+  if (quiet) store.set(quietSeqAtom, seq);
   store.set(manifestAtom, manifest);
   // the first Scene's notes and models go in with the manifest (no frame shows the new manifest with the old
   // one's models); a SceneDisplay then reads its own Scene
@@ -214,8 +215,8 @@ export const resolveContentUrl = (url: string): string => decodeContentState(url
  */
 export const pendingCollectionsAtom = atom<string[]>([]);
 
-/** A step of the trail that is a Collection (its served JSON says so). Else it is a Manifest. */
-const isCollectionStep = (item: { raw: unknown }): boolean => (item.raw as { type?: string } | null)?.type === 'Collection';
+/** A step of the trail that is a Collection (the converted object says so, as for IIIF 2 too). Else it is a Manifest. */
+const isCollectionStep = (item: { manifest: { type?: unknown } }): boolean => item.manifest.type === 'Collection';
 
 /**
  * The Collections of a location: the steps of the trail after the last Manifest (a Manifest never goes in the
@@ -223,7 +224,7 @@ const isCollectionStep = (item: { raw: unknown }): boolean => (item.raw as { typ
  * is on the trail, the Collections of a deep link still being read come first.
  */
 export function locationCollections(
-  items: readonly { url: string; raw: unknown }[],
+  items: readonly { url: string; manifest: { type?: unknown } }[],
   pending: readonly string[] = [],
 ): string[] {
   let cut = -1;
@@ -240,7 +241,7 @@ export const lastReportAtom = atom<{ seq: number; url: string; collections: stri
 /** Where a shown manifest is: its URL and the Collections of the trail (when the trail belongs to `owner`, the iiif-content). */
 export function shownLocation(
   shown: { url: string; origin: ShownOrigin },
-  trail: { owner: string | null; items: { url: string; raw: unknown }[] },
+  trail: { owner: string | null; items: { url: string; manifest: { type?: unknown } }[] },
   owner: string | null,
   pending: readonly string[] = [],
 ): ViewerShown {
@@ -300,30 +301,49 @@ const contentEpochAtom = atom<object | null>(null);
 
 /**
  * The Collections walked through to reach the manifest are read after the manifest was shown, and do not hold
- * it back: the trail gets them when they arrive. They are put in front of what the trail holds by then (the
- * reader may have moved on already), as long as no new iiif-content came meanwhile. Each gets the index of the
- * next step in it (so that Back lands on the entry that was opened). A Collection that cannot be read is left
- * out; one that cannot be parsed is dropped by goBack when Back reaches it.
+ * it back. Each goes on the trail when its own read settles, nearest first, so that the lineage stays unbroken
+ * (Back from the manifest always reaches its parent; the ones above follow as they arrive). They are put in
+ * front of what the trail holds by then (the reader may have moved on already), as long as no new iiif-content
+ * came meanwhile. A Collection that cannot be read is dropped together with the ones above it (they could not
+ * be reached from here), and no longer counts as part of the location. One that never answers stays pending
+ * (there is no timeout). Each gets the index of the next step in it (so that Back lands on the entry that was
+ * opened); one that cannot be parsed is dropped by goBack when Back reaches it.
  */
 function attachCollections(store: Store, url: string, collections: string[]): void {
   const epoch = store.get(contentEpochAtom);
   // what the last Collection lists: the iiif-content as given, or the manifest it stands for (a content state)
   const shownId = store.get(shownManifestAtom)?.manifest.id;
-  void Promise.all(collections.map((u) => readManifestSource(u))).then((read) => {
+  const results: (ManifestSource | null | undefined)[] = collections.map(() => undefined);
+  // the Collections from index `waiting` up are on the trail (or dropped); the ones below it are still pending
+  let waiting = collections.length;
+  const advance = () => {
     if (store.get(contentEpochAtom) !== epoch) return;
-    store.set(pendingCollectionsAtom, []);
-    const trail = store.get(trailAtom);
-    if (trail.owner !== store.get(manifestUrlAtom)) return;
-    const items: TrailItem[] = [];
-    collections.forEach((collectionUrl, i) => {
-      const entry = read[i];
-      if (!entry) return;
+    while (waiting > 0 && results[waiting - 1] !== undefined) {
+      const entry = results[waiting - 1];
+      const i = waiting - 1;
+      if (!entry) {
+        // not readable: this one and the ones above it are given up
+        waiting = 0;
+        break;
+      }
       const next = collections[i + 1];
       const at = (id: string | undefined) => (id ? containersOf(entry.manifest).findIndex((c) => c.id === id) : -1);
       const index = Math.max(0, next ? at(next) : Math.max(at(resolveContentUrl(url)), at(url), at(shownId)));
-      items.push({ url: collectionUrl, manifest: entry.manifest, raw: entry.raw, index });
+      const trail = store.get(trailAtom);
+      if (trail.owner !== store.get(manifestUrlAtom)) return;
+      store.set(trailAtom, {
+        owner: trail.owner,
+        items: [{ url: collections[i], manifest: entry.manifest, raw: entry.raw, index }, ...trail.items],
+      });
+      waiting = i;
+    }
+    store.set(pendingCollectionsAtom, collections.slice(0, waiting));
+  };
+  collections.forEach((u, i) => {
+    void readManifestSource(u).then((source) => {
+      results[i] = source;
+      advance();
     });
-    store.set(trailAtom, { owner: trail.owner, items: [...items, ...trail.items] });
   });
 }
 

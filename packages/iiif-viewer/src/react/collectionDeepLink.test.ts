@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createStore } from 'jotai';
 import { manifestUrlAtom, shownManifestAtom } from './atoms';
-import { pickedPageAtom } from './internalState';
+import { pickedPageAtom, quietSeqAtom } from './internalState';
 import { collectionsFromParams, encodeContentState, sameUrlList } from '../core';
 import {
   cancelContentLoad,
@@ -37,6 +37,9 @@ const manifestJson = (id: string, pages = 3) => ({
     items: [],
   })),
 });
+
+const isQuiet = (store: ReturnType<typeof createStore>) =>
+  store.get(quietSeqAtom) === store.get(shownManifestAtom)?.seq;
 
 let run = 0;
 let top = '';
@@ -122,8 +125,9 @@ describe('loading a manifest with the Collections it was reached through', () =>
     delete served[sub];
     await expect(loadContent(store, m1, () => 'en', [top, sub])).resolves.toBe('shown');
     expect(store.get(shownManifestAtom)?.url).toBe(m1);
-    await settled(store, 1);
-    expect(trailUrls(store)).toEqual([top]);
+    // the nearest one is missing: the one above it could not be reached from here either
+    await vi.waitFor(() => expect(store.get(pendingCollectionsAtom)).toEqual([]));
+    expect(trailUrls(store)).toEqual([]);
   });
 
   it('fails when the manifest itself cannot be read', async () => {
@@ -253,9 +257,9 @@ describe('a manifest the host is not told about', () => {
     const store = createStore();
     await loadContent(store, top, () => 'en');
     await openManifest(store, m1, false, () => 'en', 'move');
-    expect(store.get(shownManifestAtom)?.quiet).toBe(true);
+    expect(isQuiet(store)).toBe(true);
     await openManifest(store, m1, true, () => 'en');
-    expect(store.get(shownManifestAtom)?.quiet).toBeUndefined();
+    expect(isQuiet(store)).toBe(false);
   });
 });
 
@@ -432,13 +436,13 @@ describe('round 3', () => {
     const store = createStore();
     await loadContent(store, top, () => 'en');
     await openManifest(store, m1, true, () => 'en');
-    expect(store.get(shownManifestAtom)?.quiet).toBeUndefined();
+    expect(isQuiet(store)).toBe(false);
     expect(takeOverContent(store, top, [])).toBe(true);
-    expect(store.get(shownManifestAtom)?.quiet).toBe(true);
+    expect(isQuiet(store)).toBe(true);
     // the viewer's own Back is not quiet
     await openManifest(store, m2, true, () => 'en');
     goBack(store, 'en');
-    expect(store.get(shownManifestAtom)?.quiet).toBeUndefined();
+    expect(isQuiet(store)).toBe(false);
   });
 
   it('compares lists of URLs element by element', () => {
@@ -532,7 +536,7 @@ describe('round 4', () => {
     store.set(trailAtom, { owner: trail.owner, items: [...trail.items, { url: brokenId, manifest: broken as never, raw: brokenRaw, index: 0 }] });
     expect(takeOverContent(store, brokenId, [top])).toBe(true);
     expect(store.get(shownManifestAtom)?.url).toBe(top);
-    expect(store.get(shownManifestAtom)?.quiet).toBeUndefined();
+    expect(isQuiet(store)).toBe(false);
   });
 
   it('no Collection stays pending when its load ends without attaching', async () => {
@@ -554,5 +558,83 @@ describe('round 4', () => {
     answer();
     await expect(load).resolves.toBe('stale');
     expect(store.get(pendingCollectionsAtom)).toEqual([]);
+  });
+});
+
+describe('round 5', () => {
+  it('reads a IIIF 2 Collection as a Collection (the converted object says so)', async () => {
+    const store = createStore();
+    const v2 = `https://example.org/deep${run}/v2top.json`;
+    served[v2] = {
+      '@context': 'http://iiif.io/api/presentation/2/context.json',
+      '@id': v2,
+      '@type': 'sc:Collection',
+      label: 'v2 top',
+      manifests: [{ '@id': m1, '@type': 'sc:Manifest', label: 'm1' }],
+    };
+    await loadContent(store, v2, () => 'en');
+    await openManifest(store, m1, true, () => 'en');
+    expect(shownLocation(store.get(shownManifestAtom)!, store.get(trailAtom), store.get(manifestUrlAtom))).toEqual({
+      url: m1,
+      collections: [v2],
+      origin: 'move',
+    });
+  });
+
+  describe('Collections attach as they settle', () => {
+    // fetch where each URL answers when released (ok: false for a failure)
+    const gates = (urls: string[]) => {
+      const open: Record<string, (ok: boolean) => void> = {};
+      const waits = Object.fromEntries(urls.map((u) => [u, new Promise<boolean>((r) => (open[u] = r))]));
+      vi.stubGlobal('fetch', async (target: string) => {
+        const ok = target in waits ? await waits[target] : target in served;
+        return { ok: ok && target in served, json: async () => served[target] } as unknown as Response;
+      });
+      return open;
+    };
+
+    it('the nearest one goes on the trail first, the one above follows; none waits for the other', async () => {
+      const store = createStore();
+      const gate = gates([top, sub]);
+      await loadContent(store, m1, () => 'en', [top, sub]);
+      gate[top](true);
+      await new Promise((r) => setTimeout(r, 20));
+      // the top one has settled but the one under it has not: nothing yet (the lineage would have a gap)
+      expect(trailUrls(store)).toEqual([]);
+      expect(store.get(pendingCollectionsAtom)).toEqual([top, sub]);
+      gate[sub](true);
+      await settled(store, 2);
+      expect(trailUrls(store)).toEqual([top, sub]);
+      expect(store.get(pendingCollectionsAtom)).toEqual([]);
+    });
+
+    it('the nearest one alone is attached while the one above hangs, which stays pending', async () => {
+      const store = createStore();
+      const gate = gates([top, sub]);
+      await loadContent(store, m1, () => 'en', [top, sub]);
+      gate[sub](true);
+      await settled(store, 1);
+      expect(trailUrls(store)).toEqual([sub]);
+      expect(store.get(pendingCollectionsAtom)).toEqual([top]);
+    });
+
+    it('a Collection that cannot be read is dropped with the ones above it, and no longer pending', async () => {
+      const store = createStore();
+      const gate = gates([top, sub]);
+      await loadContent(store, m1, () => 'en', [top, sub]);
+      gate[sub](false);
+      await vi.waitFor(() => expect(store.get(pendingCollectionsAtom)).toEqual([]));
+      expect(trailUrls(store)).toEqual([]);
+    });
+
+    it('one above that fails leaves the nearest ones on the trail', async () => {
+      const store = createStore();
+      const gate = gates([top, sub]);
+      await loadContent(store, m1, () => 'en', [top, sub]);
+      gate[sub](true);
+      gate[top](false);
+      await vi.waitFor(() => expect(store.get(pendingCollectionsAtom)).toEqual([]));
+      expect(trailUrls(store)).toEqual([sub]);
+    });
   });
 });

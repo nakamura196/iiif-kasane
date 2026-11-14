@@ -89,11 +89,6 @@ export interface ShownManifest {
   origin: ShownOrigin;
   /** A Canvas or Scene of the manifest has a geographic position (georeferencing, navPlace features). */
   hasGeo: boolean;
-  /**
-   * Internal: set for a manifest that `onShownChange` does not report (a dropped link: the host has no address to
-   * write for it; or the place the host asked for with the browser's Back, which it set itself). Optional, so a host that sets the value is unaffected.
-   */
-  quiet?: boolean;
 }
 export const shownManifestAtom = atom<ShownManifest | null>(null);
 

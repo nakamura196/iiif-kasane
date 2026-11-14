@@ -151,7 +151,6 @@ export [type] interface ShownManifest {
     seq: number;
     origin: ShownOrigin;
     hasGeo: boolean;
-    quiet?: boolean;
 }
 export [type] type ShownOrigin = 'content' | 'move' | 'back';
 export [value] SidePanel: (props: Props) => Element

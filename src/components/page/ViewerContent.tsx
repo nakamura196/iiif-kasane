@@ -118,14 +118,9 @@ const ViewerContent: NextPage = () => {
   // the link opens it (and the browser's Back returns to the place before). The arguments of the item left
   // (canvas, pos, puzzle, ...) are dropped; only the tab stays. The viewer takes the new URL over without reading again.
   const pushed = useRef(new PushedLocations());
-  const selfBack = useRef(false);
   useEffect(() => {
     // the browser's own Back / Forward: keep the list of entries in step (our own Back is counted already)
     const onPop = () => {
-      if (selfBack.current) {
-        selfBack.current = false;
-        return;
-      }
       pushed.current.browsed(window.location.search);
     };
     window.addEventListener('popstate', onPop);
@@ -147,8 +142,8 @@ const ViewerContent: NextPage = () => {
         // new entry; the browser's Back then continues from there). Else the current entry is replaced:
         // pushing would grow the history and the browser's Back would walk forward through the places just left.
         if (pushed.current.takeIfPrevious(next)) {
-          // the history's Back is on its way: its popstate is ours (cleared there), not the browser's button
-          selfBack.current = true;
+          // the history's Back is on its way: its popstate is ours (counted there), not the browser's button
+          pushed.current.expectOwnBack();
           router.back();
         } else router.replace(next);
         return;

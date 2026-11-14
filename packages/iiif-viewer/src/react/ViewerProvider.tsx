@@ -14,7 +14,7 @@ import {
 import { Provider, createStore, useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { containersOf, type ContainerInfo, type ManifestV4 } from '../core';
 import { manifestAtom, manifestUrlAtom, modelChoicesAtom, shownManifestAtom } from './atoms';
-import { backFailedAtom, pickedIndex, pickedPageAtom } from './internalState';
+import { backFailedAtom, pickedIndex, pickedPageAtom, quietSeqAtom } from './internalState';
 import { navRequestAtom, nextSeq, trailAtom } from './displays/structureState';
 import { ViewerEnv, type ResolvedTheme } from './env';
 import {
@@ -181,11 +181,12 @@ function ViewerStateRoot({
   const { failed } = useManifest(iiifContent, collection);
 
   // Report each manifest shown (a new seq) with the Collections it was reached through. A takeover (see
-  // useManifest) shows nothing new, or (the browser's Back) shows a manifest flagged quiet: it reports nothing.
+  // useManifest) shows nothing new, or (the browser's Back) shows a manifest flagged quiet (quietSeqAtom): it reports nothing.
   const trail = useAtomValue(trailAtom);
   const owner = useAtomValue(manifestUrlAtom);
   const pending = useAtomValue(pendingCollectionsAtom);
   const setLastReport = useSetAtom(lastReportAtom);
+  const quietSeq = useAtomValue(quietSeqAtom);
   const onShownChangeRef = useRef(onShownChange);
   const reportedSeq = useRef(0);
   useEffect(() => {
@@ -194,12 +195,12 @@ function ViewerStateRoot({
   useEffect(() => {
     if (!shown || shown.seq === reportedSeq.current) return;
     reportedSeq.current = shown.seq;
-    if (shown.quiet) return;
+    if (quietSeq === shown.seq) return;
     const location = shownLocation(shown, trail, owner, pending);
     // remembered: the host writes it into its address, and gives it back (a takeover matches it)
     setLastReport({ seq: shown.seq, url: location.url, collections: location.collections });
     onShownChangeRef.current?.(location);
-  }, [shown, trail, owner, pending, setLastReport]);
+  }, [shown, trail, owner, pending, setLastReport, quietSeq]);
 
   // The playback position of video and audio. The transcript (right panel) and the media display follow it.
   // A time given from outside (target.t) is applied when the player of that Canvas is attached.

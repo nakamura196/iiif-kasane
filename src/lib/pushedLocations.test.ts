@@ -43,4 +43,22 @@ describe('PushedLocations', () => {
     h.browsed('?iiif-content=elsewhere');
     expect(h.depth).toBe(0);
   });
+
+  it('counts the Backs the page asked for: two in a row are both its own', () => {
+    const h = new PushedLocations();
+    h.push(top);
+    h.push(sub);
+    h.takeIfPrevious(sub);
+    h.expectOwnBack();
+    h.takeIfPrevious(top);
+    h.expectOwnBack();
+    // two popstates come: neither is the browser's button, so the list is not cleared
+    h.browsed(sub);
+    h.browsed(top);
+    h.push(top);
+    expect(h.depth).toBe(1);
+    // the third is a real browser Back and does not match: forgotten
+    h.browsed('?iiif-content=elsewhere');
+    expect(h.depth).toBe(0);
+  });
 });

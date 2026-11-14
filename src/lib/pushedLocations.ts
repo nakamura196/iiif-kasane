@@ -16,6 +16,8 @@ export function locationKey(search: string): string {
 
 export class PushedLocations {
   private stack: string[] = [];
+  // Backs the page asked the history for itself whose popstate has not come yet (each popstate uses one)
+  private ownBacks = 0;
 
   /** The address `search` is left by a push: the entry before the new one. */
   push(search: string): void {
@@ -34,7 +36,16 @@ export class PushedLocations {
    * before, else the history is not known any more.
    */
   browsed(search: string): void {
+    if (this.ownBacks > 0) {
+      this.ownBacks -= 1;
+      return;
+    }
     if (!this.takeIfPrevious(search)) this.stack = [];
+  }
+
+  /** The page is about to call the history's Back itself: its popstate is not the browser's button. */
+  expectOwnBack(): void {
+    this.ownBacks += 1;
   }
 
   get depth(): number {
