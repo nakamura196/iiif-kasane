@@ -15,29 +15,29 @@ import {
 } from '../../core';
 import { manifestAtom } from '../atoms';
 import { useTranslations, type Translator } from '../env';
+import { BUTTON } from '../common/buttonClasses';
+import { CopyButton } from '../common/CopyButton';
 import { baseImageLayerOf, sourceImageUrl } from '../inference/sourceImage';
 import type { Panel, PanelContext } from './types';
 
-// 表示中の画像でジグソーパズル（マスを入れ替えて元の絵に戻す）。portal_pro の puzzle.html を移したもの。
-// 画像は 1 枚だけ取り、ピースは CSS の背景の位置で切り出す。画素は読まないので、
-// 画像のサーバが他所からの読み取り（CORS）を許していなくても遊べる。
+// A jigsaw puzzle of the shown image (swap squares to restore the picture). Moved from portal_pro's puzzle.html.
+// The image is fetched once and the pieces are cut out with the CSS background position. No pixels are read,
+// so it works even when the image server does not allow cross-origin reads (CORS).
 
-const BUTTON =
-  'px-2.5 py-1 rounded border border-gray-300 dark:border-gray-600 text-xs hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40 disabled:hover:bg-transparent';
 const PRIMARY =
   'px-2.5 py-1 rounded text-xs text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:hover:bg-blue-600';
 
 const SIZES = [3, 4, 5, 6, 8] as const;
-// 取り寄せる画像の長辺。盤面は画面に収まる大きさなので、これ以上は要らない
+// The long side of the image to fetch. The board fits the screen, so more is not needed
 const LONG_SIDE = 1600;
-// 盤面の外に取る余白（上の帯・下の操作の行）
+// The margin kept outside the board (the bar above and the row of controls below)
 const CHROME_HEIGHT = 190;
-// 揃ったときに降らせる紙吹雪の数と色
+// The number and the colours of the confetti that falls when the puzzle is solved
 const CONFETTI_COUNT = 90;
 const CONFETTI_COLORS = ['#facc15', '#f472b6', '#60a5fa', '#34d399', '#f97316', '#a78bfa', '#ffffff'];
 
-// 揃ったときの演出。新しい依存を足さず、CSS の動きだけで描く。
-// 動きを減らす設定（prefers-reduced-motion）のときは、光と紙吹雪を出さず、結果の表示だけにする
+// The celebration when solved. It adds no dependency and is drawn with CSS motion only.
+// With reduced motion (prefers-reduced-motion), the glow and confetti are left out and only the result is shown
 const CELEBRATION_CSS = `
 @keyframes kasane-puzzle-snap {
   0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(250, 204, 21, 0); }
@@ -100,10 +100,10 @@ const makeConfetti = (): Confetto[] =>
     round: Math.random() < 0.3,
   }));
 
-// 揃った瞬間の時刻と、そのとき降らせる紙吹雪（ピースを動かしたときにだけ呼ぶ）
+// The time of the moment it is solved, and the confetti that falls then (called only when a piece is moved)
 const finishRound = () => ({ at: Date.now(), confetti: makeConfetti() });
 
-/** 経過時間を m:ss（1 時間を超えたら h:mm:ss）にする。 */
+/** Formats the elapsed time as m:ss (h:mm:ss over an hour). */
 const formatElapsed = (ms: number) => {
   const total = Math.max(0, Math.floor(ms / 1000));
   const h = Math.floor(total / 3600);
@@ -112,7 +112,7 @@ const formatElapsed = (ms: number) => {
   return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`;
 };
 
-// 経過時間。揃った時刻（finishedAt）があれば、そこで止める
+// The elapsed time. Stops at the finish time (finishedAt) when there is one
 const useElapsed = (startedAt: number, finishedAt: number | null) => {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -122,45 +122,6 @@ const useElapsed = (startedAt: number, finishedAt: number | null) => {
   }, [finishedAt, startedAt]);
   return (finishedAt ?? Math.max(now, startedAt)) - startedAt;
 };
-
-// 共有のリンクをコピーする。書き込めない（権限が無い・古いブラウザ）ときは、リンクを欄に出して自分で選べるようにする
-function CopyLinkButton({ url, t }: { url: string; t: Translator }) {
-  const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
-  useEffect(() => {
-    if (state !== 'copied') return;
-    const id = window.setTimeout(() => setState('idle'), 2000);
-    return () => window.clearTimeout(id);
-  }, [state]);
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(url);
-      setState('copied');
-    } catch {
-      setState('failed');
-    }
-  };
-  return (
-    <>
-      <button type="button" className={`${BUTTON} border-gray-500 text-white hover:bg-gray-800`} onClick={copy}>
-        {state === 'copied' ? t('copied') : t('copyLink')}
-      </button>
-      {state === 'failed' && (
-        <input
-          readOnly
-          value={url}
-          aria-label={t('copyFailed')}
-          title={t('copyFailed')}
-          onFocus={(e) => e.currentTarget.select()}
-          autoFocus
-          className="w-64 max-w-full rounded border border-gray-500 bg-black/40 px-1.5 py-0.5 text-xs text-white"
-        />
-      )}
-      <span className="sr-only" aria-live="polite">
-        {state === 'copied' ? t('copied') : ''}
-      </span>
-    </>
-  );
-}
 
 interface Picture {
   url: string;
@@ -207,12 +168,12 @@ function PuzzleDialog({
   const [startedAt, setStartedAt] = useState(() => Date.now());
   const viewport = useViewport();
   const solved = isPuzzleSolved(board);
-  // 揃った時刻と、そのとき降らせる紙吹雪（揃うたびに新しく作る）
+  // The time it was solved and the confetti for it (made anew each time it is solved)
   const [finishedAt, setFinishedAt] = useState<number | null>(null);
   const [confetti, setConfetti] = useState<Confetto[]>([]);
   const elapsed = useElapsed(startedAt, finishedAt);
 
-  // 画面に収まる大きさの盤面（縦横比は画像のまま）
+  // A board that fits the screen (the aspect ratio of the image is kept)
   const aspect = picture.width / picture.height;
   const maxW = Math.max(120, viewport.w - 32);
   const maxH = Math.max(120, viewport.h - CHROME_HEIGHT);
@@ -251,7 +212,7 @@ function PuzzleDialog({
     setConfetti([]);
   };
 
-  // body の下に出すので、ビューアの色と、ビューアに限った見た目（iiif-viewer）をここにも付ける
+  // It is rendered under body, so the viewer's colours and the viewer-only styles (iiif-viewer) are applied here too
   return createPortal(
     <div className="iiif-viewer">
     <div
@@ -316,7 +277,7 @@ function PuzzleDialog({
                 style={{
                   backgroundImage: `url("${picture.url}")`,
                   backgroundSize: `${width}px ${height}px`,
-                  // 隙間の分だけずれないよう、マスの大きさではなく盤面に対する割合で位置を決める
+                  // Position by the share of the board, not the size of a square, so gaps do not shift it
                   backgroundPosition: `${size > 1 ? (col / (size - 1)) * 100 : 0}% ${size > 1 ? (row / (size - 1)) * 100 : 0}%`,
                 }}
               />
@@ -328,7 +289,7 @@ function PuzzleDialog({
           <img src={picture.url} alt="" className="pointer-events-none absolute inset-0 h-full w-full opacity-40" />
         )}
         {solved && (
-          // 光が絵の上を横切る。盤面の外にはみ出さないよう、この枠で切る
+          // The light sweeps across the picture. Clipped by this frame so it does not spill outside the board
           <div key={finishedAt ?? 0} className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
             <div className="kasane-puzzle-shine" />
           </div>
@@ -366,7 +327,16 @@ function PuzzleDialog({
           <input type="checkbox" checked={showSample} onChange={(e) => setShowSample(e.target.checked)} />
           {t('sample')}
         </label>
-        {shareUrl && <CopyLinkButton url={shareUrl} t={t} />}
+        {shareUrl && (
+          <CopyButton
+            text={shareUrl}
+            className={`${BUTTON} border-gray-500 text-white hover:bg-gray-800`}
+            inputClassName="w-64 max-w-full rounded border border-gray-500 bg-black/40 px-1.5 py-0.5 text-xs text-white"
+            failedLabel={t('copyFailed')}
+          >
+            {t('copyLink')}
+          </CopyButton>
+        )}
         <button type="button" className={PRIMARY} onClick={onClose} autoFocus>
           {t('close')}
         </button>
@@ -437,15 +407,15 @@ export function Puzzle({
     }
   };
 
-  // リンクから開いたとき: その Canvas で 1 回だけ始める（閉じたあとにまた開かないように）
+  // When opened from a link: start once on that Canvas (so it does not open again after being closed)
   const autoStarted = useRef<string | null>(null);
   useEffect(() => {
     if (autoStart === undefined || !container || !m || autoStarted.current === container.id) return;
     if (!SIZES.includes(autoStart as (typeof SIZES)[number])) return;
     autoStarted.current = container.id;
-    // 描画の途中で状態を変えないよう、次の機会に始める
+    // Start at the next chance so the state is not changed in the middle of drawing
     void Promise.resolve().then(() => start(container, autoStart));
-    // start は描くたびに作り直されるので、依存には入れない
+    // start is made anew on every draw, so it is not a dependency
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoStart, container, m]);
 

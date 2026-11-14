@@ -19,6 +19,7 @@ describe('PANELS', () => {
       'annotations',
       'inference',
       'puzzle',
+      'share',
     ]);
   });
 
