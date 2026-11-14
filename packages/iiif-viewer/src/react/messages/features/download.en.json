@@ -36,6 +36,9 @@
     "failedHttp": "The server answered with an error ({status}), so the file could not be saved here.",
     "failedAccess": "The server refused ({status}); the file may need a login or permission.",
     "failedNetwork": "The browser could not read the file here: the server may not allow it, or the network failed.",
-    "openFile": "Open the file in the browser"
+    "openFile": "Open the file in the browser",
+    "degraded": "Access to the full image is not granted yet, so this is the lower-quality copy the server shows in its place. The original is not offered here.",
+    "authLocked": "Access to this image is not granted yet, so nothing is offered for download. Allow access in the viewer first.",
+    "capped": "This image server lists no sizes and limits the size it serves, so only the image file as the manifest links it is offered."
   }
 }

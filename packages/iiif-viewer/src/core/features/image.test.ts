@@ -319,15 +319,6 @@ describe('tiles', () => {
     expect(imageRequestUrl({ id: 'u', version: 1 }, region, 1024)).toBe('u/0,0,40427,27112/1024,/0/native.jpg');
   });
 
-  it('imageRequestUrl: a size keyword asks for the largest; widths are unchanged', () => {
-    const region = { x: 1.4, y: 2, w: 30.6, h: 40 };
-    expect(imageRequestUrl({ id: 'u', version: 3 }, 'full', 'max')).toBe('u/full/max/0/default.jpg');
-    expect(imageRequestUrl({ id: 'u', version: 2 }, region, 'full')).toBe('u/1,2,31,40/full/0/default.jpg');
-    expect(imageRequestUrl({ id: 'u', version: 1 }, 'full', 'full')).toBe('u/full/full/0/native.jpg');
-    expect(imageRequestUrl({ id: 'u', version: 3 }, 'full', 500, 400)).toBe('u/full/500,400/0/default.jpg');
-    expect(imageRequestUrl({ id: 'u', version: 2 }, 'full', 500, 400)).toBe('u/full/500,/0/default.jpg');
-  });
-
   it('imageRequestUrl: v2 gets w, and v1 asks for native', () => {
     expect(imageRequestUrl({ id: 'u', version: 2 }, 'full', 100, 50)).toBe('u/full/100,/0/default.jpg');
     expect(imageRequestUrl({ id: 'u', version: 1 }, 'full', 100)).toBe('u/full/100,/0/native.jpg');

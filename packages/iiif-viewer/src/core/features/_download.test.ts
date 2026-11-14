@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   canCutRegion,
+  fetchCredentialsOf,
   downloadFileName,
   downloadSizesOf,
   extensionOf,
@@ -186,5 +187,40 @@ describe('file names', () => {
     expect(extensionOf('https://e.org/a', 'video/mp4')).toBe('mp4');
     expect(extensionOf('https://e.org/a/m.GLB?x=1')).toBe('glb');
     expect(extensionOf('https://e.org/a/full/max/0/default', undefined, 'jpg')).toBe('jpg');
+  });
+});
+
+describe('retryUrl: the whole image as pixels, for servers that refuse `full`', () => {
+  it('is given for the whole image at level 1 and up, and not for a region or level 0', () => {
+    const s = downloadSizesOf(v3, info({ version: 3 }), 'full');
+    expect(s[0].retryUrl).toBe('https://example.org/iiif/3/a/0,0,4000,3000/256,/0/default.jpg');
+    expect(s.at(-1)?.retryUrl).toBe('https://example.org/iiif/3/a/0,0,4000,3000/max/0/default.jpg');
+    expect(downloadSizesOf(v2, info(), 'full').at(-1)?.retryUrl).toBe('https://example.org/iiif/2/a/0,0,4000,3000/full/0/default.jpg');
+    const listed = downloadSizesOf(v2, info({ sizes: [{ width: 500, height: 375 }] }), 'full');
+    expect(listed[0].retryUrl).toBe('https://example.org/iiif/2/a/0,0,4000,3000/500,/0/default.jpg');
+    expect(downloadSizesOf(v2, info(), { x: 0, y: 0, w: 100, h: 100 }).every((x) => x.retryUrl === undefined)).toBe(true);
+    expect(downloadSizesOf(v2, info({ level: 0 }), 'full').every((x) => x.retryUrl === undefined)).toBe(true);
+  });
+});
+
+describe('fetchCredentialsOf', () => {
+  it('sends cookies only once an Auth 2.0 access service has let the reader in', () => {
+    expect(fetchCredentialsOf(undefined, true)).toBe('omit');
+    expect(fetchCredentialsOf({ access: [{}] }, true)).toBe('include');
+    expect(fetchCredentialsOf({ access: [{}] }, false)).toBe('omit');
+    expect(fetchCredentialsOf({ access: [] }, true)).toBe('omit');
+  });
+});
+
+describe('file name: cut by code points', () => {
+  it('does not split a character outside the BMP at the cut', () => {
+    const name = downloadFileName(`${'x'.repeat(59)}𠮷𠮷`, undefined, undefined, 'jpg');
+    expect(name).toBe(`${'x'.repeat(59)}𠮷.jpg`);
+    // a lone surrogate makes encodeURIComponent throw
+    expect(() => encodeURIComponent(name)).not.toThrow();
+  });
+  it('trims `_` and `.` the cut leaves at the end', () => {
+    expect(downloadFileName(`${'a'.repeat(59)}.bbb`, undefined, undefined, 'jpg')).toBe(`${'a'.repeat(59)}.jpg`);
+    expect(downloadFileName(`${'a'.repeat(58)} _bbb`, undefined, undefined, 'jpg')).toBe(`${'a'.repeat(58)}.jpg`);
   });
 });

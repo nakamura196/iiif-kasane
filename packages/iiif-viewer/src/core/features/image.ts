@@ -5,6 +5,7 @@
 // 元の（Presentation 3 のままの）Canvas から読む。
 // ここで読むのは「表示に要る情報」だけで、画面の組み立ては react/displays/ImageCanvasDisplay.tsx が行う。
 
+import { imageQuality, largestRequestUrl } from './_imageUrl';
 import { probeServiceOf, type AuthProbeRef, type AuthSubstitute } from './auth';
 
 type Json = Record<string, unknown>;
@@ -599,21 +600,17 @@ export interface Tile {
   url: string;
 }
 
-const quality = (version: 1 | 2 | 3) => (version === 1 ? 'native' : 'default');
+const quality = imageQuality;
 
-/**
- * `{id}/{region}/{size}/0/default.jpg` for a region of the source in source pixels. `outWidth` is a width, or a size
- * keyword: `max` (Image API 3) or `full` (before 3), which ask for the largest the server gives.
- */
+/** `{id}/{region}/{size}/0/default.jpg` for a region of the source in source pixels. */
 export const imageRequestUrl = (
   service: ImageServiceRef,
   region: ImageRegion | 'full',
-  outWidth: number | 'max' | 'full',
+  outWidth: number,
   outHeight?: number,
 ): string => {
   const r = region === 'full' ? 'full' : `${Math.round(region.x)},${Math.round(region.y)},${Math.round(region.w)},${Math.round(region.h)}`;
-  const size =
-    typeof outWidth === 'string' ? outWidth : service.version === 3 && outHeight ? `${outWidth},${outHeight}` : `${outWidth},`;
+  const size = service.version === 3 && outHeight ? `${outWidth},${outHeight}` : `${outWidth},`;
   return `${service.id}/${r}/${size}/0/${quality(service.version)}.jpg`;
 };
 
@@ -742,7 +739,7 @@ export const singleImageUrl = (service: ImageServiceRef, info: ImageInfo, needed
     if (info.level >= 1) return imageRequestUrl(service, 'full', Math.min(info.width, Math.max(neededWidth, 256)));
     // Level 0 promises only the whole image at its own size, by keyword: `full` in 1 and 2, `max` in 3.
     // A width (`full/3509,`) is a resize, which a static tile store does not have.
-    return `${service.id}/full/${service.version === 3 ? 'max' : 'full'}/0/${quality(service.version)}.jpg`;
+    return largestRequestUrl(service, 'full');
   }
   const pick = info.sizes.find((s) => s.width >= neededWidth) ?? info.sizes[info.sizes.length - 1];
   return imageRequestUrl(service, 'full', pick.width, pick.height);

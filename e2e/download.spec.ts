@@ -38,12 +38,12 @@ const manifestFor = (name: string) => ({
               type: 'Annotation',
               motivation: 'painting',
               body: {
-                id: `${BASE}/${name}/svc/full/max/0/default.jpg`,
+                id: name === 'capped' ? `${BASE}/capped/body.jpg` : `${BASE}/${name}/svc/full/max/0/default.jpg`,
                 type: 'Image',
                 format: 'image/jpeg',
                 width: W,
                 height: H,
-                service: [{ id: `${BASE}/${name}/svc`, type: 'ImageService3', profile: name === 'level0' ? 'level0' : 'level2' }],
+                service: [{ id: `${BASE}/${name}/svc`, type: 'ImageService3', profile: name === 'level2' ? 'level2' : 'level0' }],
               },
               target: `${BASE}/${name}/canvas`,
             },
@@ -59,15 +59,22 @@ const infoFor = (name: string) => ({
   id: `${BASE}/${name}/svc`,
   type: 'ImageService3',
   protocol: 'http://iiif.io/api/image',
-  profile: name === 'level0' ? 'level0' : 'level2',
+  profile: name === 'level2' ? 'level2' : 'level0',
   width: W,
   height: H,
   ...(name === 'level0' ? { tiles: [{ width: 512, scaleFactors: [1, 2, 4] }] } : {}),
+  ...(name === 'capped' ? { maxWidth: 1000 } : {}),
 });
 
-async function serve(page: Page, name: 'level2' | 'level0', { imageFails = false, imageStatus = 200 } = {}) {
+async function serve(
+  page: Page,
+  name: 'level2' | 'level0' | 'capped',
+  { imageFails = false, imageStatus = 200, refuseFull = false, blobFails = false } = {},
+) {
   const asked: string[] = [];
   const infoRequests: string[] = [];
+  // the body of the answer breaks half way: the page gets the headers, then an error while reading
+  if (blobFails) await page.addInitScript(() => { Response.prototype.blob = () => Promise.reject(new TypeError('network error')); });
   await page.route(`${BASE}/**`, (route) => {
     const url = route.request().url();
     if (url.endsWith('/manifest.json')) return route.fulfill({ json: manifestFor(name), headers: cors });
@@ -75,6 +82,8 @@ async function serve(page: Page, name: 'level2' | 'level0', { imageFails = false
       infoRequests.push(url);
       return route.fulfill({ json: infoFor(name), headers: cors });
     }
+    // a server that answers 403 to the keyword form of the whole image (the National Archives of Japan does)
+    if (refuseFull && /\/svc\/full\//.test(url)) return route.fulfill({ status: 403, body: 'x', headers: cors });
     asked.push(url.slice(`${BASE}/${name}/svc/`.length));
     // a failed request is what the page sees when the server does not allow reading from another origin
     if (imageFails) return route.abort();
@@ -154,4 +163,42 @@ test('a refusal (403) says a login or permission may be needed', async ({ page }
   await serve(page, 'level2', { imageStatus: 403 });
   await page.getByTestId('download-save').click();
   await expect(page.getByTestId('download-failed')).toContainText('refused (403)');
+});
+
+test('a body that breaks while it is read ends in the failure message, not a button stuck on Downloading', async ({ page }) => {
+  await serve(page, 'level2', { blobFails: true });
+  await page.getByTestId('download-save').click();
+  await expect(page.getByTestId('download-failed')).toContainText('could not read the file here');
+  await expect(page.getByTestId('download-save')).toBeEnabled();
+  await expect(page.getByTestId('download-save')).toHaveText('Download');
+});
+
+test('a server that refuses the keyword `full` is asked again with the whole image as pixels', async ({ page }) => {
+  await serve(page, 'level2', { refuseFull: true });
+  // the address shown is the keyword form; the retry is used when it is refused
+  expect(await url(page)).toBe(`${BASE}/level2/svc/full/max/0/default.jpg`);
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('download-save').click()]);
+  expect(download.suggestedFilename()).toBe('Postcard_full_4000x3000.jpg');
+});
+
+test('level 0 that lists no size and caps the size: the image file of the manifest, not an empty list', async ({ page }) => {
+  await serve(page, 'capped');
+  await expect(page.getByText('lists no sizes and limits the size')).toBeVisible();
+  await expect(page.getByRole('radio', { name: /× .* px/ })).toHaveCount(0);
+  expect(await url(page)).toBe(`${BASE}/capped/body.jpg`);
+});
+
+const MOCK = 'http://localhost:3839';
+
+test('Auth 2.0: nothing of the protected image is offered until access is granted, then it downloads with the cookie', async ({ page }) => {
+  await page.goto(`/en/viewer/?iiif-content=${encodeURIComponent(`${MOCK}/manifest.json`)}&tab=download`);
+  await expect(page.getByText('Access to this image is not granted yet')).toBeVisible();
+  await expect(page.getByTestId('download-save')).toHaveCount(0);
+
+  // the session cookie of an earlier visit
+  await page.goto(`${MOCK}/login-do`);
+  await page.goto(`/en/viewer/?iiif-content=${encodeURIComponent(`${MOCK}/manifest.json`)}&tab=download`);
+  await expect(page.getByRole('radio', { name: /Largest|px/ }).first()).toBeVisible();
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('download-save').click()]);
+  expect(download.suggestedFilename()).toMatch(/\.jpg$/);
 });

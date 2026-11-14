@@ -8,6 +8,7 @@
 // - level 0 and no `sizes` (a static tile store): only the whole image at full size, by keyword. No region, no resize.
 // An image without a service is the file itself.
 import { imageRequestUrl, type ImageInfo, type ImageLayer, type ImageRegion, type ImageServiceRef } from './image';
+import { largestRequestUrl } from './_imageUrl';
 import { imageRegionOfBox } from './inference/region';
 
 /** The whole image, or a rectangle of it in pixels of the image (not of the Canvas). */
@@ -20,6 +21,11 @@ export interface DownloadSize {
   height: number;
   url: string;
   max: boolean;
+  /**
+   * The same image asked with the whole image given as pixels (`0,0,W,H`) instead of the keyword `full`, for servers
+   * that refuse `full` (the National Archives of Japan answers 403): the display asks again this way too. Level 1 and up.
+   */
+  retryUrl?: string;
 }
 
 /** Long sides tried when the service lists no sizes (only those below the long side of the region are used). */
@@ -64,8 +70,8 @@ export const visibleDownloadRegion = (
 export const regionSize = (region: DownloadRegion, info: Pick<ImageInfo, 'width' | 'height'>): { width: number; height: number } =>
   region === 'full' ? { width: info.width, height: info.height } : { width: region.w, height: region.h };
 
-/** The keyword for "the largest the server gives": `max` in Image API 3, `full` before. */
-const maxKeyword = (service: ImageServiceRef) => (service.version === 3 ? 'max' : 'full');
+/** The whole image as a pixel region (what a server that refuses the keyword `full` accepts). */
+const wholeRegion = (info: Pick<ImageInfo, 'width' | 'height'>): ImageRegion => ({ x: 0, y: 0, w: info.width, h: info.height });
 
 /**
  * The sizes to offer for `region`, smallest first, the largest last (id `max`). Empty when the server cannot serve
@@ -79,19 +85,24 @@ export const downloadSizesOf = (service: ImageServiceRef, info: ImageInfo, regio
   const max = limitedSize(rw, rh, info);
   const out: DownloadSize[] = [];
 
-  const push = (width: number, height: number, url: string) => {
+  const push = (width: number, height: number, url: string, retryUrl?: string) => {
     if (width >= max.width || out.some((s) => s.width === width)) return;
-    out.push({ id: String(width), width, height, url, max: false });
+    out.push({ id: String(width), width, height, url, max: false, ...(retryUrl ? { retryUrl } : {}) });
   };
   if (region === 'full' && info.sizes.length > 0) {
-    for (const s of info.sizes) push(s.width, s.height, imageRequestUrl(service, 'full', s.width, s.height));
+    for (const s of info.sizes) push(s.width, s.height, imageRequestUrl(service, 'full', s.width, s.height), imageRequestUrl(service, wholeRegion(info), s.width, s.height));
   } else {
     const long = Math.max(rw, rh);
     for (const side of COMPUTED_LONG_SIDES) {
       if (side >= long) break;
       const k = side / long;
       const small = limitedSize(Math.max(1, Math.round(rw * k)), Math.max(1, Math.round(rh * k)), info);
-      push(small.width, small.height, imageRequestUrl(service, region, small.width));
+      push(
+        small.width,
+        small.height,
+        imageRequestUrl(service, region, small.width),
+        region === 'full' ? imageRequestUrl(service, wholeRegion(info), small.width) : undefined,
+      );
     }
   }
   out.sort((a, b) => a.width - b.width);
@@ -99,8 +110,8 @@ export const downloadSizesOf = (service: ImageServiceRef, info: ImageInfo, regio
   // The largest the server gives: the keyword when nothing cuts it, else its size as pixels (a level 1 or 2 server
   // takes any width)
   const limited = max.width !== rw || max.height !== rh;
-  const url = service.version === 3 || !limited ? imageRequestUrl(service, region, maxKeyword(service)) : imageRequestUrl(service, region, max.width);
-  out.push({ id: 'max', width: max.width, height: max.height, url, max: true });
+  const asked = (r: DownloadRegion | ImageRegion) => (service.version === 3 || !limited ? largestRequestUrl(service, r) : imageRequestUrl(service, r, max.width));
+  out.push({ id: 'max', width: max.width, height: max.height, url: asked(region), max: true, ...(region === 'full' ? { retryUrl: asked(wholeRegion(info)) } : {}) });
   return out;
 };
 
@@ -116,7 +127,7 @@ const level0SizesOf = (service: ImageServiceRef, info: ImageInfo): DownloadSize[
   const allowed = limitedSize(info.width, info.height, info);
   // The full size is the listed one when the server lists it; else the keyword, if no limit cuts it
   if (!full && allowed.width === info.width && allowed.height === info.height) {
-    out.push({ id: 'max', width: info.width, height: info.height, url: imageRequestUrl(service, 'full', maxKeyword(service)), max: true });
+    out.push({ id: 'max', width: info.width, height: info.height, url: largestRequestUrl(service, 'full'), max: true });
   } else if (out.length > 0) {
     out[out.length - 1] = { ...out[out.length - 1], id: 'max', max: true };
   }
@@ -133,7 +144,8 @@ export const downloadFileName = (
   size: { width: number; height: number } | undefined,
   ext: string,
 ): string => {
-  const slug = label.normalize('NFKC').replace(UNSAFE, '_').replace(/^[_.]+|[_.]+$/g, '').slice(0, 60) || 'image';
+  // Cut by code points (a character outside the BMP, like 𠮷, is two UTF-16 units), then trim what the cut left at the ends
+  const slug = Array.from(label.normalize('NFKC').replace(UNSAFE, '_')).slice(0, 60).join('').replace(/^[_.]+|[_.]+$/g, '') || 'image';
   const parts = [slug];
   if (region) parts.push(region === 'full' ? 'full' : `region-${Math.round(region.x)}-${Math.round(region.y)}-${Math.round(region.w)}-${Math.round(region.h)}`);
   if (size) parts.push(`${Math.round(size.width)}x${Math.round(size.height)}`);
@@ -166,3 +178,10 @@ export const extensionOf = (url: string, format?: string, fallback = 'bin'): str
   const m = /\.([a-z0-9]{2,5})$/i.exec(path.slice(path.lastIndexOf('/') + 1));
   return m ? m[1].toLowerCase() : fallback;
 };
+
+/**
+ * Whether the file is fetched with the reader's cookies. Only for an image the Auth 2.0 access service let in (its cookie
+ * decides), and cross-origin that needs a server that allows credentials; everything else goes without cookies.
+ */
+export const fetchCredentialsOf = (probe: { access: unknown[] } | undefined, allowed: boolean): 'include' | 'omit' =>
+  probe && probe.access.length > 0 && allowed ? 'include' : 'omit';
