@@ -1,0 +1,38 @@
+{
+  "Info": {
+    "download": "Download"
+  },
+  "Download": {
+    "hint": "Save the image or media of the page you are viewing.",
+    "layer": "Image",
+    "layerN": "Image {n}",
+    "area": "Area",
+    "whole": "Whole image",
+    "visible": "Visible area",
+    "reread": "Use the area on screen now",
+    "areaPixels": "{w} × {h} px of the image",
+    "viewMissed": "The area on screen does not overlap the image. Move or zoom the image and try again.",
+    "noCrop": "This image server cannot cut out an area, so only the whole image can be saved.",
+    "plainOnly": "This image is cropped or turned in the manifest, so the file as the manifest links it is offered.",
+    "size": "Size",
+    "sizeMax": "Largest",
+    "sizeOption": "{w} × {h} px",
+    "loadingInfo": "Checking what the image server offers…",
+    "infoFailed": "Could not read the image server's information, so only the image file as the manifest links it is offered.",
+    "imageFile": "Image file",
+    "mediaFile": "Media file",
+    "video": "Video",
+    "audio": "Audio",
+    "model": "3D model",
+    "save": "Download",
+    "saving": "Downloading…",
+    "saved": "Saved as {name}.",
+    "openedInTab": "The browser could not fetch the file here (the server may not allow it, or may need a login), so it was opened in a new tab. Save it from there.",
+    "url": "Address",
+    "copy": "Copy",
+    "copied": "Copied",
+    "copyFailed": "Could not copy. Select the address and copy it by hand.",
+    "rights": "Rights",
+    "nothing": "Nothing to download on this page."
+  }
+}

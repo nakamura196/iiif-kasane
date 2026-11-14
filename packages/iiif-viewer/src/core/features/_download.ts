@@ -1,0 +1,157 @@
+// Underscore name: not in the generated list of core/features, so it is not part of the package's public API.
+// download: what the Download tab offers for an image, and the Image API URLs for it (no React, no DOM).
+//
+// An image with an Image API service can be fetched whole or by region, at several sizes. What is offered depends on
+// what the server can serve, so that no URL is offered that would answer 404:
+// - `sizes` listed: those sizes (a level 0 service serves nothing else except the whole image at full size).
+// - no `sizes`, level 1 or 2: a few computed sizes, never above maxWidth / maxHeight / maxArea.
+// - level 0 and no `sizes` (a static tile store): only the whole image at full size, by keyword. No region, no resize.
+// An image without a service is the file itself.
+import { imageRequestUrl, type ImageInfo, type ImageLayer, type ImageRegion, type ImageServiceRef } from './image';
+import { imageRegionOfBox } from './inference/region';
+
+/** The whole image, or a rectangle of it in pixels of the image (not of the Canvas). */
+export type DownloadRegion = 'full' | ImageRegion;
+
+export interface DownloadSize {
+  /** `max` for the largest the server gives, else the width (unique in a list). */
+  id: string;
+  width: number;
+  height: number;
+  url: string;
+  max: boolean;
+}
+
+/** Long sides tried when the service lists no sizes (only those below the long side of the region are used). */
+export const COMPUTED_LONG_SIDES = [256, 512, 1024, 2048, 4096] as const;
+
+const quality = (version: 1 | 2 | 3) => (version === 1 ? 'native' : 'default');
+
+const regionParam = (region: DownloadRegion): string =>
+  region === 'full' ? 'full' : `${Math.round(region.x)},${Math.round(region.y)},${Math.round(region.w)},${Math.round(region.h)}`;
+
+/** Whether the layer is the plain image of its service (not cropped, turned or mirrored by the manifest). */
+export const isPlainLayer = (layer: Pick<ImageLayer, 'regionSpec' | 'rotation' | 'mirror'>): boolean =>
+  (!layer.regionSpec || layer.regionSpec === 'full') && layer.rotation % 360 === 0 && !layer.mirror;
+
+/** Whether the server can cut a region (level 1 and up). A level 0 service serves whole images only. */
+export const canCutRegion = (info: ImageInfo): boolean => info.level >= 1;
+
+/** Shrinks `width` x `height` to the limits of the server (keeping the shape); unchanged when it fits. */
+export const limitedSize = (width: number, height: number, info: Pick<ImageInfo, 'maxWidth' | 'maxHeight' | 'maxArea'>): { width: number; height: number } => {
+  let k = 1;
+  if (info.maxWidth) k = Math.min(k, info.maxWidth / width);
+  if (info.maxHeight) k = Math.min(k, info.maxHeight / height);
+  if (info.maxArea) k = Math.min(k, Math.sqrt(info.maxArea / (width * height)));
+  if (k >= 1) return { width, height };
+  return { width: Math.max(1, Math.floor(width * k)), height: Math.max(1, Math.floor(height * k)) };
+};
+
+/**
+ * The part of the image under `box` (Canvas coordinates) as a region of the image in its own pixels, clamped to the
+ * image. `target` is where the image sits on the Canvas (the whole Canvas when absent). 'full' when the box takes in
+ * the whole image; null when it misses the image or the Canvas has no size.
+ */
+export const visibleDownloadRegion = (
+  box: ImageRegion,
+  layer: Pick<ImageLayer, 'target'>,
+  canvas: { width?: number; height?: number },
+  info: Pick<ImageInfo, 'width' | 'height'>,
+): DownloadRegion | null => {
+  const target = layer.target ?? (canvas.width && canvas.height ? { x: 0, y: 0, w: canvas.width, h: canvas.height } : undefined);
+  if (!target || !(target.w > 0) || !(target.h > 0)) return null;
+  const r = imageRegionOfBox(box, target, info.width, info.height);
+  if (!r) return null;
+  return r.x === 0 && r.y === 0 && r.w === info.width && r.h === info.height ? 'full' : r;
+};
+
+/** The pixel size of a region (the whole image when 'full'). */
+export const regionSize = (region: DownloadRegion, info: Pick<ImageInfo, 'width' | 'height'>): { width: number; height: number } =>
+  region === 'full' ? { width: info.width, height: info.height } : { width: region.w, height: region.h };
+
+/**
+ * The sizes to offer for `region`, smallest first, the largest last (id `max`). Empty when the server cannot serve
+ * the region (level 0 cannot cut). Every URL is one the service promises to serve.
+ */
+export const downloadSizesOf = (service: ImageServiceRef, info: ImageInfo, region: DownloadRegion): DownloadSize[] => {
+  if (region !== 'full' && !canCutRegion(info)) return [];
+  const full = regionSize(region, info);
+  const rw = Math.round(full.width);
+  const rh = Math.round(full.height);
+  const max = limitedSize(rw, rh, info);
+  const out: DownloadSize[] = [];
+
+  const push = (width: number, height: number, url: string) => {
+    if (width >= max.width || out.some((s) => s.width === width)) return;
+    out.push({ id: String(width), width, height, url, max: false });
+  };
+  if (region === 'full' && info.sizes.length > 0) {
+    // The listed sizes are the only ones a level 0 service has; at other levels they are the natural steps
+    for (const s of info.sizes) push(s.width, s.height, imageRequestUrl(service, 'full', s.width, s.height));
+  } else if (canCutRegion(info)) {
+    const long = Math.max(rw, rh);
+    for (const side of COMPUTED_LONG_SIDES) {
+      if (side >= long) break;
+      const k = side / long;
+      const width = Math.max(1, Math.round(rw * k));
+      const height = Math.max(1, Math.round(rh * k));
+      const small = limitedSize(width, height, info);
+      push(small.width, small.height, imageRequestUrl(service, region, small.width));
+    }
+  }
+  out.sort((a, b) => a.width - b.width);
+
+  // The largest the server gives. `max` is the keyword of Image API 3; before it `full` (no resize) is the whole size.
+  const r = regionParam(region);
+  const q = quality(service.version);
+  let url: string;
+  if (service.version === 3) url = `${service.id}/${r}/max/0/${q}.jpg`;
+  else if (max.width === rw && max.height === rh) url = `${service.id}/${r}/full/0/${q}.jpg`;
+  else url = imageRequestUrl(service, region, max.width);
+  out.push({ id: 'max', width: max.width, height: max.height, url, max: true });
+  return out;
+};
+
+/** Characters a file name cannot hold (or that make a shell or a browser trip), and runs of spaces. */
+const UNSAFE = /[\\/:*?"<>|\u0000-\u001f\s]+/g;
+
+/** `<label>_<region>_<width>x<height>.<ext>`; the label is cut to 60 characters. */
+export const downloadFileName = (
+  label: string,
+  region: DownloadRegion | undefined,
+  size: { width: number; height: number } | undefined,
+  ext: string,
+): string => {
+  const slug = label.normalize('NFKC').replace(UNSAFE, '_').replace(/^[_.]+|[_.]+$/g, '').slice(0, 60) || 'image';
+  const parts = [slug];
+  if (region) parts.push(region === 'full' ? 'full' : `region-${Math.round(region.x)}-${Math.round(region.y)}-${Math.round(region.w)}-${Math.round(region.h)}`);
+  if (size) parts.push(`${Math.round(size.width)}x${Math.round(size.height)}`);
+  return `${parts.join('_')}.${ext.replace(/^\./, '') || 'bin'}`;
+};
+
+const EXT_BY_TYPE: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+  'image/tiff': 'tif',
+  'image/jp2': 'jp2',
+  'image/svg+xml': 'svg',
+  'video/mp4': 'mp4',
+  'video/webm': 'webm',
+  'audio/mpeg': 'mp3',
+  'audio/mp4': 'm4a',
+  'audio/ogg': 'ogg',
+  'audio/wav': 'wav',
+  'model/gltf-binary': 'glb',
+  'model/gltf+json': 'gltf',
+};
+
+/** The file extension from a media type, else from the last part of the URL path, else `fallback`. */
+export const extensionOf = (url: string, format?: string, fallback = 'bin'): string => {
+  const byType = format ? EXT_BY_TYPE[format.split(';')[0].trim().toLowerCase()] : undefined;
+  if (byType) return byType;
+  const path = url.split(/[?#]/)[0];
+  const m = /\.([a-z0-9]{2,5})$/i.exec(path.slice(path.lastIndexOf('/') + 1));
+  return m ? m[1].toLowerCase() : fallback;
+};
