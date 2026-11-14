@@ -1,0 +1,15 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { EMPTY_HISTORY, readHistory, subscribeHistory, type HistoryData } from '@/lib/history';
+
+/** The two lists, read after mount (storage does not exist while the page is built) and kept live. */
+export function useHistory(): HistoryData {
+  const [data, setData] = useState<HistoryData>(EMPTY_HISTORY);
+  useEffect(() => {
+    const load = () => setData(readHistory());
+    load();
+    return subscribeHistory(load);
+  }, []);
+  return data;
+}

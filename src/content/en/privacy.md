@@ -2,7 +2,7 @@
 
 IIIF Kasane ("the Service") respects the privacy of its users and handles information obtained through the provision of the Service as described below.
 
-Last updated: November 2, 2026
+Last updated: November 13, 2026
 
 ## 1. Operator
 
@@ -15,6 +15,8 @@ The Service has no account registration feature and does not ask users to direct
 - Access date and time, pages viewed, and referrer
 - Approximate region of the user (estimated from the IP address; the IP address itself is not stored)
 - Device information such as browser type and version, OS, and screen size
+
+The viewer's entry screen lists the items you opened recently and the ones you bookmarked. These two lists (the address, name and thumbnail address of each item) are kept only in your browser (local storage) and are never sent to the Service. Items you open from your computer are not kept. To remove them, use "Clear history" and the remove buttons on the entry screen, or clear this site's data in your browser settings.
 
 ## 3. Analytics (Google Analytics)
 
