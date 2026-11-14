@@ -732,9 +732,32 @@ export const tilesCovering = (
  * size that is at least `neededWidth` wide, else the largest, else the whole image.
  */
 export const singleImageUrl = (service: ImageServiceRef, info: ImageInfo, neededWidth: number): string => {
-  if (info.sizes.length === 0) return imageRequestUrl(service, 'full', info.level >= 1 ? Math.min(info.width, Math.max(neededWidth, 256)) : info.width);
+  if (info.sizes.length === 0) {
+    if (info.level >= 1) return imageRequestUrl(service, 'full', Math.min(info.width, Math.max(neededWidth, 256)));
+    // Level 0 promises only the whole image at its own size, by keyword: `full` in 1 and 2, `max` in 3.
+    // A width (`full/3509,`) is a resize, which a static tile store does not have.
+    return `${service.id}/full/${service.version === 3 ? 'max' : 'full'}/0/${quality(service.version)}.jpg`;
+  }
   const pick = info.sizes.find((s) => s.width >= neededWidth) ?? info.sizes[info.sizes.length - 1];
   return imageRequestUrl(service, 'full', pick.width, pick.height);
+};
+
+/**
+ * The base image of a level 0 service that lists tiles but no sizes (a static tile store): the tiles of
+ * its coarsest scale factor that cover `region`. Such a service has no small image of the whole, and the
+ * whole image at full size can be megabytes. Null when the service has sizes, can cut regions itself, has
+ * no tiles, or when more than `limit` tiles would be needed.
+ */
+export const level0BaseTiles = (service: ImageServiceRef, info: ImageInfo, region: ImageRegion, limit = 16): Tile[] | null => {
+  if (info.level >= 1 || info.sizes.length > 0 || info.tiles.length === 0) return null;
+  const scheme = info.tiles[0];
+  const coarsest = Math.max(...scheme.scaleFactors);
+  const spanW = scheme.width * coarsest;
+  const spanH = scheme.height * coarsest;
+  const across = Math.floor((region.x + region.w - 1) / spanW) - Math.floor(region.x / spanW) + 1;
+  const down = Math.floor((region.y + region.h - 1) / spanH) - Math.floor(region.y / spanH) + 1;
+  if (across * down > limit) return null;
+  return tilesCovering(service, info, scheme, coarsest, region, limit, 'base:');
 };
 
 /**

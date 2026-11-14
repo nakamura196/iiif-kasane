@@ -1895,6 +1895,7 @@ export [value] largestPart: (mask: ArrayLike<number>, w: number, h: number) => n
 export [value] layerItemsOf: (paintings: CanvasPainting[]) => LayerItem[]
 export [value] layerOpacity: (item: LayerItem, settings: Record<string, LayerSetting>) => number
 export [value] layerThumbnailUrl: (layer: ImageLayer, height?: number) => string
+export [value] level0BaseTiles: (service: ImageServiceRef, info: ImageInfo, region: ImageRegion, limit?: number) => Tile[] | null
 export [value] loadSearchSource: (ctx: Omit<ReadContext, "onPartial"> & { onPartial?: ((partial: SearchSource) => void) | undefined; }, readers?: SearchReader[]) => Promise<SearchSource>
 export [value] localNorthUpRotation: (pairs: GeorefPair[], index: number) => null | number
 export [value] localizedString: (label: unknown, locale: string) => string

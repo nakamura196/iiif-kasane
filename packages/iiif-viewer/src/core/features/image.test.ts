@@ -14,6 +14,7 @@ import {
   rotationFromCss,
   serviceFromImageUrl,
   singleImageUrl,
+  level0BaseTiles,
   smallerBaseWidths,
   thumbnailUrlOf,
   tileSchemeOf,
@@ -256,6 +257,37 @@ describe('tiles', () => {
     expect(tileSchemeOf(l0)).toBeNull();
     expect(singleImageUrl(service, l0, 600)).toBe('https://h/i/full/1000,750/0/default.jpg');
     expect(singleImageUrl(service, l0, 5000)).toBe('https://h/i/full/1000,750/0/default.jpg');
+  });
+
+  // A static tile store (projektemacher.org): level 0, tiles, no sizes. Asking for a width of the whole
+  // (`full/3509,`) is a resize the store does not have and answers 404, which showed a broken image.
+  const store = { width: 3509, height: 2506, version: 2 as const, level: 0, tiles: [{ width: 512, height: 512, scaleFactors: [1, 2, 4] }], sizes: [] };
+  const all = { x: 0, y: 0, w: 3509, h: 2506 };
+  const v2 = { id: 'https://h/i', version: 2 as const };
+
+  it('level 0 without sizes: the whole image by keyword, never a width', () => {
+    expect(singleImageUrl(v2, store, 600)).toBe('https://h/i/full/full/0/default.jpg');
+    expect(singleImageUrl({ id: 'https://h/i', version: 3 }, { ...store, version: 3 }, 600)).toBe('https://h/i/full/max/0/default.jpg');
+    expect(singleImageUrl({ id: 'https://h/i', version: 1 }, { ...store, version: 1 }, 600)).toBe('https://h/i/full/full/0/native.jpg');
+  });
+
+  it('level 0 without sizes: the coarsest tiles are the base image', () => {
+    const base = level0BaseTiles(v2, store, all)!;
+    expect(base.map((t) => t.url)).toEqual([
+      'https://h/i/0,0,2048,2048/512,/0/default.jpg',
+      'https://h/i/2048,0,1461,2048/366,/0/default.jpg',
+      'https://h/i/0,2048,2048,458/512,/0/default.jpg',
+      'https://h/i/2048,2048,1461,458/366,/0/default.jpg',
+    ]);
+    // they cover the image exactly
+    expect(base.reduce((a, t) => a + t.w * t.h, 0)).toBe(3509 * 2506);
+  });
+
+  it('level0BaseTiles: not when the service has sizes or cuts regions, or would need too many tiles', () => {
+    expect(level0BaseTiles(v2, { ...store, sizes: [{ width: 877, height: 626 }] }, all)).toBeNull();
+    expect(level0BaseTiles(v2, { ...store, level: 1 }, all)).toBeNull();
+    expect(level0BaseTiles(v2, { ...store, tiles: [] }, all)).toBeNull();
+    expect(level0BaseTiles(v2, { ...store, tiles: [{ width: 256, height: 256, scaleFactors: [1] }] }, all)).toBeNull();
   });
 
   it('level 1 without tiles: 512 px tiles at powers of two', () => {
