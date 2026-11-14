@@ -116,8 +116,8 @@ test('a local image is not recorded and cannot be bookmarked', async ({ page }) 
   await expect(page.getByRole('status').filter({ hasText: 'cat.png' })).toBeVisible();
   await expect(page.locator('img[src^="blob:"]')).toBeVisible();
   await expect(page.getByTestId('bookmark-toggle')).toHaveCount(0);
-  // give a (wrong) recorder time to write, then check that nothing was kept
-  await page.waitForTimeout(500);
+  // the app has finished opening it (it moves to the text reading tab), then nothing must have been kept
+  await expect.poll(() => new URL(page.url()).searchParams.get('tab')).toBe('inference');
   expect(await page.evaluate(() => localStorage.getItem('kasane:history:v1'))).toBeNull();
 });
 
@@ -140,6 +140,53 @@ test('bookmarks are capped on the screen like recent ones, and the note shows fo
   await expect(page.getByText('Kept only in this browser.')).toBeVisible();
   await page.getByRole('button', { name: 'Show all (8)' }).click();
   await expect(items).toHaveCount(8);
+});
+
+test('an item that cannot be read is not recorded', async ({ page }) => {
+  await page.route(`${BASE}/**`, (route) => route.fulfill({ status: 404, headers: cors }));
+  await page.goto(viewerUrl('en', 1));
+  await expect(page.getByTestId('bookmark-toggle')).toBeVisible();
+  await page.waitForTimeout(1000);
+  expect(await page.evaluate(() => localStorage.getItem('kasane:history:v1'))).toBeNull();
+});
+
+test('a slow manifest is still recorded after the user left the viewer', async ({ page }) => {
+  await page.route(`${BASE}/**`, async (route) => {
+    await new Promise((r) => setTimeout(r, 1500));
+    await route.fulfill({ json: manifest(1), headers: cors });
+  });
+  await page.goto(viewerUrl('en', 1));
+  await expect(page.getByTestId('bookmark-toggle')).toBeVisible();
+  // leave inside the app (the page stays alive) before the manifest arrives
+  await page.getByRole('link', { name: 'IIIF Kasane' }).first().click();
+  await expect(page.getByTestId('bookmark-toggle')).toHaveCount(0);
+  await page.waitForFunction(() => (localStorage.getItem('kasane:history:v1') ?? '').includes('Postcard 1'));
+});
+
+test('Clear history can be undone', async ({ page }) => {
+  await page.goto('/en/viewer/');
+  await page.evaluate(() => {
+    const recent = [1, 2].map((i) => ({ url: `https://example.org/m${i}.json`, label: `Postcard ${i}`, kind: 'manifest', at: 10 - i }));
+    localStorage.setItem('kasane:history:v1', JSON.stringify({ recent, bookmarks: [] }));
+  });
+  await page.reload();
+  await page.getByRole('button', { name: 'Clear history' }).click();
+  await expect(page.getByTestId('recent-list')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByTestId('recent-list').getByRole('listitem')).toHaveCount(2);
+});
+
+test('a full storage shows a message instead of failing silently', async ({ page }) => {
+  await serve(page);
+  await page.goto(viewerUrl('en', 1));
+  await page.waitForFunction(() => (localStorage.getItem('kasane:history:v1') ?? '').includes('Postcard 1'));
+  await page.evaluate(() => {
+    Storage.prototype.setItem = () => {
+      throw new DOMException('full', 'QuotaExceededError');
+    };
+  });
+  await page.getByTestId('bookmark-toggle').click();
+  await expect(page.getByRole('alert').filter({ hasText: 'Could not save' })).toBeVisible();
 });
 
 test('long labels do not make the phone-width page scroll sideways', async ({ page }) => {

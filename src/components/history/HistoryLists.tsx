@@ -1,13 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Link } from '@/i18n/routing';
-import { contentParam } from 'iiif-kasane/core';
+import { contentParam, labelIn } from 'iiif-kasane/core';
 import {
   clearRecent,
+  restoreRecent,
   hostOf,
-  labelText,
   removeBookmark,
   removeRecent,
   type HistoryEntry,
@@ -16,11 +16,11 @@ import { useHistory } from './useHistory';
 
 const SHOWN = 6;
 
-function Item({ entry, onRemove, removeLabel }: { entry: HistoryEntry; onRemove: () => void; removeLabel: string }) {
+function Item({ entry, onRemove, removeLabel }: { entry: HistoryEntry; onRemove: () => boolean; removeLabel: string }) {
   const locale = useLocale();
   const t = useTranslations('History');
   const host = hostOf(entry.url);
-  const label = labelText(entry.label, locale) || host || entry.url;
+  const label = labelIn(entry.label, locale) || host || entry.url;
   return (
     <li className="relative flex min-w-0 items-center gap-3 rounded-lg border border-[var(--ds-border)] bg-[var(--ds-surface)] p-2 pr-9 hover:border-[var(--ds-primary)]">
       <span className="shrink-0 w-12 h-12 rounded overflow-hidden bg-[var(--ds-surface-2)]">
@@ -38,7 +38,7 @@ function Item({ entry, onRemove, removeLabel }: { entry: HistoryEntry; onRemove:
       </Link>
       <button
         type="button"
-        onClick={onRemove}
+        onClick={() => void onRemove()}
         aria-label={`${removeLabel}: ${label}`}
         title={removeLabel}
         className="absolute right-1.5 top-1.5 z-10 p-1 rounded text-[var(--ds-fg-muted)] hover:text-[var(--ds-fg)] hover:bg-[var(--ds-surface-2)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-ring)]"
@@ -57,7 +57,35 @@ export default function HistoryLists() {
   const { recent, bookmarks } = useHistory();
   const [allRecent, setAllRecent] = useState(false);
   const [allBookmarks, setAllBookmarks] = useState(false);
-  if (recent.length === 0 && bookmarks.length === 0) return null;
+  // what "Clear history" removed, offered back for a few seconds
+  const [cleared, setCleared] = useState<HistoryEntry[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+  const check = (saved: boolean) => {
+    setFailed(!saved);
+    return saved;
+  };
+  const clear = () => {
+    const before = clearRecent();
+    if (!check(before !== null) || !before?.length) return;
+    setCleared(before);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setCleared(null), 8000);
+  };
+  const undo = () => {
+    if (cleared && check(restoreRecent(cleared))) setCleared(null);
+  };
+  if (recent.length === 0 && bookmarks.length === 0) {
+    // right after "Clear history": say so, with an undo
+    if (!cleared) return null;
+    return (
+      <p className="mt-8 text-sm text-[var(--ds-fg-muted)]" role="status" data-testid="history-lists">
+        {t('cleared')}{' '}
+        <button type="button" onClick={undo} className="underline text-[var(--ds-primary)]">{t('undo')}</button>
+      </p>
+    );
+  }
   const shownRecent = allRecent ? recent : recent.slice(0, SHOWN);
   const shownBookmarks = allBookmarks ? bookmarks : bookmarks.slice(0, SHOWN);
   return (
@@ -69,7 +97,7 @@ export default function HistoryLists() {
           </h3>
           <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2" data-testid="bookmark-list">
             {shownBookmarks.map((e) => (
-              <Item key={e.url} entry={e} removeLabel={t('removeBookmark')} onRemove={() => removeBookmark(e.url)} />
+              <Item key={e.url} entry={e} removeLabel={t('removeBookmark')} onRemove={() => check(removeBookmark(e.url))} />
             ))}
           </ul>
           {bookmarks.length > SHOWN && (
@@ -85,13 +113,13 @@ export default function HistoryLists() {
             <h3 id="history-recent" className="text-sm font-medium text-[var(--ds-fg-muted)]">
               {t('recent')}
             </h3>
-            <button type="button" onClick={clearRecent} className="text-xs underline text-[var(--ds-fg-muted)] hover:text-[var(--ds-fg)]">
+            <button type="button" onClick={clear} className="text-xs underline text-[var(--ds-fg-muted)] hover:text-[var(--ds-fg)]">
               {t('clear')}
             </button>
           </div>
           <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2" data-testid="recent-list">
             {shownRecent.map((e) => (
-              <Item key={e.url} entry={e} removeLabel={t('removeRecent')} onRemove={() => removeRecent(e.url)} />
+              <Item key={e.url} entry={e} removeLabel={t('removeRecent')} onRemove={() => check(removeRecent(e.url))} />
             ))}
           </ul>
           {recent.length > SHOWN && (
@@ -102,6 +130,11 @@ export default function HistoryLists() {
         </section>
       )}
       <p className="text-xs text-[var(--ds-fg-muted)]">{t('note')}</p>
+      {failed && (
+        <p className="text-xs text-red-600 dark:text-red-400" role="alert">
+          {t('saveFailed')}
+        </p>
+      )}
     </div>
   );
 }

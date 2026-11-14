@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { addBookmark, isBookmarked, isRecordable, removeBookmark } from '@/lib/history';
 import { useHistory } from './useHistory';
@@ -8,17 +9,18 @@ import { useHistory } from './useHistory';
 export default function BookmarkButton({ url }: { url: string | null }) {
   const t = useTranslations('History');
   const data = useHistory();
+  const [failed, setFailed] = useState(false);
   if (!url || !isRecordable(url)) return null;
   const on = isBookmarked(data, url);
-  // the label and thumbnail were put in "recent" when the item was opened
-  const known = data.recent.find((e) => e.url === url) ?? data.bookmarks.find((e) => e.url === url);
   const toggle = () => {
-    if (on) removeBookmark(url);
-    else addBookmark({ url, label: known?.label, kind: known?.kind, thumbnail: known?.thumbnail });
+    // label, kind and thumbnail are filled in from the recent entry
+    const saved = on ? removeBookmark(url) : addBookmark({ url });
+    setFailed(!saved);
   };
   // one fixed name; the pressed state says whether it is on
   const text = t('bookmarkItem');
   return (
+    <>
     <button
       type="button"
       onClick={toggle}
@@ -32,5 +34,11 @@ export default function BookmarkButton({ url }: { url: string | null }) {
         <path d="M12 3.5l2.6 5.3 5.8.85-4.2 4.1 1 5.8L12 16.8l-5.2 2.75 1-5.8-4.2-4.1 5.8-.85L12 3.5z" />
       </svg>
     </button>
+    {failed && (
+      <span role="alert" className="fixed right-3 top-12 z-50 max-w-[16rem] rounded-md border border-[var(--ds-border)] bg-[var(--ds-surface)] px-3 py-1.5 text-xs text-red-600 dark:text-red-400 shadow">
+        {t('saveFailed')}
+      </span>
+    )}
+    </>
   );
 }

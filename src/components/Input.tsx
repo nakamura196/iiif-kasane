@@ -36,7 +36,7 @@ const ManifestInput = ({
   description?: string;
   // 並べるユースケース。既定はトップと同じ featured の 6 件
   useCases?: UseCase[];
-  // 最近開いたものとブックマーク。既定では、ビューアの入口（トップ用の compact と、専用の入口 title は除く）
+  // Recently opened items and bookmarks. On by default for the viewer entry (not the top page's compact form, nor entries with their own title)
   history?: boolean;
 }) => {
   const t = useTranslations('Input');

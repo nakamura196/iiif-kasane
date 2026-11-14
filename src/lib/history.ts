@@ -1,4 +1,4 @@
-import { labelIn } from 'iiif-kasane/core';
+import { manifestThumbnailOf } from 'iiif-kasane/core';
 
 // Recently opened items and bookmarks, kept only in this browser (localStorage).
 // Both lists live under one versioned key, so the shape can change later without reading old junk.
@@ -28,7 +28,10 @@ export const RECENT_LIMIT = 30;
 // Bookmarks have no cap: the user chose each one, so none is dropped silently.
 
 export const EMPTY_HISTORY: HistoryData = { recent: [], bookmarks: [] };
-const EMPTY = EMPTY_HISTORY;
+
+/** http:// and https:// of the same address are one item (the loader retries http as https), so they compare equal. */
+export const urlKey = (url: string): string => url.replace(/^http:/i, 'https:');
+const same = (a: string, b: string): boolean => urlKey(a) === urlKey(b);
 
 // The viewer page is the only place that records and bookmarks (the Header does it).
 // TODO: move the recorder and the star into ViewerContent once #356 has landed (that file is being changed there),
@@ -71,8 +74,8 @@ function cleanList(v: unknown, limit: number): HistoryEntry[] {
   const out: HistoryEntry[] = [];
   for (const raw of v) {
     const e = cleanEntry(raw);
-    if (!e || seen.has(e.url)) continue;
-    seen.add(e.url);
+    if (!e || seen.has(urlKey(e.url))) continue;
+    seen.add(urlKey(e.url));
     out.push(e);
     if (out.length >= limit) break;
   }
@@ -83,27 +86,28 @@ function cleanList(v: unknown, limit: number): HistoryEntry[] {
 export function readHistory(): HistoryData {
   try {
     const text = localStorage.getItem(HISTORY_KEY);
-    if (!text) return EMPTY;
+    if (!text) return EMPTY_HISTORY;
     const v: unknown = JSON.parse(text);
-    if (!isObject(v)) return EMPTY;
+    if (!isObject(v)) return EMPTY_HISTORY;
     return { recent: cleanList(v.recent, RECENT_LIMIT), bookmarks: cleanList(v.bookmarks, Infinity) };
   } catch {
-    return EMPTY;
+    return EMPTY_HISTORY;
   }
 }
 
-function write(data: HistoryData): void {
+/** Save both lists. False when storage is full or blocked: the change was not kept, and callers tell the user. */
+function write(data: HistoryData): boolean {
   try {
     localStorage.setItem(HISTORY_KEY, JSON.stringify(data));
   } catch {
-    // full or blocked: the lists just are not kept
-    return;
+    return false;
   }
   try {
     window.dispatchEvent(new Event(HISTORY_EVENT));
   } catch {
     // no window (tests, server)
   }
+  return true;
 }
 
 /** What is known about an item. A missing field means "not known now" (for example the load failed): it never overwrites. */
@@ -128,48 +132,72 @@ function merged(e: NewEntry, old: HistoryEntry | undefined, at: number): History
 }
 
 /**
- * Put the item at the top of "recently opened" (once per URL), keeping at most RECENT_LIMIT.
+ * Put the item at the top of "recently opened" (once per address), keeping at most RECENT_LIMIT.
  * A bookmarked copy learns the label, kind and thumbnail too. One read, one write, one event.
+ * Returns false when it could not be saved.
  */
-export function recordOpened(entry: NewEntry): void {
+export function recordOpened(entry: NewEntry): boolean {
   const data = readHistory();
   const at = entry.at ?? Date.now();
-  const e = merged(entry, data.recent.find((x) => x.url === entry.url) ?? data.bookmarks.find((x) => x.url === entry.url), at);
-  if (!e) return;
-  write({
-    recent: [e, ...data.recent.filter((x) => x.url !== e.url)].slice(0, RECENT_LIMIT),
-    bookmarks: data.bookmarks.map((b) => (b.url === e.url ? { ...e, at: b.at } : b)),
+  const e = merged(entry, data.recent.find((x) => same(x.url, entry.url)) ?? data.bookmarks.find((x) => same(x.url, entry.url)), at);
+  if (!e) return false;
+  return write({
+    recent: [e, ...data.recent.filter((x) => !same(x.url, e.url))].slice(0, RECENT_LIMIT),
+    bookmarks: data.bookmarks.map((b) => (same(b.url, e.url) ? { ...e, at: b.at } : b)),
   });
 }
 
-/** Bookmark the item (newest first). Bookmarking again keeps the first date. */
-export function addBookmark(entry: NewEntry): void {
-  const data = readHistory();
-  const old = data.bookmarks.find((x) => x.url === entry.url);
-  const e = merged(entry, old ?? data.recent.find((x) => x.url === entry.url), old?.at ?? entry.at ?? Date.now());
-  if (!e) return;
-  write({ ...data, bookmarks: [e, ...data.bookmarks.filter((x) => x.url !== e.url)] });
+/**
+ * Record an item whose manifest was just read. When it could not be read (`raw` is null: 404, typo, CORS, login),
+ * nothing is recorded and nothing already kept is touched. The label may be passed raw: it is cleaned here.
+ */
+export function recordLoaded(url: string, raw: unknown): boolean {
+  if (!raw || typeof raw !== 'object') return false;
+  const r = raw as { label?: unknown; type?: unknown };
+  return recordOpened({
+    url,
+    label: r.label as HistoryLabel | undefined,
+    kind: r.type === 'Collection' ? 'collection' : 'manifest',
+    thumbnail: manifestThumbnailOf(raw),
+  });
 }
 
-export function removeBookmark(url: string): void {
+/** Bookmark the item (newest first). Bookmarking again keeps the first date. Returns false when it could not be saved. */
+export function addBookmark(entry: NewEntry): boolean {
   const data = readHistory();
-  write({ ...data, bookmarks: data.bookmarks.filter((x) => x.url !== url) });
+  const old = data.bookmarks.find((x) => same(x.url, entry.url));
+  const e = merged(entry, old ?? data.recent.find((x) => same(x.url, entry.url)), old?.at ?? entry.at ?? Date.now());
+  if (!e) return false;
+  return write({ ...data, bookmarks: [e, ...data.bookmarks.filter((x) => !same(x.url, e.url))] });
 }
 
-export function removeRecent(url: string): void {
+export function removeBookmark(url: string): boolean {
   const data = readHistory();
-  write({ ...data, recent: data.recent.filter((x) => x.url !== url) });
+  return write({ ...data, bookmarks: data.bookmarks.filter((x) => !same(x.url, url)) });
 }
 
-export function clearRecent(): void {
-  write({ ...readHistory(), recent: [] });
+export function removeRecent(url: string): boolean {
+  const data = readHistory();
+  return write({ ...data, recent: data.recent.filter((x) => !same(x.url, url)) });
+}
+
+/** Empty "recently opened". Returns what was there (for an undo), or null when it could not be saved. */
+export function clearRecent(): HistoryEntry[] | null {
+  const data = readHistory();
+  return write({ ...data, recent: [] }) ? data.recent : null;
+}
+
+/** Put back entries removed by clearRecent: merged with what was opened since, newest first. */
+export function restoreRecent(entries: HistoryEntry[]): boolean {
+  const data = readHistory();
+  const seen = new Set(data.recent.map((e) => urlKey(e.url)));
+  const back = entries.filter((e) => !seen.has(urlKey(e.url)));
+  const recent = [...data.recent, ...back].sort((a, b) => b.at - a.at).slice(0, RECENT_LIMIT);
+  return write({ ...data, recent });
 }
 
 export const isBookmarked = (data: HistoryData, url: string | null | undefined): boolean =>
-  !!url && data.bookmarks.some((b) => b.url === url);
-
-/** The label in the reader's language (the viewer package's rule: that language, none, English, then any). */
-export const labelText = (label: HistoryLabel, locale: string): string => labelIn(label, locale);
+  !!url && data.bookmarks.some((b) => same(b.url, url));
 
 /** The site name of a URL ("example.org"), for the small line under a label. */
 export function hostOf(url: string): string {

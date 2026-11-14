@@ -1,14 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { labelIn } from 'iiif-kasane/core';
 import {
   HISTORY_EVENT,
   HISTORY_KEY,
   RECENT_LIMIT,
   addBookmark,
   clearRecent,
+  recordLoaded,
+  restoreRecent,
+  urlKey,
   hostOf,
   isViewerPath,
   isBookmarked,
-  labelText,
   readHistory,
   recordOpened,
   removeBookmark,
@@ -135,7 +138,7 @@ describe('bookmarks', () => {
     expect(b.thumbnail).toBe('https://example.org/t.jpg');
   });
 
-  it('keeps kind, label and thumbnail of a known item when a later load fails (only the url is known)', () => {
+  it('keeps kind, label and thumbnail of a known item when a later read lacks them', () => {
     recordOpened(entry(1, { kind: 'collection', thumbnail: 'https://example.org/t.jpg' }));
     addBookmark(entry(1, { kind: 'collection', thumbnail: 'https://example.org/t.jpg' }));
     recordOpened({ url: entry(1).url });
@@ -151,6 +154,27 @@ describe('bookmarks', () => {
     expect(readHistory().bookmarks[0].kind).toBe('collection');
   });
 
+  it('records nothing when the manifest could not be read, and leaves kept entries untouched', () => {
+    expect(recordLoaded('https://example.org/missing.json', null)).toBe(false);
+    expect(store.has(HISTORY_KEY)).toBe(false);
+    recordOpened(entry(1, { kind: 'collection' }));
+    const before = store.get(HISTORY_KEY);
+    expect(recordLoaded(entry(1).url, null)).toBe(false);
+    expect(store.get(HISTORY_KEY)).toBe(before);
+  });
+
+  it('records a read manifest with a raw label, its kind and thumbnail', () => {
+    recordLoaded('https://example.org/c.json', {
+      type: 'Collection',
+      label: { en: ['  ', 'Cards'], ja: 5 },
+      thumbnail: [{ id: 'https://example.org/t.jpg', type: 'Image' }],
+    });
+    const [e] = readHistory().recent;
+    expect(e.kind).toBe('collection');
+    expect(e.label).toEqual({ en: ['Cards'] });
+    expect(e.thumbnail).toBe('https://example.org/t.jpg');
+  });
+
   it('reads once, writes once and fires one event when a bookmarked item is opened', () => {
     addBookmark(entry(1));
     const onChange = vi.fn();
@@ -164,7 +188,7 @@ describe('bookmarks', () => {
   it('keeps a language map label', () => {
     addBookmark({ url: entry(1).url, label: { ja: ['日本語'], en: ['English'] }, kind: 'collection' });
     const [b] = readHistory().bookmarks;
-    expect(labelText(b.label, 'ja')).toBe('日本語');
+    expect(labelIn(b.label, 'ja')).toBe('日本語');
     expect(b.kind).toBe('collection');
   });
 });
@@ -232,6 +256,50 @@ describe('change events', () => {
   });
 });
 
+describe('http and https are one item', () => {
+  it('dedupes recent and bookmarks, and reports the bookmark, keeping the URL that loaded', () => {
+    recordOpened({ url: 'http://example.org/m.json', label: 'A' });
+    recordOpened({ url: 'https://example.org/m.json', label: 'A' });
+    expect(readHistory().recent.map((e) => e.url)).toEqual(['https://example.org/m.json']);
+    addBookmark({ url: 'http://example.org/m.json' });
+    expect(isBookmarked(readHistory(), 'https://example.org/m.json')).toBe(true);
+    removeBookmark('https://example.org/m.json');
+    expect(readHistory().bookmarks).toEqual([]);
+    expect(urlKey('HTTP://x/y')).toBe('https://x/y');
+  });
+  it('dedupes entries read from storage', () => {
+    store.set(HISTORY_KEY, JSON.stringify({ recent: [{ url: 'http://example.org/m.json' }, { url: 'https://example.org/m.json' }], bookmarks: [] }));
+    expect(readHistory().recent).toHaveLength(1);
+  });
+});
+
+describe('saving can fail', () => {
+  it('returns false when storage is full, true otherwise', () => {
+    expect(recordOpened(entry(1))).toBe(true);
+    expect(addBookmark(entry(1))).toBe(true);
+    throwOnSet = true;
+    expect(recordOpened(entry(2))).toBe(false);
+    expect(addBookmark(entry(2))).toBe(false);
+    expect(removeBookmark(entry(1).url)).toBe(false);
+    expect(removeRecent(entry(1).url)).toBe(false);
+    expect(clearRecent()).toBeNull();
+    expect(restoreRecent([])).toBe(false);
+  });
+});
+
+describe('undo of "Clear history"', () => {
+  it('puts the cleared entries back, merged with what was opened since, newest first', () => {
+    recordOpened({ ...entry(1), at: 1 });
+    recordOpened({ ...entry(2), at: 2 });
+    const cleared = clearRecent();
+    expect(cleared).toHaveLength(2);
+    expect(readHistory().recent).toEqual([]);
+    recordOpened({ ...entry(3), at: 3 });
+    restoreRecent(cleared!);
+    expect(readHistory().recent.map((e) => e.url)).toEqual([entry(3).url, entry(2).url, entry(1).url]);
+  });
+});
+
 describe('isViewerPath', () => {
   it('is true only for the viewer page, with or without the trailing slash', () => {
     expect(isViewerPath('/en/viewer')).toBe(true);
@@ -245,13 +313,13 @@ describe('isViewerPath', () => {
 describe('labelText and hostOf', () => {
   it('picks the reader language, then English, then the rest', () => {
     const map = { fr: ['Français'], en: ['English'] };
-    expect(labelText(map, 'ja')).toBe('English');
+    expect(labelIn(map, 'ja')).toBe('English');
     // the same rule as the viewer package: the language, then "none", then English
-    expect(labelText({ en: ['English'], none: ['Plain'] }, 'ja')).toBe('Plain');
-    expect(labelText({ none: ['Plain'] }, 'ja')).toBe('Plain');
-    expect(labelText({ fr: ['Français'] }, 'ja')).toBe('Français');
-    expect(labelText('Already text', 'ja')).toBe('Already text');
-    expect(labelText({}, 'ja')).toBe('');
+    expect(labelIn({ en: ['English'], none: ['Plain'] }, 'ja')).toBe('Plain');
+    expect(labelIn({ none: ['Plain'] }, 'ja')).toBe('Plain');
+    expect(labelIn({ fr: ['Français'] }, 'ja')).toBe('Français');
+    expect(labelIn('Already text', 'ja')).toBe('Already text');
+    expect(labelIn({}, 'ja')).toBe('');
   });
 
   it('names the host, and is empty for a non-URL', () => {
