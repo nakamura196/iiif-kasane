@@ -12,7 +12,7 @@ import { FilterChips } from '../annotation/FilterChips';
 import { ShowMarksToggle } from '../annotation/ShowMarksToggle';
 import { useKindOptions } from '../annotation/kindLabels';
 import { useLocale, useTranslations } from '../env';
-import { batchStateAtom, batchTargetsOf, readingPageAtom, startBatch, stopBatch } from '../inference/batch';
+import { batchStateAtom, batchTargetsOf, readingPageAtom, startBatch, stopBatch, type BatchState } from '../inference/batch';
 import { modelStatus } from '../inference/modelStore';
 import { MODELS } from '../inference/models/registry';
 import type { InferenceModel } from '../inference/models/types';
@@ -109,6 +109,23 @@ const useReadyModels = (): InferenceModel[] | null => {
   return ready;
 };
 
+/**
+ * The message under the run button (a key in the Inference messages, with its values), or null when there is
+ * nothing to say for the model shown.
+ */
+export const batchStatusOf = (
+  batch: BatchState | null,
+  shownModel: string | null | undefined,
+): { key: string; values?: Record<string, number> } | null => {
+  if (!batch || batch.modelId !== shownModel) return null;
+  const counts = { done: batch.done, total: batch.total };
+  if (batch.running) return { key: batch.waiting ? 'batchWaiting' : 'batchProgress', values: counts };
+  if (batch.total === 0) return { key: 'batchNothing' };
+  if (batch.blocked) return { key: 'batchBlocked', values: counts };
+  if (batch.stopped) return { key: 'batchStopped', values: counts };
+  return { key: 'batchDone', values: { total: batch.total } };
+};
+
 export function PagesBatchBar({ pages, manifest }: { pages: ContainerInfo[]; manifest: ManifestV4 | null | undefined }) {
   const t = useTranslations('Inference');
   const tf = useTranslations('AnnotationFilter');
@@ -142,15 +159,8 @@ export function PagesBatchBar({ pages, manifest }: { pages: ContainerInfo[]; man
   // Only pages without a result are read (after a stop, the run goes on from there)
   const remaining = model ? targets.filter((c) => !results[resultKey(c.id, model.id)]).length : targets.length;
   const resuming = remaining < targets.length;
-  const status = !batch || batch.modelId !== shownModel
-    ? null
-    : batch.running
-      ? t('batchProgress', { done: batch.done, total: batch.total })
-      : batch.total === 0
-        ? t('batchNothing')
-        : batch.stopped
-          ? t('batchStopped', { done: batch.done, total: batch.total })
-          : t('batchDone', { total: batch.total });
+  const st = batchStatusOf(batch, shownModel);
+  const status = st ? t(st.key, st.values) : null;
 
   return (
     <div className="px-2 pt-2 space-y-2 text-xs">

@@ -1,6 +1,6 @@
-// 推論に渡す画像を用意する。表示中のタイルではなく、Canvas の画像を、モデルに合う大きさで取り直す。
-// IIIF Image API があれば幅を指定して取る。無ければ画像そのもの。画素を読むので、画像のサーバが
-// 他所からの読み取り（CORS）を許していないと読めない（ビューアの表示も同じ条件で読んでいる）。
+// Get the image to give a model: not the tiles on screen, but the Canvas's image again, at a size that suits the
+// model. With the IIIF Image API it is asked for at a width; without, the image itself. The pixels are read, so the
+// image server must allow reading from another origin (CORS), the same condition as for the viewer's display.
 import {
   canvasImagesOf,
   imageInfoUrl,
@@ -22,10 +22,60 @@ import {
 } from '../../core';
 
 export class SourceImageError extends Error {
-  constructor(public readonly reason: 'noImage' | 'unsupported' | 'fetch' | 'emptyView' | 'tooLarge') {
+  constructor(
+    public readonly reason: 'noImage' | 'unsupported' | 'fetch' | 'emptyView' | 'tooLarge',
+    /**
+     * For 'fetch': the HTTP status when the server answered, and how long it asked us to wait (Retry-After) before
+     * trying again; `network` when the request itself failed. A refusal without CORS headers reaches the page as such
+     * a network error, with no status. Retry-After is only readable from another origin when the server exposes it
+     * (Access-Control-Expose-Headers), so it is often missing.
+     */
+    public readonly detail: { status?: number; retryAfterMs?: number; network?: boolean } = {},
+  ) {
     super(reason);
   }
 }
+
+/** The request itself failed (no answer the page may read). */
+class NetworkError extends Error {}
+
+const request = async (url: string, init?: RequestInit) => {
+  try {
+    return await fetch(url, init);
+  } catch {
+    throw new NetworkError('network');
+  }
+};
+
+/** An HTTP answer that was not ok (kept so a run over every page can tell a busy server from a missing image). */
+class HttpError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly retryAfterMs: number | undefined,
+  ) {
+    super(`HTTP ${status}`);
+  }
+}
+
+/** Retry-After in milliseconds (seconds or an HTTP date); undefined when missing or unreadable. */
+export const retryAfterMsOf = (value: string | null, now = Date.now()): number | undefined => {
+  if (!value) return undefined;
+  const v = value.trim();
+  if (/^\d+$/.test(v)) return Number(v) * 1000;
+  const t = Date.parse(v);
+  return Number.isNaN(t) ? undefined : Math.max(0, t - now);
+};
+
+const httpErrorOf = (res: Response) => new HttpError(res.status, retryAfterMsOf(res.headers.get('Retry-After')));
+
+/** Statuses that mean "too many requests now, ask again later". */
+export const isBusyStatus = (status: number | undefined) => status === 429 || status === 503;
+
+const fetchError = (e: unknown) =>
+  new SourceImageError(
+    'fetch',
+    e instanceof HttpError ? { status: e.status, retryAfterMs: e.retryAfterMs } : e instanceof NetworkError ? { network: true } : {},
+  );
 
 /** The first image painted on the Canvas (the base layer). */
 export const baseImageLayerOf = (manifest: ManifestV4 | null | undefined, container: ContainerInfo | undefined): ImageLayer | undefined => {
@@ -35,15 +85,20 @@ export const baseImageLayerOf = (manifest: ManifestV4 | null | undefined, contai
   return undefined;
 };
 
-const infoOf = async (layer: ImageLayer): Promise<ImageInfo | null> => {
+/**
+ * The image's info.json, or null without one. With `busyFails`, a busy answer (429, 503) throws instead of giving
+ * null: the callers fall back to the whole image, which asks a busy server for even more.
+ */
+const infoOf = async (layer: ImageLayer, busyFails = false): Promise<ImageInfo | null> => {
   if (!layer.service) return null;
-  const res = await fetch(imageInfoUrl(layer.service));
+  const res = await request(imageInfoUrl(layer.service));
+  if (busyFails && isBusyStatus(res.status)) throw httpErrorOf(res);
   return res.ok ? parseImageInfo(await res.json()) : null;
 };
 
 const fetchBitmap = async (url: string): Promise<ImageBitmap> => {
-  const res = await fetch(url, { mode: 'cors', credentials: 'omit' });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const res = await request(url, { mode: 'cors', credentials: 'omit' });
+  if (!res.ok) throw httpErrorOf(res);
   return createImageBitmap(await res.blob());
 };
 
@@ -59,8 +114,8 @@ const shrink = async (bitmap: ImageBitmap, longSide: number): Promise<ImageBitma
 };
 
 /** The image URL at most `longSide` on the long side (IIIF Image API when there is one). Also used by the puzzle. */
-export const sourceImageUrl = async (layer: ImageLayer, longSide: number): Promise<string> => {
-  const info = await infoOf(layer);
+export const sourceImageUrl = async (layer: ImageLayer, longSide: number, busyFails = false): Promise<string> => {
+  const info = await infoOf(layer, busyFails);
   if (!layer.service || !info) return layer.url;
   const k = Math.min(1, longSide / Math.max(info.width, info.height));
   const width = Math.max(1, Math.round(info.width * k));
@@ -68,22 +123,27 @@ export const sourceImageUrl = async (layer: ImageLayer, longSide: number): Promi
   return singleImageUrl(layer.service, info, width);
 };
 
-/** The image to give a model (at most `longSide` on the long side), and how its pixels map to the Canvas. */
+/**
+ * The image to give a model (at most `longSide` on the long side), and how its pixels map to the Canvas. With
+ * `busyFails` (the run over every page, which asks again later), a busy info.json fails instead of falling back to
+ * the whole image.
+ */
 export const loadSourceImage = async (
   layer: ImageLayer,
   container: ContainerInfo,
   longSide: number,
+  { busyFails = false }: { busyFails?: boolean } = {},
 ): Promise<{ bitmap: ImageBitmap; map: ImageToCanvas; url: string }> => {
-  // 切り抜き・回転した画像は、結果の置き直しに未対応（先に断る）
+  // Cropped or rotated images: putting the results back is not supported (refuse first)
   if (!imageToCanvasOf(layer, container, 1, 1)) throw new SourceImageError('unsupported');
   let url: string;
   let bitmap: ImageBitmap;
   try {
-    url = await sourceImageUrl(layer, longSide);
-    // サーバが大きいまま返したときは、ここで縮める
+    url = await sourceImageUrl(layer, longSide, busyFails);
+    // When the server sent it larger, shrink it here
     bitmap = await shrink(await fetchBitmap(url), longSide);
-  } catch {
-    throw new SourceImageError('fetch');
+  } catch (e) {
+    throw fetchError(e);
   }
   const map = imageToCanvasOf(layer, container, bitmap.width, bitmap.height);
   if (!map) {
@@ -161,7 +221,7 @@ export const loadSourceRegion = async (
       }
     }
   } else {
-    // 範囲を切り出せないサーバ・画像そのもの: 取れるいちばん大きい画像から切り出す
+    // A server that cannot cut regions, or a plain image: cut from the largest image there is
     url = layer.service && info ? singleImageUrl(layer.service, info, info.width) : layer.url;
     let whole: ImageBitmap;
     try {
