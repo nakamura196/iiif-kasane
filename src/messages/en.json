@@ -121,6 +121,19 @@
       "subjectOf": "Mentioned in"
     }
   },
+  "History": {
+    "title": "History",
+    "recent": "Recently opened",
+    "bookmarks": "Bookmarks",
+    "clear": "Clear history",
+    "removeRecent": "Remove from recently opened",
+    "removeBookmark": "Remove bookmark",
+    "addBookmark": "Bookmark this item",
+    "collection": "Collection",
+    "showAll": "Show all ({count})",
+    "showFewer": "Show fewer",
+    "note": "Kept only in this browser."
+  },
   "Home": {
     "developers": "Developers",
     "developerNames": "Satoru Nakamura & Jun Ogawa (The University of Tokyo)",

@@ -6,6 +6,8 @@ import { isLocalManifestUrl } from '@/lib/localImage';
 import { useTranslations, useLocale } from 'next-intl';
 import { useRouter, usePathname } from 'next/navigation';
 import { Link } from '@/i18n/routing';
+import HistoryRecorder from '@/components/history/HistoryRecorder';
+import BookmarkButton from '@/components/history/BookmarkButton';
 import { ThemeToggle, LanguageSwitcher, buttonClass } from '@nakamura196/react-ui';
 
 // compact: ビューアのように表示領域を広く取りたいページでは、帯を細くする
@@ -15,6 +17,8 @@ const Header = ({ compact = false }: { compact?: boolean }) => {
   const pathname = usePathname();
   const locale = useLocale();
   const t = useTranslations('Header');
+
+  const onViewer = /\/viewer\/?$/.test(pathname ?? '');
 
   const handleHomeClick = () => {
     setManifestUrl(null);
@@ -52,6 +56,9 @@ const Header = ({ compact = false }: { compact?: boolean }) => {
         </Link>
       </div>
       <div className="flex items-center space-x-2 sm:space-x-3 ml-2 shrink-0">
+        {/* On the viewer page: keep the open item in "Recently opened" and offer a bookmark */}
+        {onViewer && <HistoryRecorder url={manifestUrl} />}
+        {onViewer && <BookmarkButton url={manifestUrl} />}
         <a
           href="https://github.com/nakamura196/iiif-kasane"
           target="_blank"

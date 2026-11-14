@@ -5,6 +5,7 @@ import { Link } from '@/i18n/routing';
 import { buttonClass } from '@nakamura196/react-ui';
 import { FEATURED_USE_CASES, clipOf, hrefOf, thumbnailOf, type UseCase } from '@/lib/usecases';
 import UseCaseClip from '@/components/usecases/UseCaseClip';
+import HistoryLists from '@/components/history/HistoryLists';
 
 const ManifestInput = ({
   onSubmit,
@@ -13,6 +14,7 @@ const ManifestInput = ({
   title,
   description,
   useCases = FEATURED_USE_CASES,
+  history = !compact && !title,
   onOpenFile,
   fileError,
   fileStatus,
@@ -34,6 +36,8 @@ const ManifestInput = ({
   description?: string;
   // 並べるユースケース。既定はトップと同じ featured の 6 件
   useCases?: UseCase[];
+  // 最近開いたものとブックマーク。既定では、ビューアの入口（トップ用の compact と、専用の入口 title は除く）
+  history?: boolean;
 }) => {
   const t = useTranslations('Input');
   const locale = useLocale() === 'en' ? 'en' : 'ja';
@@ -172,6 +176,8 @@ const ManifestInput = ({
           </div>
         )}
       </div>
+
+      {history && <HistoryLists />}
 
       {children ? <div className={compact ? 'mt-10' : 'mt-12'}>{children}</div> : null}
 
