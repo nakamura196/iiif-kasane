@@ -58,6 +58,16 @@ jobs:
       - name: Smoke test the packed package
         run: npm run test:package -- --pack-dir "$RUNNER_TEMP/pack"
 
+      # Hands the tarball to npm the way the publish job does, without publishing.
+      # npm reads "pack/x.tgz" as the GitHub repository pack/x.tgz, so the path must start with "./".
+      # Keep this command and the one in the publish job in the same form.
+      - name: Dry-run the publish command
+        working-directory: ${{ runner.temp }}
+        run: |
+          v=$(node -p "require('${{ github.workspace }}/packages/iiif-viewer/package.json').version")
+          if [[ "$v" == *-* ]]; then dist=(--tag next); else dist=(); fi
+          npm publish "./pack/iiif-kasane-$v.tgz" --access public --dry-run "${dist[@]}"
+
       - name: Upload the tested tarball
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
@@ -108,4 +118,5 @@ jobs:
           # A version with a prerelease part (0.6.0-rc.1) goes to the "next" dist-tag, so that it never becomes "latest".
           v="${TAG#iiif-kasane-v}"
           if [[ "$v" == *-* ]]; then dist=(--tag next); else dist=(); fi
-          npm publish "pack/iiif-kasane-$v.tgz" --access public --provenance "${dist[@]}"
+          # "./" is needed: without it npm reads pack/x.tgz as a GitHub repository (0.5.0 failed so).
+          npm publish "./pack/iiif-kasane-$v.tgz" --access public --provenance "${dist[@]}"
