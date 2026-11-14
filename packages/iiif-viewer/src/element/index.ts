@@ -98,7 +98,7 @@ export class IiifViewerElement extends HTMLElement {
       );
       return;
     }
-        const collection = collectionsFromParams(parseCollection(this.getAttribute('collection')));
+    const collection = collectionsFromParams(parseCollection(this.getAttribute('collection')));
     const lang = this.getAttribute('locale') ?? document.documentElement.lang;
     const locale: ViewerProps['locale'] = lang.toLowerCase().startsWith('en') ? 'en' : 'ja';
     const themeAttr = this.getAttribute('theme');

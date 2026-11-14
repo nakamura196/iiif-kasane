@@ -2051,6 +2051,7 @@ export [value] sam2Outline: (masks: ArrayLike<number>, iou: ArrayLike<number>, c
 export [value] sam2PointInput: (points: Sam2Point[], crop: Sam2Box) => { coords: number[]; labels: number[]; }
 export [value] sam2Tensor: (px: Uint8ClampedArray<ArrayBufferLike>, size?: number) => Float32Array<ArrayBufferLike>
 export [value] sam2ViewCrop: (view: Sam2Box, w: number, h: number, min?: number) => Sam2Box
+export [value] sameUrlList: (a: readonly string[], b: readonly string[]) => boolean
 export [value] sanitizeAboutHtml: (html: unknown) => string
 export [value] sanitizeAnnotationHtml: (html: string) => string
 export [value] sanitizeDeclaration: (property: string, value: string) => [string, string] | null

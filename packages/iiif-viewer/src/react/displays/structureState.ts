@@ -29,6 +29,7 @@ import {
   isContentLoading,
   loadManifest,
   goBack,
+  resolveContentUrl,
   trailAtom,
   useLocaleRef,
   type OpenResult,
@@ -108,7 +109,7 @@ export async function openManifest(
       // what goes on the trail is the one being left (its own URL, not the one being opened), with its page
       const picked = store.get(pickedPageAtom);
       const index = picked.shown === here.seq ? picked.index : 0;
-      const item: TrailItem = { url: here.url, manifest: here.manifest, raw: here.raw, index };
+      const item: TrailItem = { url: resolveContentUrl(here.url), manifest: here.manifest, raw: here.raw, index };
       const owner = store.get(manifestUrlAtom);
       store.set(trailAtom, (t) => ({ owner, items: t.owner === owner ? [...t.items, item] : [item] }));
     }

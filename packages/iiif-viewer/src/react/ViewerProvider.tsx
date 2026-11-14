@@ -28,7 +28,7 @@ import {
   type ViewerTarget,
 } from './navigation';
 import { PlaybackContext, type Playback } from './playback';
-import { shownLocation, useManifest, type ViewerShown } from './useManifest';
+import { pendingCollectionsAtom, shownLocation, useManifest, type ViewerShown } from './useManifest';
 
 export type { ViewerShown };
 
@@ -181,9 +181,10 @@ function ViewerStateRoot({
   const { failed } = useManifest(iiifContent, collection);
 
   // Report each manifest shown (a new seq) with the Collections it was reached through. A takeover (see
-  // useManifest) shows nothing new, so it reports nothing.
+  // useManifest) shows nothing new, or (the browser's Back) shows a manifest flagged quiet: it reports nothing.
   const trail = useAtomValue(trailAtom);
   const owner = useAtomValue(manifestUrlAtom);
+  const pending = useAtomValue(pendingCollectionsAtom);
   const onShownChangeRef = useRef(onShownChange);
   const reportedSeq = useRef(0);
   useEffect(() => {
@@ -193,8 +194,8 @@ function ViewerStateRoot({
     if (!shown || shown.seq === reportedSeq.current) return;
     reportedSeq.current = shown.seq;
     if (shown.quiet) return;
-    onShownChangeRef.current?.(shownLocation(shown, trail, owner));
-  }, [shown, trail, owner]);
+    onShownChangeRef.current?.(shownLocation(shown, trail, owner, pending));
+  }, [shown, trail, owner, pending]);
 
   // The playback position of video and audio. The transcript (right panel) and the media display follow it.
   // A time given from outside (target.t) is applied when the player of that Canvas is attached.

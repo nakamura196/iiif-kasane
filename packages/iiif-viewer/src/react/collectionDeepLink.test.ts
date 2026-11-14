@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createStore } from 'jotai';
 import { manifestUrlAtom, shownManifestAtom } from './atoms';
 import { pickedPageAtom } from './internalState';
-import { collectionsFromParams, encodeContentState } from '../core';
-import { loadContent, openContent, shownLocation, takeOverContent } from './useManifest';
+import { collectionsFromParams, encodeContentState, sameUrlList } from '../core';
+import { loadContent, openContent, pendingCollectionsAtom, shownLocation, takeOverContent } from './useManifest';
 import { goBack, openManifest, trailAtom } from './displays/structureState';
 
 // A deep link into a Collection: ?iiif-content=<manifest>&collection=<top>&collection=<sub>
@@ -368,5 +368,75 @@ describe('what onShownChange reports', () => {
     const seq = store.get(shownManifestAtom)!.seq;
     takeOverContent(store, m1, [top]);
     expect(store.get(shownManifestAtom)!.seq).toBe(seq);
+  });
+});
+
+describe('round 3', () => {
+  const where = (store: ReturnType<typeof createStore>) =>
+    shownLocation(
+      store.get(shownManifestAtom)!,
+      store.get(trailAtom),
+      store.get(manifestUrlAtom),
+      store.get(pendingCollectionsAtom),
+    );
+
+  it('counts the Collections still loading as part of the location', async () => {
+    const store = createStore();
+    let answer = () => {};
+    const wait = new Promise<void>((r) => (answer = r));
+    vi.stubGlobal('fetch', async (target: string) => {
+      if (target === top) await wait;
+      return { ok: target in served, json: async () => served[target] } as unknown as Response;
+    });
+    await loadContent(store, sub, () => 'en', [top]);
+    await openManifest(store, m1, true, () => 'en');
+    // the move is reported with the Collection above, though it has not arrived
+    expect(where(store)).toEqual({ url: m1, collections: [top, sub], origin: 'move' });
+    expect(takeOverContent(store, m1, [top, sub])).toBe(true);
+    answer();
+    await settled(store, 2);
+    expect(where(store).collections).toEqual([top, sub]);
+    expect(store.get(pendingCollectionsAtom)).toEqual([]);
+    expect(takeOverContent(store, m1, [top, sub])).toBe(true);
+  });
+
+  it('keeps the resolved URL on the trail when the iiif-content is a content state', async () => {
+    const store = createStore();
+    const state = encodeContentState(top);
+    served[state] = served[top];
+    await loadContent(store, state, () => 'en');
+    await openManifest(store, m1, true, () => 'en');
+    expect(trailUrls(store)).toEqual([top]);
+    expect(where(store).collections).toEqual([top]);
+    expect(takeOverContent(store, m1, [top])).toBe(true);
+  });
+
+  it('finds the entry to go back to by the manifest shown when the iiif-content is a content state', async () => {
+    const state = encodeContentState(m1);
+    served[state] = served[m1];
+    const other = createStore();
+    // sub lists m1 second
+    await loadContent(other, state, () => 'en', [sub]);
+    await settled(other, 1);
+    expect(other.get(trailAtom).items[0].index).toBe(1);
+  });
+
+  it('a takeover that goes back is quiet: the host has set the place already', async () => {
+    const store = createStore();
+    await loadContent(store, top, () => 'en');
+    await openManifest(store, m1, true, () => 'en');
+    expect(store.get(shownManifestAtom)?.quiet).toBeUndefined();
+    expect(takeOverContent(store, top, [])).toBe(true);
+    expect(store.get(shownManifestAtom)?.quiet).toBe(true);
+    // the viewer's own Back is not quiet
+    await openManifest(store, m2, true, () => 'en');
+    goBack(store, 'en');
+    expect(store.get(shownManifestAtom)?.quiet).toBeUndefined();
+  });
+
+  it('compares lists of URLs element by element', () => {
+    expect(sameUrlList(['a', 'b'], ['a', 'b'])).toBe(true);
+    expect(sameUrlList(['a\nb'], ['a', 'b'])).toBe(false);
+    expect(sameUrlList(['a'], ['a', 'b'])).toBe(false);
   });
 });

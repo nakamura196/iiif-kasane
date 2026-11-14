@@ -2,10 +2,16 @@
 // can use the history's own Back when the entry before is exactly the place to return to. Without it, going
 // back would push a new entry (the history grows) or replace the current one (two equal entries in a row).
 
-/** An address compared by what it opens: the item, the Collections walked through, the tab. */
+import { decodeContentState } from 'iiif-kasane/core';
+
+/**
+ * An address compared by what it opens: the item, the Collections walked through, the tab. A content state and
+ * the URL it names are the same place.
+ */
 export function locationKey(search: string): string {
   const params = new URLSearchParams(search);
-  return JSON.stringify([params.get('iiif-content'), params.getAll('collection'), params.get('tab')]);
+  const resolved = (v: string | null) => decodeContentState(v) ?? v;
+  return JSON.stringify([resolved(params.get('iiif-content')), params.getAll('collection').map(resolved), params.get('tab')]);
 }
 
 export class PushedLocations {

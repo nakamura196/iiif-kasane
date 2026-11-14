@@ -188,3 +188,24 @@ test('a ?collection= value that is not an address is dropped; the manifest still
   await expect(card(page, /Sub shelf/)).toBeVisible();
   expect(outside).toEqual([]);
 });
+
+test('a move before the deep link Collections arrive still writes them into the address', async ({ page }) => {
+  await serve(page);
+  // the Collection above is slow: it answers only when released
+  let release = () => {};
+  const held = new Promise<void>((r) => (release = r));
+  await page.route(TOP, async (route) => {
+    await held;
+    return route.fulfill({ json: data[TOP], headers: cors });
+  });
+  await page.goto(viewer(`iiif-content=${enc(SUB)}&collection=${enc(TOP)}`));
+  await card(page, /Alpha/).click();
+  await expect(pager(page)).toContainText('1 / 3');
+  await expect.poll(() => params(page).get('iiif-content')).toBe(ALPHA);
+  expect(params(page).getAll('collection')).toEqual([TOP, SUB]);
+  release();
+  // Back then goes through both
+  await back(page).click();
+  await expect.poll(() => params(page).get('iiif-content')).toBe(SUB);
+  expect(params(page).getAll('collection')).toEqual([TOP]);
+});

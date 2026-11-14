@@ -147,8 +147,8 @@ const ViewerContent: NextPage = () => {
         // new entry; the browser's Back then continues from there). Else the current entry is replaced:
         // pushing would grow the history and the browser's Back would walk forward through the places just left.
         if (pushed.current.takeIfPrevious(next)) {
+          // the history's Back is on its way: its popstate is ours (cleared there), not the browser's button
           selfBack.current = true;
-          window.setTimeout(() => (selfBack.current = false), 1000);
           router.back();
         } else router.replace(next);
         return;
