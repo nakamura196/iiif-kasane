@@ -1,5 +1,5 @@
-// structure: 複数ページの資料の見せ方（ページ送り・開始位置・目次・content state）の読み取り。
-// React に依存しない。この機能の担当だけがこのファイルを書く。
+// structure: reading how a multi-page item is shown (paging, start position, table of contents, content state).
+// No dependency on React. Only the owner of this feature writes this file.
 
 import type { ContainerInfo } from '../services/containers';
 
@@ -11,12 +11,12 @@ const str = (v: unknown): string | undefined => (typeof v === 'string' && v ? v 
 const strings = (v: unknown): string[] => asList(v).filter((x): x is string => typeof x === 'string');
 
 // ---------------------------------------------------------------------------
-// 断片（#xywh=... と #t=...）
+// Fragments (#xywh=... and #t=...)
 // ---------------------------------------------------------------------------
 
-/** Canvas 上の領域 [x, y, width, height]（Canvas 座標）。 */
+/** A region of a Canvas [x, y, width, height] (Canvas coordinates). */
 export type Xywh = [number, number, number, number];
-/** 時間の範囲 [開始, 終了]（秒）。終了が無いときは undefined。 */
+/** A time range [start, end] in seconds. `end` is undefined when there is none. */
 export type TocTimeRange = [number, number | undefined];
 
 export interface Fragment {
@@ -26,7 +26,7 @@ export interface Fragment {
 
 const nums = (s: string): number[] => s.split(',').map((x) => Number(x.trim()));
 
-/** `xywh=1,2,3,4&t=10,20` のような断片（# の後ろ）を読む。 */
+/** Reads a fragment such as `xywh=1,2,3,4&t=10,20` (the part after #). */
 export function parseFragment(fragment: string | undefined | null): Fragment {
   const out: Fragment = {};
   if (!fragment) return out;
@@ -48,15 +48,22 @@ export function parseFragment(fragment: string | undefined | null): Fragment {
   return out;
 }
 
-/** `https://.../canvas/1#t=0,30` を、id と断片に分ける。 */
+const MEDIA_KEY = /^(?:xywh|t)=/;
+
+/**
+ * Splits `https://.../canvas/1#t=0,30` into the id and the fragment. The split is at the last `#` that starts a
+ * media fragment key (`xywh=`, `t=`), even when the values do not parse; a `#` that starts anything else belongs to
+ * the id (ids such as `.../manifest#p1` exist).
+ */
 export function splitId(id: string): { id: string; fragment: Fragment } {
-  const hash = id.indexOf('#');
-  if (hash < 0) return { id, fragment: {} };
-  return { id: id.slice(0, hash), fragment: parseFragment(id.slice(hash + 1)) };
+  for (let i = id.lastIndexOf('#'); i >= 0; i = i === 0 ? -1 : id.lastIndexOf('#', i - 1)) {
+    if (MEDIA_KEY.test(id.slice(i + 1))) return { id: id.slice(0, i), fragment: parseFragment(id.slice(i + 1)) };
+  }
+  return { id, fragment: {} };
 }
 
 // ---------------------------------------------------------------------------
-// 見せ方（behavior・viewingDirection）
+// How it is shown (behavior and viewingDirection)
 // ---------------------------------------------------------------------------
 
 export type ViewingDirection = 'left-to-right' | 'right-to-left' | 'top-to-bottom' | 'bottom-to-top';
@@ -70,7 +77,7 @@ export interface ViewingInfo {
 
 const DIRECTIONS: readonly string[] = ['left-to-right', 'right-to-left', 'top-to-bottom', 'bottom-to-top'];
 
-/** マニフェストの behavior と viewingDirection から、ページの並べ方を決める。 */
+/** Decides how the pages are arranged, from the manifest's behavior and viewingDirection. */
 export function viewingOf(manifest: unknown): ViewingInfo {
   const m = isObject(manifest) ? manifest : {};
   const behavior = strings(m.behavior);
@@ -90,17 +97,17 @@ export function viewingOf(manifest: unknown): ViewingInfo {
 }
 
 export interface StepArrows {
-  /** 「前へ」の矢印 */
+  /** The "previous" arrow */
   prev: string;
-  /** 「次へ」の矢印 */
+  /** The "next" arrow */
   next: string;
-  /** 横に並べたボタンで「次へ」を先（左）に置くか。右から左・下から上で true */
+  /** Whether "next" goes first (on the left) in a row of buttons. True for right-to-left and bottom-to-top */
   nextFirst: boolean;
-  /** 上下に読む向きか */
+  /** Whether the reading direction is vertical */
   vertical: boolean;
 }
 
-/** 読む向きに合わせた、前へ／次へ の矢印と並べ方。 */
+/** The previous/next arrows and the arrangement for a reading direction. */
 export function stepArrows(direction: ViewingDirection): StepArrows {
   switch (direction) {
     case 'right-to-left':
@@ -114,7 +121,7 @@ export function stepArrows(direction: ViewingDirection): StepArrows {
   }
 }
 
-/** Canvas ごとの behavior（Canvas の id から引く）。 */
+/** The behavior of each Canvas (looked up by Canvas id). */
 export function canvasBehaviorsOf(manifest: unknown): Map<string, string[]> {
   const out = new Map<string, string[]>();
   const items = isObject(manifest) ? asList(manifest.items) : [];
@@ -125,9 +132,9 @@ export function canvasBehaviorsOf(manifest: unknown): Map<string, string[]> {
 }
 
 /**
- * 見開きの組み分け。order は表示順の container の番号。
- * paged では先頭 1 枚を単独にし、あとは 2 枚ずつ組む。non-paged / facing-pages は単独。
- * paged 以外は 1 枚ずつ。
+ * Groups pages into spreads. `order` holds the indexes of the containers in display order.
+ * In paged mode the first one stands alone and the rest are paired. Non-paged and facing-pages stand alone.
+ * Anything other than paged shows one at a time.
  */
 export function groupSpreads(order: number[], mode: ViewingMode, standalone: (index: number) => boolean): number[][] {
   if (mode !== 'paged') return order.map((i) => [i]);
@@ -151,27 +158,21 @@ export function groupSpreads(order: number[], mode: ViewingMode, standalone: (in
 }
 
 // ---------------------------------------------------------------------------
-// 開始位置（start）
+// Start position (start)
 // ---------------------------------------------------------------------------
 
 export interface CanvasTarget extends Fragment {
-  /** 断片を除いた Canvas の id */
+  /** The Canvas id without the fragment */
   canvasId: string;
 }
 
-// start・Range の項目・content state の target など、Canvas を指す書き方をすべて受ける。
-//  - "canvasId#xywh=..." （文字列）
-//  - { id, type: "Canvas" } （id に断片が付くこともある）
+// Accepts every way of pointing at a Canvas: start, Range items, content state targets, and so on.
+//  - "canvasId#xywh=..." (a string)
+//  - { id, type: "Canvas" } (the id may carry a fragment)
 //  - { type: "SpecificResource", source: "canvasId" | { id }, selector: PointSelector | FragmentSelector }
-// A '#' that does not start a media fragment (xywh, t) belongs to the id: Canvas ids such as `.../manifest#p1` exist.
-function splitCanvasId(id: string): { id: string; fragment: Fragment } {
-  const split = splitId(id);
-  return id.includes('#') && Object.keys(split.fragment).length === 0 ? { id, fragment: {} } : split;
-}
-
 function canvasTargetOf(value: unknown): CanvasTarget | null {
   if (typeof value === 'string') {
-    const { id, fragment } = splitCanvasId(value);
+    const { id, fragment } = splitId(value);
     return id ? { canvasId: id, ...fragment } : null;
   }
   if (!isObject(value)) return null;
@@ -196,19 +197,19 @@ function canvasTargetOf(value: unknown): CanvasTarget | null {
   if (typeof value.type === 'string' && value.type !== 'Canvas' && value.type !== 'Scene' && value.type !== 'Timeline') {
     return null;
   }
-  const { id: canvasId, fragment } = splitCanvasId(id);
+  const { id: canvasId, fragment } = splitId(id);
   return { canvasId, ...fragment };
 }
 
 export interface StartInfo extends CanvasTarget {
-  /** containers の中での番号。見つからなければ -1 */
+  /** The index in containers. -1 when not found */
   index: number;
 }
 
 const indexOfCanvas = (containers: ContainerInfo[], canvasId: string): number =>
   containers.findIndex((c) => c.id === canvasId);
 
-/** マニフェストの start（開始 Canvas）。指定が無いか、Canvas が見つからなければ null。 */
+/** The manifest's start (the first Canvas). Null when there is none or the Canvas is not found. */
 export function startOf(manifest: unknown, containers: ContainerInfo[]): StartInfo | null {
   const start = isObject(manifest) ? manifest.start : undefined;
   const target = canvasTargetOf(start);
@@ -218,9 +219,9 @@ export function startOf(manifest: unknown, containers: ContainerInfo[]): StartIn
 }
 
 /**
- * URL の `canvas` 引数で、最初に開く Canvas を決める。
- * 値は 1 から数えたコマの番号（`canvas=6`）か、Canvas の URI（`#xywh=` などの断片つきでもよい）。
- * 当たらなければ null。
+ * Decides the Canvas to open first from the `canvas` URL argument.
+ * The value is a 1-based frame number (`canvas=6`) or a Canvas URI (a fragment such as `#xywh=` is allowed).
+ * Null when nothing matches.
  */
 export function canvasParamTarget(
   value: string | null | undefined,
@@ -239,18 +240,18 @@ export function canvasParamTarget(
 }
 
 // ---------------------------------------------------------------------------
-// 目次（structures の Range）と代替のページ順
+// Table of contents (Ranges in structures) and the alternative page order
 // ---------------------------------------------------------------------------
 
 export interface TocNode {
   id: string;
   label: unknown;
   behavior: string[];
-  /** no-nav: ナビゲーションには出さない（子は繰り上げて出す） */
+  /** no-nav: not shown in navigation (its children are moved up) */
   noNav: boolean;
-  /** この Range が指す先頭の Canvas（断片つき）。無ければ null */
+  /** The first Canvas this Range points at (with fragment). Null if none */
   target: CanvasTarget | null;
-  /** この Range が直接指す Canvas（断片つき） */
+  /** The Canvases this Range points at directly (with fragment) */
   canvases: CanvasTarget[];
   thumbnail?: string;
   children: TocNode[];
@@ -281,7 +282,7 @@ const collectRanges = (list: unknown, into: Map<string, Json>, depth = 0): void 
 
 const rangeTree = (range: Json, known: Map<string, Json>, seen: Set<string>): TocNode | null => {
   const id = str(range.id) ?? '';
-  // 参照だけの Range（items が無い）は、ほかの場所にある本体で置き換える
+  // A Range that only refers to another (it has no items) is replaced by the body found elsewhere
   const body = asList(range.items).length === 0 && id ? (known.get(id) ?? range) : range;
   if (id && seen.has(id)) return null;
   const nextSeen = new Set(seen);
@@ -315,7 +316,7 @@ const rangeTree = (range: Json, known: Map<string, Json>, seen: Set<string>): To
   return node;
 };
 
-/** structures の Range の木。sequence（代替のページ順）は含めない。 */
+/** The tree of Ranges in structures. Does not include sequences (alternative page orders). */
 export function rangesOf(manifest: unknown): TocNode[] {
   if (!isObject(manifest)) return [];
   const known = new Map<string, Json>();
@@ -330,7 +331,7 @@ export function rangesOf(manifest: unknown): TocNode[] {
   return out;
 }
 
-/** 目次に出す項目（no-nav を除き、その子を繰り上げた木）。 */
+/** The items shown in the table of contents (no-nav removed, their children moved up). */
 export function navigableTree(nodes: TocNode[]): TocNode[] {
   const out: TocNode[] = [];
   for (const n of nodes) {
@@ -342,8 +343,8 @@ export function navigableTree(nodes: TocNode[]): TocNode[] {
 }
 
 /**
- * 目次の項目が「いま見ている所」か。Canvas が同じで、時間の範囲があるときは再生位置も範囲に入ること。
- * 自分で Canvas を指さない項目（章のまとまり）は、子のどれかが当たっていれば当たりとする。
+ * Whether a table of contents item is "where the reader is now": the Canvas is the same and, if the item has a time range, the playback position is in it.
+ * An item that does not point at a Canvas itself (a group of chapters) is active when any of its children is.
  */
 export function isTocNodeActive(node: TocNode, canvasId: string | undefined, time = 0): boolean {
   if (!canvasId) return false;
@@ -358,12 +359,12 @@ export function isTocNodeActive(node: TocNode, canvasId: string | undefined, tim
   return node.target ? hit(node.target) : false;
 }
 
-/** 目次に何か出るか。 */
+/** Whether anything is shown in the table of contents. */
 export function hasToc(manifest: unknown): boolean {
   return navigableTree(rangesOf(manifest)).length > 0;
 }
 
-/** behavior: sequence の Range（代替のページ順）。 */
+/** behavior: a Range of sequence (an alternative page order). */
 export function sequencesOf(manifest: unknown): SequenceInfo[] {
   if (!isObject(manifest)) return [];
   const known = new Map<string, Json>();
@@ -392,8 +393,8 @@ export function sequencesOf(manifest: unknown): SequenceInfo[] {
 }
 
 /**
- * 表示順の container の番号。sequence を渡すと、その順に並べる
- * （sequence に無い Canvas は、元の順で最後に付ける）。
+ * The indexes of the containers in display order. With a sequence, they follow it
+ * (Canvases not in the sequence are added at the end in their original order).
  */
 export function orderOf(containers: ContainerInfo[], sequence?: SequenceInfo | null): number[] {
   const natural = containers.map((_, i) => i);
@@ -413,13 +414,13 @@ export function orderOf(containers: ContainerInfo[], sequence?: SequenceInfo | n
 }
 
 // ---------------------------------------------------------------------------
-// content state（iiif-content）の target
+// Targets of a content state (iiif-content)
 // ---------------------------------------------------------------------------
 
 export interface ContentStateTargets {
-  /** マニフェストの URL（target の source・partOf・Manifest から）。無ければ null */
+  /** The manifest URL (from the target's source, partOf or Manifest). Null if none */
   manifestUrl: string | null;
-  /** 指されている Canvas（領域・時間つき）。無ければ空 */
+  /** The Canvases pointed at (with region and time). Empty if none */
   targets: Array<CanvasTarget & { manifestUrl?: string }>;
 }
 
@@ -431,14 +432,14 @@ const fromBase64Url = (s: string): string => {
   return new TextDecoder().decode(bytes);
 };
 
-/** content state の値（base64url・URL エンコードした JSON・JSON）を JSON に戻す。 */
+/** Turns a content state value (base64url, URL-encoded JSON, or JSON) back into JSON. */
 function decodeJson(value: string): unknown {
   const v = value.trim();
   let text = v;
   if (!(v.startsWith('{') || v.startsWith('['))) {
     text = v.startsWith('%7B') || v.startsWith('%7b') ? v : fromBase64Url(v);
   }
-  // Cookbook は encodeURIComponent した JSON を base64 にする（仕様どおり）
+  // The Cookbook base64-encodes encodeURIComponent'ed JSON (as the spec says)
   if (text.startsWith('%')) text = decodeURIComponent(text);
   return JSON.parse(text);
 }
@@ -478,9 +479,9 @@ const targetsOf = (target: unknown, out: ContentStateTargets, inherited?: string
 };
 
 /**
- * `iiif-content` の値から、指されているマニフェストと Canvas・領域・時間を取り出す。
- * 今ある decodeContentState は URL だけを返す。こちらは Canvas の指定も返す。
- * 値が URL のときは、その URL を manifestUrl にして targets は空にする。読めなければ null。
+ * Reads the manifest and the Canvas, region and time pointed at from an `iiif-content` value.
+ * decodeContentState returns only the URL; this one also returns the Canvas.
+ * When the value is a URL, it becomes manifestUrl and targets is empty. Null when it cannot be read.
  */
 export function parseContentState(value: string | null | undefined): ContentStateTargets | null {
   if (!value) return null;
@@ -493,7 +494,7 @@ export function parseContentState(value: string | null | undefined): ContentStat
   }
 }
 
-/** 読み込み済みの content state（JSON）から取り出す。Annotation（motivation: contentState）か、Canvas・Manifest そのもの。 */
+/** Reads from a content state (JSON) already loaded: an Annotation (motivation: contentState), or a Canvas or Manifest itself. */
 export function contentStateOf(json: unknown): ContentStateTargets | null {
   if (!isObject(json)) return null;
   const out: ContentStateTargets = { manifestUrl: null, targets: [] };
@@ -502,7 +503,7 @@ export function contentStateOf(json: unknown): ContentStateTargets | null {
   return out.manifestUrl || out.targets.length > 0 ? out : null;
 }
 
-/** ドロップされた文字列（URL・`?iiif-content=` つきの URL・JSON）から content state を読む。 */
+/** Reads a content state from dropped text (a URL, a URL with `?iiif-content=`, or JSON). */
 export function parseDroppedText(text: string): ContentStateTargets | null {
   const t = text.trim();
   if (!t) return null;
@@ -521,9 +522,9 @@ export function parseDroppedText(text: string): ContentStateTargets | null {
 }
 
 /**
- * containers の中から、content state の target に当たる Canvas をすべて探す（target の並び順）。
- * 0540: 1 つの content state が複数の Canvas を指すとき、その全部。
- * 同じ Canvas・同じ領域・同じ時間の重複は 1 つにまとめる。見つからなければ空。
+ * Finds every Canvas in containers that a content state target points at (in target order).
+ * 0540: when one content state points at several Canvases, all of them.
+ * The same Canvas with the same region and time is listed once. Empty when none is found.
  */
 export function matchTargets(
   targets: ContentStateTargets['targets'],
@@ -542,7 +543,7 @@ export function matchTargets(
   return out;
 }
 
-/** content state の target に当たる最初の Canvas。見つからなければ null。 */
+/** The first Canvas in containers that a content state target points at. Null when none is found. */
 export function matchTarget(
   targets: ContentStateTargets['targets'],
   containers: ContainerInfo[],
@@ -551,8 +552,8 @@ export function matchTarget(
 }
 
 /**
- * 0540: 開いたマニフェストには無い Canvas のうち、別のマニフェスト（partOf）にあると書かれたものを、
- * マニフェストごとにまとめる（target の並び順）。単一のマニフェストの content state では空になる。
+ * 0540: of the Canvases that the opened manifest does not have, groups those said to be in another manifest (partOf)
+ * by manifest (in target order). Empty for the content state of a single manifest.
  */
 export function remoteGroupsOf(
   targets: ContentStateTargets['targets'],
@@ -569,24 +570,23 @@ export function remoteGroupsOf(
 }
 
 export interface CompareSource {
-  /** このマニフェストの URL。開いているマニフェスト（最初の要素）は省略してよい */
+  /** The URL of this manifest. May be omitted for the opened manifest (the first element) */
   manifestUrl?: string;
-  /** 見出しに使うマニフェストの名前 */
+  /** The manifest's name used in headings */
   label: string;
   containers: ContainerInfo[];
 }
 
 export interface CompareItem {
   container: ContainerInfo;
-  /** どのマニフェストの Canvas か */
+  /** Which manifest the Canvas belongs to */
   manifestLabel: string;
   sourceIndex: number;
 }
 
 /**
- * 0540: target の並び順に、並べて見せる Canvas を決める。
- * sources[0] は開いているマニフェスト。Canvas の id がそこにあればそれを使い、
- * 無ければ target の manifestUrl が一致する他の source から探す。同じ Canvas の重複は 1 つにする。
+ * 0540: decides the Canvases to show side by side, in target order.
+ * sources[0] is the opened manifest. A Canvas id found there is used; otherwise the other source whose manifestUrl matches the target is searched. The same Canvas is listed once.
  */
 export function resolveCompareItems(
   targets: ContentStateTargets['targets'],
@@ -618,14 +618,14 @@ export function resolveCompareItems(
   return out;
 }
 
-/** 並べて見せる Canvas の番号（重複なし）。2 つ未満なら空（並べる意味が無い）。 */
+/** The indexes of the Canvases to show side by side (no duplicates). Empty for fewer than two (nothing to compare). */
 export function compareIndexesOf(matched: Array<{ index: number }>): number[] {
   const idx = [...new Set(matched.map((m) => m.index))];
   return idx.length >= 2 ? idx : [];
 }
 
 // ---------------------------------------------------------------------------
-// Collection の項目
+// Collection items
 // ---------------------------------------------------------------------------
 
 export interface CollectionEntry {
@@ -633,11 +633,11 @@ export interface CollectionEntry {
   type: 'Manifest' | 'Collection';
   label: unknown;
   thumbnail?: string;
-  /** 項目に書かれた navDate（Cookbook 0230）。Manifest の中までは見に行かない。 */
+  /** The navDate written on the item (Cookbook 0230). The Manifest itself is not fetched. */
   navDate?: string;
 }
 
-/** Collection（読み込み前の JSON）の項目。Manifest と入れ子の Collection だけを拾う。 */
+/** The items of a Collection (JSON before loading). Only Manifests and nested Collections are picked up. */
 export function collectionEntriesOf(raw: unknown): CollectionEntry[] {
   if (!isObject(raw)) return [];
   const out: CollectionEntry[] = [];
@@ -656,10 +656,10 @@ export function collectionEntriesOf(raw: unknown): CollectionEntry[] {
 }
 
 // ---------------------------------------------------------------------------
-// サムネイル
+// Thumbnails
 // ---------------------------------------------------------------------------
 
-/** 画像の本体（Choice なら最初の選択肢）から、小さい画像の URL を作る。Image API があればそれで縮める。 */
+/** From the body of an image (the first option of a Choice), makes the URL of a small image. Shrunk through the Image API when there is one. */
 const imageBodyThumbnail = (body: unknown, height: number): string | undefined => {
   const b = isObject(body) && body.type === 'Choice' ? asList(body.items)[0] : body;
   if (!isObject(b) || b.type !== 'Image') return undefined;
@@ -673,9 +673,9 @@ const imageBodyThumbnail = (body: unknown, height: number): string | undefined =
 };
 
 /**
- * Manifest（または Collection）本体から、一覧のカードに出す小さな画像の URL を選ぶ。
- * Collection の項目にサムネイルが無いとき（Cookbook 0230 など）に、Manifest を取ってきて使う。
- * 順に: 本体の thumbnail → 最初の Canvas の thumbnail → 最初の Canvas の画像（Image API なら縮めて）。
+ * From the Manifest (or Collection) itself, chooses the URL of a small image for a list card.
+ * Used when a Collection item has no thumbnail (Cookbook 0230 and others): the Manifest is fetched.
+ * In order: the body's thumbnail, the first Canvas's thumbnail, the first Canvas's image (shrunk when it is an Image API one).
  */
 export function manifestThumbnailOf(raw: unknown, height = 192): string | undefined {
   if (!isObject(raw)) return undefined;
@@ -697,8 +697,8 @@ export function manifestThumbnailOf(raw: unknown, height = 192): string | undefi
 }
 
 /**
- * ページ送りの小さな画像の URL。Canvas の thumbnail があればそれを使う。
- * 無ければ、IIIF Image API の画像 URL（…/full/<size>/0/default.jpg）を小さい指定に直す。
+ * The URL of a small image for paging. Uses the Canvas's thumbnail when there is one.
+ * Otherwise turns an IIIF Image API image URL (…/full/<size>/0/default.jpg) into a small size.
  */
 export function pageThumbnailUrl(container: ContainerInfo, rawCanvas?: unknown, height = 96): string | undefined {
   if (isObject(rawCanvas)) {

@@ -78,7 +78,8 @@ test('builds a content state for the shown page and a link that opens it again',
   const u = new URL(link);
   expect(u.searchParams.get('canvas')).toBeNull();
   expect(u.searchParams.get('iiif-content')).toMatch(/^[A-Za-z0-9_-]+$/);
-  await page.goto(link);
+  expect(u.searchParams.has('tab')).toBe(false);
+  await page.goto(`${link}&tab=share`);
   await expect(page.getByLabel('Content State (JSON)')).toHaveValue(new RegExp(`"id": "${BASE}/canvas/p2"`));
 });
 

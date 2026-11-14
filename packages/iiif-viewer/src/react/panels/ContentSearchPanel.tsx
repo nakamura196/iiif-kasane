@@ -33,6 +33,7 @@ import { annotationsAtom, selectedAnnotationIdAtom } from '../atoms';
 import { fmt } from '../displays/TranscriptPanel';
 import { navRequestAtom, nextSeq } from '../displays/structureState';
 import { useLocale, useTranslations } from '../env';
+import { BUTTON } from '../common/buttonClasses';
 import { CopyButton } from '../common/CopyButton';
 import { inferenceResultsAtom } from '../inference/state';
 import { localAnnotationPagesAtom, selectedCanvasAnnotationAtom, type LocalAnnotationPage } from '../overlays/canvasAnnotationState';
@@ -54,8 +55,6 @@ const MAX_MATCHES = 2000;
 /** Number of hits shown in the list at a time (Wellcome can return 1,753 in one response) */
 const LIST_STEP = 200;
 
-const BUTTON =
-  'px-2.5 py-1 rounded border border-gray-300 dark:border-gray-600 text-xs hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40';
 const PRIMARY = 'px-3 py-1 rounded text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-40';
 
 /** service: the provider's search service. local: local annotations */

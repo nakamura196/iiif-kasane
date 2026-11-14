@@ -7,6 +7,7 @@ import {
   absoluteManifestUrl,
   dragLink,
   encodeShareState,
+  shareManifestUrl,
   shareFragment,
   viewerLinkWith,
 } from './_share';
@@ -43,6 +44,13 @@ describe('buildContentState', () => {
   it('points at the manifest only when no page is included', () => {
     const s = buildContentState({ manifestUrl: MANIFEST, region: { x: 0, y: 0, w: 1, h: 1 } }) as { target: unknown };
     expect(s.target).toEqual({ id: MANIFEST, type: 'Manifest' });
+  });
+
+  it('rounds first and keeps at least 1 wide and high; clamps into the Canvas', () => {
+    expect(shareFragment({ x: 10, y: 10, w: 0.3, h: 0.4 })).toBe('xywh=10,10,1,1');
+    expect(shareFragment({ x: -5, y: 790, w: 300, h: 40 }, undefined, { w: 1000, h: 800 })).toBe('xywh=0,790,300,10');
+    expect(shareFragment({ x: 950, y: 0, w: 300, h: 40 }, undefined, { w: 1000, h: 800 })).toBe('xywh=950,0,50,40');
+    expect(shareFragment({ x: 5000, y: 0, w: 10, h: 10 }, undefined, { w: 1000, h: 800 })).toBe('xywh=999,0,1,10');
   });
 
   it('ignores an empty area and a bad time', () => {
@@ -140,14 +148,21 @@ describe('viewerLinkWith', () => {
     const u = new URL(link!);
     expect(u.searchParams.get('iiif-content')).toBe('ENC');
     expect(u.searchParams.has('canvas')).toBe(false);
-    expect(u.searchParams.get('tab')).toBe('share');
+    expect(u.searchParams.has('tab')).toBe(false);
+  });
+
+  it('drops the tab and the search state but keeps other arguments', () => {
+    const u = new URL(
+      viewerLinkWith('https://kasane.ldas.jp/ja/viewer?iiif-content=x&tab=contentSearch&q=bird&scope=local&lang=en', 'ENC')!,
+    );
+    expect([...u.searchParams.keys()].sort()).toEqual(['iiif-content', 'lang']);
   });
 
   it('replaces manifest= and curation= (and pos=) too', () => {
     const a = new URL(viewerLinkWith('https://kasane.ldas.jp/ja/viewer?manifest=https%3A%2F%2Fe.org%2Fm&tab=share', 'ENC')!);
     expect(a.searchParams.get('iiif-content')).toBe('ENC');
     expect(a.searchParams.has('manifest')).toBe(false);
-    expect(a.searchParams.get('tab')).toBe('share');
+    expect(a.searchParams.has('tab')).toBe(false);
     const b = new URL(viewerLinkWith('https://kasane.ldas.jp/ja/viewer?curation=x&pos=3', 'ENC')!);
     expect([...b.searchParams.keys()].sort()).toEqual(['iiif-content']);
   });
@@ -169,5 +184,26 @@ describe('absoluteManifestUrl', () => {
     expect(absoluteManifestUrl('blob:https://kasane.ldas.jp/1234', 'https://kasane.ldas.jp/')).toBeNull();
     expect(absoluteManifestUrl('data:application/json,{}', 'https://kasane.ldas.jp/')).toBeNull();
     expect(absoluteManifestUrl('/manifests/a.json')).toBeNull();
+  });
+});
+
+describe('shareManifestUrl', () => {
+  const curation = { '@context': 'http://iiif.io/ns/curation/2/context.json', '@type': 'cr:Curation' };
+  const converted = {
+    items: [
+      { id: 'https://e.org/c/1', type: 'Canvas', partOf: [{ id: 'https://e.org/m1', type: 'Manifest' }] },
+      { id: 'https://e.org/c/2', type: 'Canvas' },
+    ],
+  };
+  it('uses the shown URL for a manifest', () => {
+    expect(shareManifestUrl({ url: 'https://e.org/m', raw: { type: 'Manifest' }, manifest: {} }, 'x')).toBe('https://e.org/m');
+  });
+  it('uses the source manifest of the Canvas for a curation', () => {
+    const shown = { url: 'https://e.org/curation.json', raw: curation, manifest: converted };
+    expect(shareManifestUrl(shown, 'https://e.org/c/1')).toBe('https://e.org/m1');
+  });
+  it('is null for a curation whose Canvas has no source manifest', () => {
+    const shown = { url: 'https://e.org/curation.json', raw: curation, manifest: converted };
+    expect(shareManifestUrl(shown, 'https://e.org/c/2')).toBeNull();
   });
 });

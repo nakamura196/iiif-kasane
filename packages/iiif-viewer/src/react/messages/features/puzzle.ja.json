@@ -19,7 +19,6 @@
     "solvedTitle": "完成！",
     "solvedStats": "{total} ピースを {moves} 手・{time} で揃えました",
     "copyLink": "リンクをコピー",
-    "copied": "コピーしました",
     "copyFailed": "コピーできませんでした。リンクを選んでコピーしてください"
   }
 }

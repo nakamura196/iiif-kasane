@@ -2,6 +2,7 @@
 // (Named with a leading underscore so it stays out of the public API of iiif-kasane/core.)
 // No React and no DOM: the Share tab and tests both use this file.
 
+import { isCuration } from './curation';
 import type { ImageRegion } from './image';
 
 export interface ShareInput {
@@ -15,6 +16,8 @@ export interface ShareInput {
   region?: ImageRegion;
   /** The time in seconds (audio and video). Needs `canvasId`. */
   time?: number;
+  /** The size of the Canvas, when known: the area is kept inside it. */
+  canvasSize?: { w?: number; h?: number };
 }
 
 const CONTEXT = 'http://iiif.io/api/presentation/3/context.json';
@@ -25,11 +28,27 @@ const round = (n: number, digits = 0): number => {
   return Math.round(n * k) / k;
 };
 
-/** The fragment (without `#`) for an area and/or a time, or '' when there is neither. */
-export function shareFragment(region?: ImageRegion, time?: number): string {
+/**
+ * The fragment (without `#`) for an area and/or a time, or '' when there is neither.
+ * The area is rounded to whole numbers first (at least 1 wide and high) and, when the Canvas size is known,
+ * kept inside the Canvas.
+ */
+export function shareFragment(region?: ImageRegion, time?: number, size?: { w?: number; h?: number }): string {
   const parts: string[] = [];
   if (region && [region.x, region.y, region.w, region.h].every(Number.isFinite) && region.w > 0 && region.h > 0) {
-    parts.push(`xywh=${[region.x, region.y, region.w, region.h].map((n) => round(n)).join(',')}`);
+    let x = Math.max(0, round(region.x));
+    let y = Math.max(0, round(region.y));
+    let w = Math.max(1, round(region.w));
+    let h = Math.max(1, round(region.h));
+    if (size?.w && size.w > 0) {
+      x = Math.min(x, Math.max(0, round(size.w) - 1));
+      w = Math.max(1, Math.min(w, round(size.w) - x));
+    }
+    if (size?.h && size.h > 0) {
+      y = Math.min(y, Math.max(0, round(size.h) - 1));
+      h = Math.max(1, Math.min(h, round(size.h) - y));
+    }
+    parts.push(`xywh=${x},${y},${w},${h}`);
   }
   if (time !== undefined && Number.isFinite(time) && time >= 0) parts.push(`t=${round(time, 2)}`);
   return parts.join('&');
@@ -44,7 +63,7 @@ export function buildContentState(input: ShareInput): Record<string, unknown> {
   let target: Record<string, unknown> = manifest;
   if (input.canvasId) {
     const canvas = { id: input.canvasId, type: input.canvasType ?? 'Canvas', partOf: [manifest] };
-    const fragment = shareFragment(input.region, input.time);
+    const fragment = shareFragment(input.region, input.time, input.canvasSize);
     target = fragment
       ? {
           type: 'SpecificResource',
@@ -81,9 +100,34 @@ export function absoluteManifestUrl(url: string, base?: string): string | null {
   }
 }
 
+const asList = (v: unknown): unknown[] => (Array.isArray(v) ? v : v == null ? [] : [v]);
+
+/**
+ * The URL of the Manifest to put in a content state for a Canvas, or null when there is none to give.
+ * For a manifest, the shown URL. For a curation (`?curation=`) the shown URL is the curation, not a Manifest:
+ * the Manifest is the one the Canvas came from (its partOf), if the curation says so.
+ */
+export function shareManifestUrl(
+  shown: { url: string; raw: unknown; manifest: unknown },
+  canvasId: string,
+  base?: string,
+): string | null {
+  if (!isCuration(shown.raw)) return absoluteManifestUrl(shown.url, base);
+  const items = asList((shown.manifest as { items?: unknown } | null)?.items);
+  const canvas = items.find((c) => (c as { id?: unknown } | null)?.id === canvasId) as { partOf?: unknown } | undefined;
+  for (const p of asList(canvas?.partOf)) {
+    const q = p as { id?: unknown; type?: unknown } | null;
+    if (q && q.type === 'Manifest' && typeof q.id === 'string') return absoluteManifestUrl(q.id, base);
+  }
+  return null;
+}
+
+// What describes the item and the place stays; the state of the page (tab, search) does not.
+const DROPPED_ARGS = ['manifest', 'curation', 'pos', 'canvas', 'tab', 'q', 'scope'];
+
 /**
  * The page URL with `iiif-content` set to the encoded content state. The arguments that named the item another
- * way (`manifest`, `curation`, `pos`) and `canvas`, which would contradict the state, are dropped.
+ * way (`manifest`, `curation`, `pos`), `canvas`, which would contradict the state, and the page state (`tab`, `q`, `scope`) are dropped.
  * Returns null when the URL names no item at all (an embed on another site), since there is no viewer link to build.
  */
 export function viewerLinkWith(pageUrl: string, encoded: string): string | null {
@@ -96,7 +140,7 @@ export function viewerLinkWith(pageUrl: string, encoded: string): string | null 
   const p = url.searchParams;
   if (!p.has('iiif-content') && !p.has('manifest') && !p.has('curation')) return null;
   p.set('iiif-content', encoded);
-  for (const key of ['manifest', 'curation', 'pos', 'canvas']) p.delete(key);
+  for (const key of DROPPED_ARGS) p.delete(key);
   return url.toString();
 }
 

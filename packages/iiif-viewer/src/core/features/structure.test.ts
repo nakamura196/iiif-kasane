@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { containersOf } from '../services/containers';
+import { containersOf, type ContainerInfo } from '../services/containers';
 import { convertToV4 } from '../services/manifestConverter';
 import {
   canvasBehaviorsOf,
@@ -49,6 +49,25 @@ describe('断片', () => {
   });
   it('id から断片を分ける', () => {
     expect(splitId('https://x/canvas/1#t=0,9')).toEqual({ id: 'https://x/canvas/1', fragment: { t: [0, 9] } });
+  });
+  it('splits at a media fragment key even when the values do not parse', () => {
+    expect(splitId('https://x/canvas/1#xywh=percent:10,10,20,20')).toEqual({ id: 'https://x/canvas/1', fragment: {} });
+    expect(splitId('https://x/canvas/1#t=npt:00:01:00')).toEqual({ id: 'https://x/canvas/1', fragment: {} });
+    expect(splitId('https://x/canvas/1#xywh=1,2,3')).toEqual({ id: 'https://x/canvas/1', fragment: {} });
+    expect(splitId('https://x/canvas/1#xywh=1,2,3,4&t=5')).toEqual({
+      id: 'https://x/canvas/1',
+      fragment: { xywh: [1, 2, 3, 4], t: [5, undefined] },
+    });
+  });
+  it('keeps a # that does not start a media fragment key in the id', () => {
+    expect(splitId('https://x/m#p1')).toEqual({ id: 'https://x/m#p1', fragment: {} });
+    expect(splitId('https://x/m#p1#xywh=1,2,3,4')).toEqual({ id: 'https://x/m#p1', fragment: { xywh: [1, 2, 3, 4] } });
+  });
+  it('matches the Canvas for fragments that do not parse (canvas=, start)', () => {
+    const list = [{ id: 'https://x/canvas/1' }, { id: 'https://x/m#p1' }] as unknown as ContainerInfo[];
+    expect(canvasParamTarget('https://x/canvas/1#xywh=percent:10,10,20,20', list)?.index).toBe(0);
+    expect(canvasParamTarget('https://x/m#p1#xywh=1,2,3,4', list)).toMatchObject({ index: 1, xywh: [1, 2, 3, 4] });
+    expect(startOf({ start: { id: 'https://x/canvas/1#t=npt:00:01:00', type: 'Canvas' } }, list)?.index).toBe(0);
   });
 });
 

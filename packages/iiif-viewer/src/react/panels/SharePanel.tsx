@@ -1,20 +1,20 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useAtomValue } from 'jotai';
 import type { ContainerInfo, ImageRegion } from '../../core';
 import {
-  absoluteManifestUrl,
   contentStateJson,
   dragLink,
   encodeShareState,
+  shareManifestUrl,
   viewerLinkWith,
 } from '../../core/features/_share';
 import { BUTTON } from '../common/buttonClasses';
 import { CopyButton } from '../common/CopyButton';
 import { useTranslations } from '../env';
 import { viewReaderAtom } from '../inference/viewState';
-import { usePlayback } from '../playback';
+import { usePlayback, type Playback } from '../playback';
 import type { Panel, PanelContext } from './types';
 
 // Share "this page, this area, this time": the IIIF Content State (JSON and encoded), a link to this viewer,
@@ -30,6 +30,37 @@ const hasMedia = (c: ContainerInfo, kinds: string[]): boolean =>
 
 const pageUrl = (): string | undefined => (typeof window === 'undefined' ? undefined : window.location.href);
 
+// Hands the newest playback to a ref. The playback changes about four times a second while a video plays; this part
+// renders nothing, so only it re-renders and the tab (the text fields) does not.
+function PlaybackProbe({ onPlayback }: { onPlayback: (p: Playback) => void }) {
+  const playback = usePlayback();
+  useEffect(() => {
+    onPlayback(playback);
+  });
+  return null;
+}
+
+function Check({
+  id,
+  checked,
+  disabled = false,
+  label,
+  onChange,
+}: {
+  id: string;
+  checked: boolean;
+  disabled?: boolean;
+  label: string;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <label className="flex items-center gap-2 text-sm" htmlFor={id}>
+      <input id={id} type="checkbox" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
+      <span>{label}</span>
+    </label>
+  );
+}
+
 interface InnerProps {
   container: ContainerInfo;
   manifestUrl: string;
@@ -39,7 +70,7 @@ interface InnerProps {
 function ShareInner({ container, manifestUrl }: InnerProps) {
   const t = useTranslations('Share');
   const uid = useId();
-  const playback = usePlayback();
+  const playbackRef = useRef<Playback | null>(null);
   const viewReader = useAtomValue(viewReaderAtom);
   const [withPage, setWithPage] = useState(true);
   const [withRegion, setWithRegion] = useState(false);
@@ -58,8 +89,10 @@ function ShareInner({ container, manifestUrl }: InnerProps) {
     return r;
   };
   const readTime = (): number => {
-    setTime(playback.currentTime);
-    return playback.currentTime;
+    const p = playbackRef.current;
+    const now = p?.mediaRef.current?.currentTime ?? p?.currentTime ?? 0;
+    setTime(now);
+    return now;
   };
 
   const build = (r: ImageRegion | null, tm: number | null) => {
@@ -67,6 +100,7 @@ function ShareInner({ container, manifestUrl }: InnerProps) {
       manifestUrl,
       canvasId: withPage ? canvasId : undefined,
       canvasType: container.kind,
+      canvasSize: { w: container.width, h: container.height },
       region: withPage && withRegion && isImage && r ? r : undefined,
       time: withPage && withTime && isTimed && tm !== null ? tm : undefined,
     });
@@ -77,30 +111,24 @@ function ShareInner({ container, manifestUrl }: InnerProps) {
   const shownState = build(region, time);
   const freshState = () => build(withRegion ? readRegion() : region, withTime ? readTime() : time);
 
-  const check = (id: string, checked: boolean, set: (v: boolean) => void, label: string, disabled = false) => (
-    <label className="flex items-center gap-2 text-sm" htmlFor={`${uid}-${id}`}>
-      <input id={`${uid}-${id}`} type="checkbox" checked={checked} disabled={disabled} onChange={(e) => set(e.target.checked)} />
-      <span>{label}</span>
-    </label>
-  );
-
   return (
     <div className="p-3 space-y-3 text-[var(--ds-fg)]" data-testid="share-panel">
+      {isTimed && <PlaybackProbe onPlayback={(p) => (playbackRef.current = p)} />}
       <p className="text-xs">{t('hint')}</p>
       <div className="space-y-1.5">
-        {check('page', withPage, setWithPage, t('includePage'))}
+        <Check id={`${uid}-page`} checked={withPage} onChange={setWithPage} label={t('includePage')} />
         {isImage && (
           <div className="flex flex-wrap items-center gap-2">
-            {check(
-              'region',
-              withRegion,
-              (v) => {
+            <Check
+              id={`${uid}-region`}
+              checked={withRegion}
+              onChange={(v) => {
                 setWithRegion(v);
                 if (v) readRegion();
-              },
-              t('includeRegion'),
-              !withPage || !reader,
-            )}
+              }}
+              label={t('includeRegion')}
+              disabled={!withPage || !reader}
+            />
             {withRegion && (
               <button type="button" className={BUTTON} onClick={readRegion}>
                 {t('updateRegion')}
@@ -110,16 +138,16 @@ function ShareInner({ container, manifestUrl }: InnerProps) {
         )}
         {isTimed && (
           <div className="flex flex-wrap items-center gap-2">
-            {check(
-              'time',
-              withTime,
-              (v) => {
+            <Check
+              id={`${uid}-time`}
+              checked={withTime}
+              onChange={(v) => {
                 setWithTime(v);
                 if (v) readTime();
-              },
-              withTime && time !== null ? t('includeTime', { time: time.toFixed(1) }) : t('includeTimeNow'),
-              !withPage,
-            )}
+              }}
+              label={withTime && time !== null ? t('includeTime', { time: time.toFixed(1) }) : t('includeTimeNow')}
+              disabled={!withPage}
+            />
             {withTime && (
               <button type="button" className={BUTTON} onClick={readTime}>
                 {t('updateTime')}
@@ -187,7 +215,7 @@ function ShareInner({ container, manifestUrl }: InnerProps) {
 
 function ShareTab({ container, shown }: PanelContext) {
   const t = useTranslations('Share');
-  const manifestUrl = shown?.url ? absoluteManifestUrl(shown.url, pageUrl()) : null;
+  const manifestUrl = shown && container ? shareManifestUrl(shown, container.id, pageUrl()) : null;
   if (!container || !manifestUrl) return <div className="p-4 text-sm text-[var(--ds-fg)]">{t('unavailable')}</div>;
   return <ShareInner key={container.id} container={container} manifestUrl={manifestUrl} />;
 }
@@ -196,7 +224,7 @@ export const sharePanel: Panel = {
   id: 'share',
 
   order: 120,
-  // Not for a local image (blob:) or anything else other viewers cannot open
-  available: ({ container, shown }) => !!container && !!shown?.url && absoluteManifestUrl(shown.url, pageUrl()) !== null,
+  // Not for a local image (blob:), a curation whose Canvas has no source manifest, or anything else other viewers cannot open
+  available: ({ container, shown }) => !!container && !!shown && shareManifestUrl(shown, container.id, pageUrl()) !== null,
   Component: ShareTab,
 };
