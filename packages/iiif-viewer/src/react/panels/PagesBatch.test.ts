@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import type { ContainerInfo } from '../../core';
 import { batchStateAtom, type BatchState } from '../inference/batch';
 import { inferenceResultsAtom, resultKey, type InferenceResult } from '../inference/state';
-import { PageThumbMarks, PagesReadingStyle, batchModelAtom } from './PagesBatch';
+import { PageThumbMarks, PagesReadingStyle, batchModelAtom, batchStatusOf } from './PagesBatch';
 
 const page = { id: 'c1', kind: 'Canvas', label: {}, width: 100, height: 100, painting: [], supplementing: [] } as ContainerInfo;
 const result = {
@@ -71,5 +71,22 @@ describe('how a page looks in the pages grid during a run', () => {
     const reduced = css.slice(css.indexOf('prefers-reduced-motion'));
     expect(reduced).toMatch(/\.kasane-scan-frame[^{]*\{ animation: none; \}/);
     expect(reduced).not.toMatch(/kasane-scan-frame[^{]*\{ display: none/);
+  });
+});
+
+describe('the message under the run button', () => {
+  it('says the run is waiting while the image server refuses', () => {
+    expect(batchStatusOf(batch({ done: 1, waiting: true }), 'm1')).toEqual({ key: 'batchWaiting', values: { done: 1, total: 2 } });
+    expect(batchStatusOf(batch({ done: 1 }), 'm1')?.key).toBe('batchProgress');
+  });
+
+  it('tells a stop by the image server from a stop by the user', () => {
+    expect(batchStatusOf(batch({ running: false, stopped: true, blocked: true, done: 1 }), 'm1')?.key).toBe('batchBlocked');
+    expect(batchStatusOf(batch({ running: false, stopped: true, done: 1 }), 'm1')?.key).toBe('batchStopped');
+    expect(batchStatusOf(batch({ running: false, done: 2 }), 'm1')).toEqual({ key: 'batchDone', values: { total: 2 } });
+  });
+
+  it('says nothing for another model', () => {
+    expect(batchStatusOf(batch({}), 'm2')).toBeNull();
   });
 });

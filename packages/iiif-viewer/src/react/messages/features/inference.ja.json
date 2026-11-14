@@ -45,6 +45,8 @@
     "batchProgress": "読み取り中 {done} / {total} ページ",
     "batchDone": "{total} ページを読み取りました",
     "batchStopped": "止めました（{done} / {total} ページ）",
+    "batchWaiting": "読み取り中 {done} / {total} ページ（画像のサーバに断られたので、少し待ってから読み直します）",
+    "batchBlocked": "画像のサーバに続けて断られたので止めました（{done} / {total} ページ）。時間を置いてから「続きを実行」してください",
     "batchNothing": "どのページにも、もう結果があります",
     "batchFailed": "（読めなかったページ {count}）",
     "batchNoModel": "推論タブでモデルをダウンロードすると、ここから全ページにかけられます。",

@@ -45,6 +45,8 @@
     "batchProgress": "Reading {done} / {total} pages",
     "batchDone": "Read {total} pages",
     "batchStopped": "Stopped ({done} / {total} pages)",
+    "batchWaiting": "Reading {done} / {total} pages (the image server refused; waiting a little before asking again)",
+    "batchBlocked": "Stopped because the image server kept refusing ({done} / {total} pages). Wait a while, then Continue",
     "batchNothing": "Every page already has a result",
     "batchFailed": "({count} pages could not be read)",
     "batchNoModel": "Download a model in the Inference tab to run it on all pages from here.",
