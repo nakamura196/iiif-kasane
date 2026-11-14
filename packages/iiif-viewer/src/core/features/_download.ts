@@ -25,11 +25,6 @@ export interface DownloadSize {
 /** Long sides tried when the service lists no sizes (only those below the long side of the region are used). */
 export const COMPUTED_LONG_SIDES = [256, 512, 1024, 2048, 4096] as const;
 
-const quality = (version: 1 | 2 | 3) => (version === 1 ? 'native' : 'default');
-
-const regionParam = (region: DownloadRegion): string =>
-  region === 'full' ? 'full' : `${Math.round(region.x)},${Math.round(region.y)},${Math.round(region.w)},${Math.round(region.h)}`;
-
 /** Whether the layer is the plain image of its service (not cropped, turned or mirrored by the manifest). */
 export const isPlainLayer = (layer: Pick<ImageLayer, 'regionSpec' | 'rotation' | 'mirror'>): boolean =>
   (!layer.regionSpec || layer.regionSpec === 'full') && layer.rotation % 360 === 0 && !layer.mirror;
@@ -69,12 +64,15 @@ export const visibleDownloadRegion = (
 export const regionSize = (region: DownloadRegion, info: Pick<ImageInfo, 'width' | 'height'>): { width: number; height: number } =>
   region === 'full' ? { width: info.width, height: info.height } : { width: region.w, height: region.h };
 
+/** The keyword for "the largest the server gives": `max` in Image API 3, `full` before. */
+const maxKeyword = (service: ImageServiceRef) => (service.version === 3 ? 'max' : 'full');
+
 /**
  * The sizes to offer for `region`, smallest first, the largest last (id `max`). Empty when the server cannot serve
  * the region (level 0 cannot cut). Every URL is one the service promises to serve.
  */
 export const downloadSizesOf = (service: ImageServiceRef, info: ImageInfo, region: DownloadRegion): DownloadSize[] => {
-  if (region !== 'full' && !canCutRegion(info)) return [];
+  if (!canCutRegion(info)) return region === 'full' ? level0SizesOf(service, info) : [];
   const full = regionSize(region, info);
   const rw = Math.round(full.width);
   const rh = Math.round(full.height);
@@ -86,29 +84,42 @@ export const downloadSizesOf = (service: ImageServiceRef, info: ImageInfo, regio
     out.push({ id: String(width), width, height, url, max: false });
   };
   if (region === 'full' && info.sizes.length > 0) {
-    // The listed sizes are the only ones a level 0 service has; at other levels they are the natural steps
     for (const s of info.sizes) push(s.width, s.height, imageRequestUrl(service, 'full', s.width, s.height));
-  } else if (canCutRegion(info)) {
+  } else {
     const long = Math.max(rw, rh);
     for (const side of COMPUTED_LONG_SIDES) {
       if (side >= long) break;
       const k = side / long;
-      const width = Math.max(1, Math.round(rw * k));
-      const height = Math.max(1, Math.round(rh * k));
-      const small = limitedSize(width, height, info);
+      const small = limitedSize(Math.max(1, Math.round(rw * k)), Math.max(1, Math.round(rh * k)), info);
       push(small.width, small.height, imageRequestUrl(service, region, small.width));
     }
   }
   out.sort((a, b) => a.width - b.width);
 
-  // The largest the server gives. `max` is the keyword of Image API 3; before it `full` (no resize) is the whole size.
-  const r = regionParam(region);
-  const q = quality(service.version);
-  let url: string;
-  if (service.version === 3) url = `${service.id}/${r}/max/0/${q}.jpg`;
-  else if (max.width === rw && max.height === rh) url = `${service.id}/${r}/full/0/${q}.jpg`;
-  else url = imageRequestUrl(service, region, max.width);
+  // The largest the server gives: the keyword when nothing cuts it, else its size as pixels (a level 1 or 2 server
+  // takes any width)
+  const limited = max.width !== rw || max.height !== rh;
+  const url = service.version === 3 || !limited ? imageRequestUrl(service, region, maxKeyword(service)) : imageRequestUrl(service, region, max.width);
   out.push({ id: 'max', width: max.width, height: max.height, url, max: true });
+  return out;
+};
+
+// Level 0 serves only the sizes it lists and the whole image at its own size. A width that is not listed (`full/<w>,`)
+// is a resize, which it does not have, so it is never asked for, not even when a limit cuts the full size.
+const level0SizesOf = (service: ImageServiceRef, info: ImageInfo): DownloadSize[] => {
+  const out: DownloadSize[] = [];
+  for (const s of [...info.sizes].sort((a, b) => a.width - b.width)) {
+    if (out.some((o) => o.width === s.width)) continue;
+    out.push({ id: String(s.width), width: s.width, height: s.height, url: imageRequestUrl(service, 'full', s.width, s.height), max: false });
+  }
+  const full = out.find((s) => s.width === info.width && s.height === info.height);
+  const allowed = limitedSize(info.width, info.height, info);
+  // The full size is the listed one when the server lists it; else the keyword, if no limit cuts it
+  if (!full && allowed.width === info.width && allowed.height === info.height) {
+    out.push({ id: 'max', width: info.width, height: info.height, url: imageRequestUrl(service, 'full', maxKeyword(service)), max: true });
+  } else if (out.length > 0) {
+    out[out.length - 1] = { ...out[out.length - 1], id: 'max', max: true };
+  }
   return out;
 };
 

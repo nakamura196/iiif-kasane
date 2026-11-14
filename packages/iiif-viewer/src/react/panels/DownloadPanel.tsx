@@ -1,19 +1,15 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { useAtomValue } from 'jotai';
 import {
   aboutOf,
-  canvasImagesOf,
-  imageInfoUrl,
   isLayerVisible,
   labelIn,
-  layerItemsOf,
   orderLayers,
-  parseImageInfo,
-  rawCanvasOf,
+  probeServiceOf,
   safeAboutUrl,
-  type ImageInfo,
+  type AuthProbeRef,
   type ImageLayer,
   type LayerItem,
   type MediaKind,
@@ -28,9 +24,12 @@ import {
   visibleDownloadRegion,
   type DownloadRegion,
 } from '../../core/features/_download';
-import { layerOrderAtom, layerSettingsAtom, manifestAtom } from '../atoms';
+import { canvasLayersAtom, layerOrderAtom, layerSettingsAtom, manifestAtom } from '../atoms';
+import { useAuth } from '../auth/authStore';
+import { useImageInfo } from '../displays/ImageTiles';
 import { useLocale, useTranslations, type Translator } from '../env';
 import { viewReaderAtom } from '../inference/viewState';
+import { MetadataList } from './SafeHtml';
 import type { Panel, PanelContext } from './types';
 
 // Save what the shown page holds: an image (the whole, or the part on screen, at a chosen size, through the IIIF Image
@@ -43,6 +42,7 @@ const PRIMARY =
   'px-3 py-1.5 rounded text-xs text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:hover:bg-blue-600';
 const LINK = 'text-blue-600 dark:text-blue-400 hover:underline break-words';
 
+// TODO: switch to the shared copy button of the viewer package once #359 is merged.
 function CopyButton({ url, t }: { url: string; t: Translator }) {
   const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
   useEffect(() => {
@@ -69,53 +69,66 @@ function CopyButton({ url, t }: { url: string; t: Translator }) {
 }
 
 // The download button, the address of the file (to copy), and what happened. The file is fetched here and saved under a
-// readable name; when the browser may not read it (the server does not allow it, or needs a login), the address is
-// opened in a new tab instead, and the reader is told.
+// readable name. When that fails, nothing is opened for the reader (a window opened after the wait is blocked as a
+// popup, and cannot be detected): the message says why, with a link the reader clicks to open the file in the browser.
+type Failure = { status: number } | { network: true };
+
 function DownloadAction({ url, fileName, t }: { url: string; fileName: string; t: Translator }) {
-  const [state, setState] = useState<'idle' | 'busy' | 'saved' | 'tab'>('idle');
+  const urlId = useId();
+  const [state, setState] = useState<{ phase: 'idle' | 'busy' | 'saved' } | { phase: 'failed'; failure: Failure }>({ phase: 'idle' });
   const save = async () => {
-    setState('busy');
+    setState({ phase: 'busy' });
+    let res: Response;
     try {
-      const res = await fetch(url, { mode: 'cors', credentials: 'omit' });
-      if (!res.ok) throw new Error(String(res.status));
-      const href = URL.createObjectURL(await res.blob());
-      const a = document.createElement('a');
-      a.href = href;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.setTimeout(() => URL.revokeObjectURL(href), 10_000);
-      setState('saved');
+      res = await fetch(url, { mode: 'cors', credentials: 'omit' });
     } catch {
-      window.open(url, '_blank', 'noopener,noreferrer');
-      setState('tab');
+      // no answer the page may read: the server does not allow it (CORS), or the network is down
+      setState({ phase: 'failed', failure: { network: true } });
+      return;
     }
+    if (!res.ok) {
+      setState({ phase: 'failed', failure: { status: res.status } });
+      return;
+    }
+    const href = URL.createObjectURL(await res.blob());
+    const a = document.createElement('a');
+    a.href = href;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.setTimeout(() => URL.revokeObjectURL(href), 10_000);
+    setState({ phase: 'saved' });
   };
+  const failure = state.phase === 'failed' ? state.failure : null;
   return (
     <div className="space-y-1.5">
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" className={PRIMARY} onClick={save} disabled={state === 'busy'} data-testid="download-save">
-          {state === 'busy' ? t('saving') : t('save')}
+        <button type="button" className={PRIMARY} onClick={save} disabled={state.phase === 'busy'} data-testid="download-save">
+          {state.phase === 'busy' ? t('saving') : t('save')}
         </button>
       </div>
       <div role="status" aria-live="polite" className="text-xs text-gray-600 dark:text-gray-300">
-        {state === 'saved' && t('saved', { name: fileName })}
-        {state === 'tab' && (
-          <span className="text-amber-700 dark:text-amber-400">
-            {t('openedInTab')}{' '}
+        {state.phase === 'saved' && t('saved', { name: fileName })}
+        {failure && (
+          <span className="text-amber-700 dark:text-amber-400" data-testid="download-failed">
+            {'network' in failure
+              ? t('failedNetwork')
+              : failure.status === 401 || failure.status === 403
+                ? t('failedAccess', { status: failure.status })
+                : t('failedHttp', { status: failure.status })}{' '}
             <a href={url} target="_blank" rel="noopener noreferrer" className={LINK}>
-              {url}
+              {t('openFile')}
             </a>
           </span>
         )}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <label className="text-xs text-gray-500 dark:text-gray-400" htmlFor="download-url">
+        <label className="text-xs text-gray-500 dark:text-gray-400" htmlFor={urlId}>
           {t('url')}
         </label>
         <input
-          id="download-url"
+          id={urlId}
           readOnly
           value={url}
           onFocus={(e) => e.currentTarget.select()}
@@ -131,8 +144,6 @@ function DownloadAction({ url, fileName, t }: { url: string; fileName: string; t
 const Heading = ({ children }: { children: string }) => (
   <div className="text-sm text-gray-500 dark:text-gray-400">{children}</div>
 );
-
-type InfoState = { status: 'loading' } | { status: 'failed' } | { status: 'ok'; info: ImageInfo };
 
 // One image: whole or visible area, and a size.
 function ImageDownload({
@@ -151,29 +162,26 @@ function ImageDownload({
   const service = layer.service;
   const plain = isPlainLayer(layer);
   const useService = !!service && plain;
-  const [info, setInfo] = useState<InfoState>({ status: 'loading' });
   const [mode, setMode] = useState<'full' | 'view'>('full');
   const [view, setView] = useState<DownloadRegion | 'missed' | null>(null);
   const [sizeId, setSizeId] = useState('max');
+  const groupId = useId();
   const reader = useAtomValue(viewReaderAtom);
   const liveReader = reader?.canvasId === containerId ? reader : null;
 
+  // The image information comes from the display's loader (shared cache), which also reads the 401-with-body answer of
+  // Auth 2.0 servers. The probe is the manifest's, else the one the info.json declares.
+  const locale = useLocale();
+  const [infoProbe, setInfoProbe] = useState<AuthProbeRef | undefined>();
+  const probe = layer.auth ?? infoProbe;
+  const epoch = useAuth(probe, locale)?.state.epoch ?? 0;
+  const info = useImageInfo(useService ? service : undefined, !!probe, epoch);
+  const infoJson = info.status === 'ready' ? info.json : undefined;
   useEffect(() => {
-    if (!useService || !service) return;
-    const ac = new AbortController();
-    fetch(imageInfoUrl(service), { signal: ac.signal })
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      .then((json) => {
-        const parsed = parseImageInfo(json);
-        setInfo(parsed ? { status: 'ok', info: parsed } : { status: 'failed' });
-      })
-      .catch(() => {
-        if (!ac.signal.aborted) setInfo({ status: 'failed' });
-      });
-    return () => ac.abort();
-  }, [service, useService]);
-
-  const okInfo = info.status === 'ok' ? info.info : null;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!layer.auth && infoJson) setInfoProbe(probeServiceOf(infoJson, locale));
+  }, [layer.auth, infoJson, locale]);
+  const okInfo = info.status === 'ready' ? info.info : null;
   const cut = okInfo ? canCutRegion(okInfo) : false;
 
   const readView = () => {
@@ -191,11 +199,11 @@ function ImageDownload({
   const picked = sizes.find((s) => s.id === sizeId) ?? sizes[sizes.length - 1];
 
   // Without a usable service (or without its information): the image file the manifest links
-  if (!useService || info.status === 'failed') {
+  if (!useService || info.status === 'error') {
     return (
       <div className="space-y-2">
         {service && !plain && <p className="text-xs text-gray-600 dark:text-gray-300">{t('plainOnly')}</p>}
-        {service && plain && <p className="text-xs text-gray-600 dark:text-gray-300">{t('infoFailed')}</p>}
+        {service && plain && info.status === 'error' && <p className="text-xs text-gray-600 dark:text-gray-300">{t('infoFailed')}</p>}
         <Heading>{t('imageFile')}</Heading>
         <DownloadAction key={layer.url} url={layer.url} fileName={downloadFileName(name, undefined, undefined, extensionOf(layer.url, undefined, 'jpg'))} t={t} />
       </div>
@@ -211,7 +219,7 @@ function ImageDownload({
         <label className="flex items-center gap-2">
           <input
             type="radio"
-            name="download-area"
+            name={`${groupId}-area`}
             checked={mode === 'full'}
             onChange={() => {
               setMode('full');
@@ -223,7 +231,7 @@ function ImageDownload({
         <label className={`flex items-center gap-2 ${!cut || !liveReader ? 'opacity-50' : ''}`}>
           <input
             type="radio"
-            name="download-area"
+            name={`${groupId}-area`}
             checked={mode === 'view'}
             disabled={!cut || !liveReader}
             onChange={() => {
@@ -251,7 +259,7 @@ function ImageDownload({
             <legend className="text-sm text-gray-500 dark:text-gray-400">{t('size')}</legend>
             {sizes.map((s) => (
               <label key={s.id} className="flex items-center gap-2">
-                <input type="radio" name="download-size" checked={s.id === picked.id} onChange={() => setSizeId(s.id)} />
+                <input type="radio" name={`${groupId}-size`} checked={s.id === picked.id} onChange={() => setSizeId(s.id)} />
                 <span>{t('sizeOption', { w: s.width, h: s.height })}</span>
                 {s.max && <span className="text-xs text-gray-500 dark:text-gray-400">{t('sizeMax')}</span>}
               </label>
@@ -280,11 +288,9 @@ function DownloadTab({ container, manifest }: PanelContext) {
   const order = useAtomValue(layerOrderAtom)[container?.id ?? ''];
   const [layerId, setLayerId] = useState<string | null>(null);
 
-  const images = useMemo(
-    () => (container?.kind === 'Canvas' ? canvasImagesOf(rawCanvasOf(m, container.id)) : null),
-    [m, container],
-  );
-  const items = useMemo(() => layerItemsOf(images?.paintings ?? []), [images]);
+  // The layers of the shown Canvas, as the display read them from the manifest as served
+  const layerState = useAtomValue(canvasLayersAtom);
+  const items = useMemo(() => (container && layerState?.canvasId === container.id ? layerState.items : []), [layerState, container]);
   // The layers on screen now, the one in front first (all of them when none is shown)
   const candidates: LayerItem[] = useMemo(() => {
     const shown = orderLayers(items, order).filter((it) => isLayerVisible(it, settings)).reverse();
@@ -311,7 +317,7 @@ function DownloadTab({ container, manifest }: PanelContext) {
     <div className="p-3 space-y-4 text-sm">
       <p className="text-xs text-gray-600 dark:text-gray-300">{t('hint')}</p>
 
-      {current && images && (
+      {current && container && (
         <section className="space-y-3">
           {candidates.length > 1 && (
             <label className="flex items-center gap-2">
@@ -333,7 +339,7 @@ function DownloadTab({ container, manifest }: PanelContext) {
             key={`${container.id}|${current.id}`}
             layer={current.layer}
             containerId={container.id}
-            canvas={{ width: images.width, height: images.height }}
+            canvas={{ width: container.width, height: container.height }}
             name={candidates.length > 1 ? `${containerName}_${layerName(current)}` : containerName}
             t={t}
           />
@@ -351,8 +357,8 @@ function DownloadTab({ container, manifest }: PanelContext) {
         <section className="space-y-1 border-t border-gray-200 dark:border-gray-700 pt-2 text-xs text-gray-600 dark:text-gray-300">
           {statement && (
             <div>
-              {statement.label && <span className="font-medium">{statement.label}: </span>}
-              {statement.values.join(' ')}
+              {statement.label && <div className="font-medium">{statement.label}</div>}
+              <MetadataList items={[{ ...statement, label: '' }]} />
             </div>
           )}
           {rights && (

@@ -601,15 +601,19 @@ export interface Tile {
 
 const quality = (version: 1 | 2 | 3) => (version === 1 ? 'native' : 'default');
 
-/** `{id}/{region}/{size}/0/default.jpg` for a region of the source in source pixels. */
+/**
+ * `{id}/{region}/{size}/0/default.jpg` for a region of the source in source pixels. `outWidth` is a width, or a size
+ * keyword: `max` (Image API 3) or `full` (before 3), which ask for the largest the server gives.
+ */
 export const imageRequestUrl = (
   service: ImageServiceRef,
   region: ImageRegion | 'full',
-  outWidth: number,
+  outWidth: number | 'max' | 'full',
   outHeight?: number,
 ): string => {
   const r = region === 'full' ? 'full' : `${Math.round(region.x)},${Math.round(region.y)},${Math.round(region.w)},${Math.round(region.h)}`;
-  const size = service.version === 3 && outHeight ? `${outWidth},${outHeight}` : `${outWidth},`;
+  const size =
+    typeof outWidth === 'string' ? outWidth : service.version === 3 && outHeight ? `${outWidth},${outHeight}` : `${outWidth},`;
   return `${service.id}/${r}/${size}/0/${quality(service.version)}.jpg`;
 };
 

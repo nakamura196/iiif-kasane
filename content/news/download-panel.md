@@ -2,7 +2,7 @@
 date: 2026-11-13
 title.ja: 表示中の画像を、範囲と大きさを選んで保存できるようになりました
 title.en: Save the image you are viewing, choosing the area and the size
-action.viewer: https://iiif.io/api/cookbook/recipe/0001-mvm-image/manifest.json
+action.viewer: https://iiif.io/api/cookbook/recipe/0005-image-service/manifest.json
 action.params: tab=download
 ---
 

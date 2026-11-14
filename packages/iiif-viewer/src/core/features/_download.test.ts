@@ -90,6 +90,25 @@ describe('downloadSizesOf: level 0', () => {
     expect(downloadSizesOf(v2, tiles, 'full').map((x) => x.url)).toEqual(['https://example.org/iiif/2/a/full/full/0/default.jpg']);
     expect(downloadSizesOf(v3, { ...tiles, version: 3 }, 'full').map((x) => x.url)).toEqual(['https://example.org/iiif/3/a/full/max/0/default.jpg']);
   });
+  it('never asks for `full/<w>,` when a limit cuts the full size: only the listed sizes remain', () => {
+    const l0 = info({ level: 0, maxWidth: 1000, maxHeight: 1000, sizes: [{ width: 500, height: 375 }] });
+    const s = downloadSizesOf(v2, l0, 'full');
+    expect(s.map((x) => x.url)).toEqual(['https://example.org/iiif/2/a/full/500,/0/default.jpg']);
+    expect(s[0]).toMatchObject({ id: 'max', max: true });
+    // no sizes and a limit: nothing is offered (the whole image is not allowed, a resize is not served)
+    expect(downloadSizesOf(v2, info({ level: 0, maxWidth: 1000 }), 'full')).toEqual([]);
+  });
+  it('uses the listed URL when a listed size is the full image', () => {
+    const l0 = info({ level: 0, sizes: [{ width: 500, height: 375 }, { width: 4000, height: 3000 }] });
+    expect(downloadSizesOf(v2, l0, 'full').map((x) => x.url)).toEqual([
+      'https://example.org/iiif/2/a/full/500,/0/default.jpg',
+      'https://example.org/iiif/2/a/full/4000,/0/default.jpg',
+    ]);
+    expect(downloadSizesOf(v3, { ...l0, version: 3 }, 'full').at(-1)).toMatchObject({
+      url: 'https://example.org/iiif/3/a/full/4000,3000/0/default.jpg',
+      max: true,
+    });
+  });
   it('offers no region', () => {
     expect(canCutRegion(info({ level: 0 }))).toBe(false);
     expect(downloadSizesOf(v2, info({ level: 0 }), { x: 0, y: 0, w: 100, h: 100 })).toEqual([]);
