@@ -54,9 +54,9 @@ const loadInfo = (service: ImageServiceRef, withAuth: boolean, epoch: number): P
   return p;
 };
 
-type InfoState = { status: 'none' | 'loading' | 'error' } | { status: 'ready'; info: ImageInfo; json: unknown };
+export type InfoState = { status: 'none' | 'loading' | 'error' } | { status: 'ready'; info: ImageInfo; json: unknown };
 
-function useImageInfo(service: ImageServiceRef | undefined, withAuth: boolean, epoch: number): InfoState {
+export function useImageInfo(service: ImageServiceRef | undefined, withAuth: boolean, epoch: number): InfoState {
   const key = service ? `${imageInfoUrl(service)}#${withAuth ? epoch : 0}${withAuth ? 'c' : ''}` : null;
   const [res, setRes] = useState<{ key: string; info: ImageInfo | null; json: unknown } | null>(null);
   useEffect(() => {

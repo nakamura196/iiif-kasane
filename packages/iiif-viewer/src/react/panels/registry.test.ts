@@ -18,6 +18,7 @@ describe('PANELS', () => {
       'canvasAnnotations',
       'annotations',
       'inference',
+      'download',
       'puzzle',
       'share',
     ]);

@@ -1,0 +1,41 @@
+{
+  "Info": {
+    "download": "Download"
+  },
+  "Download": {
+    "hint": "Save the image or media of the page you are viewing.",
+    "layer": "Image",
+    "layerN": "Image {n}",
+    "area": "Area",
+    "whole": "Whole image",
+    "visible": "Visible area",
+    "reread": "Use the area on screen now",
+    "areaPixels": "{w} × {h} px of the image",
+    "viewMissed": "The area on screen does not overlap the image. Move or zoom the image and try again.",
+    "noCrop": "This image server cannot cut out an area, so only the whole image can be saved.",
+    "plainOnly": "This image is cropped or turned in the manifest, so the file as the manifest links it is offered.",
+    "size": "Size",
+    "sizeMax": "Largest",
+    "sizeOption": "{w} × {h} px",
+    "loadingInfo": "Checking what the image server offers…",
+    "infoFailed": "Could not read the image server's information, so only the image file as the manifest links it is offered.",
+    "imageFile": "Image file",
+    "mediaFile": "Media file",
+    "video": "Video",
+    "audio": "Audio",
+    "model": "3D model",
+    "save": "Download",
+    "saving": "Downloading…",
+    "saved": "Saved as {name}.",
+    "url": "Address",
+    "rights": "Rights",
+    "nothing": "Nothing to download on this page.",
+    "failedHttp": "The server answered with an error ({status}), so the file could not be saved here.",
+    "failedAccess": "The server refused ({status}); the file may need a login or permission.",
+    "failedNetwork": "The browser could not read the file here: the server may not allow it, or the network failed.",
+    "openFile": "Open the file in the browser",
+    "degraded": "Access to the full image is not granted yet, so this is the lower-quality copy the server shows in its place. The original is not offered here.",
+    "authLocked": "Access to this image is not granted yet, so nothing is offered for download. Allow access in the viewer first.",
+    "capped": "This image server lists no sizes and limits the size it serves, so only the image file as the manifest links it is offered."
+  }
+}
