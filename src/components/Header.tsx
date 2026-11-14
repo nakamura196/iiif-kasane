@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useAtom } from 'jotai';
 import { manifestUrlAtom } from 'iiif-kasane';
 import { isLocalManifestUrl } from '@/lib/localImage';
@@ -11,7 +12,7 @@ import { isViewerPath } from '@/lib/history';
 import BookmarkButton from '@/components/history/BookmarkButton';
 import { ThemeToggle, LanguageSwitcher, buttonClass } from '@nakamura196/react-ui';
 
-// compact: ビューアのように表示領域を広く取りたいページでは、帯を細くする
+// compact: a thinner bar for pages that want a large display area, such as the viewer
 const Header = ({ compact = false }: { compact?: boolean }) => {
   const [manifestUrl, setManifestUrl] = useAtom(manifestUrlAtom);
   const router = useRouter();
@@ -19,6 +20,8 @@ const Header = ({ compact = false }: { compact?: boolean }) => {
   const locale = useLocale();
   const t = useTranslations('Header');
 
+  // the item that loaded successfully (the star waits for it)
+  const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
   const onViewer = isViewerPath(pathname);
 
   const handleHomeClick = () => {
@@ -26,14 +29,14 @@ const Header = ({ compact = false }: { compact?: boolean }) => {
   };
 
   const changeLanguage = (newLocale: string) => {
-    // 現在のパスから言語部分を除去
+    // Remove the language part from the current path
     const currentPath = pathname.replace(/^\/[^\/]+/, '');
 
-    // クエリパラメータを維持
+    // Keep the query parameters
     const searchParams = new URLSearchParams(window.location.search);
     const queryString = searchParams.toString();
 
-    // 新しいパスを構築
+    // Build the new path
     const newPath = `/${newLocale}${currentPath}`;
     const fullPath = queryString ? `${newPath}?${queryString}` : newPath;
 
@@ -58,8 +61,8 @@ const Header = ({ compact = false }: { compact?: boolean }) => {
       </div>
       <div className="flex items-center space-x-2 sm:space-x-3 ml-2 shrink-0">
         {/* On the viewer page: keep the open item in "Recently opened" and offer a bookmark */}
-        {onViewer && <HistoryRecorder url={manifestUrl} />}
-        {onViewer && <BookmarkButton url={manifestUrl} />}
+        {onViewer && <HistoryRecorder url={manifestUrl} onLoaded={setLoadedUrl} />}
+        {onViewer && <BookmarkButton url={manifestUrl} loaded={loadedUrl === manifestUrl} />}
         <a
           href="https://github.com/nakamura196/iiif-kasane"
           target="_blank"

@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import SaveNotice from './SaveNotice';
 import { useLocale, useTranslations } from 'next-intl';
 import { Link } from '@/i18n/routing';
 import { contentParam, labelIn } from 'iiif-kasane/core';
@@ -60,6 +61,7 @@ export default function HistoryLists() {
   // what "Clear history" removed, offered back for a few seconds
   const [cleared, setCleared] = useState<HistoryEntry[] | null>(null);
   const [failed, setFailed] = useState(false);
+  const closeNotice = useCallback(() => setFailed(false), []);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
   const check = (saved: boolean) => {
@@ -76,20 +78,18 @@ export default function HistoryLists() {
   const undo = () => {
     if (cleared && check(restoreRecent(cleared))) setCleared(null);
   };
-  if (recent.length === 0 && bookmarks.length === 0) {
-    // right after "Clear history": say so, with an undo
-    if (!cleared) return null;
-    return (
-      <p className="mt-8 text-sm text-[var(--ds-fg-muted)]" role="status" data-testid="history-lists">
-        {t('cleared')}{' '}
-        <button type="button" onClick={undo} className="underline text-[var(--ds-primary)]">{t('undo')}</button>
-      </p>
-    );
-  }
+  if (recent.length === 0 && bookmarks.length === 0 && !cleared) return null;
   const shownRecent = allRecent ? recent : recent.slice(0, SHOWN);
   const shownBookmarks = allBookmarks ? bookmarks : bookmarks.slice(0, SHOWN);
   return (
     <div className="mt-8 space-y-6 text-left" data-testid="history-lists">
+      {/* right after "Clear history": say so, with an undo (also when bookmarks remain) */}
+      {cleared && (
+        <p className="text-sm text-[var(--ds-fg-muted)]" role="status">
+          {t('cleared')}{' '}
+          <button type="button" onClick={undo} className="underline text-[var(--ds-primary)]">{t('undo')}</button>
+        </p>
+      )}
       {bookmarks.length > 0 && (
         <section aria-labelledby="history-bookmarks">
           <h3 id="history-bookmarks" className="mb-2 text-sm font-medium text-[var(--ds-fg-muted)]">
@@ -130,11 +130,7 @@ export default function HistoryLists() {
         </section>
       )}
       <p className="text-xs text-[var(--ds-fg-muted)]">{t('note')}</p>
-      {failed && (
-        <p className="text-xs text-red-600 dark:text-red-400" role="alert">
-          {t('saveFailed')}
-        </p>
-      )}
+      {failed && <SaveNotice onClose={closeNotice} />}
     </div>
   );
 }

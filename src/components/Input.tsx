@@ -1,4 +1,4 @@
-// 入力フォームコンポーネント
+// The manifest input form
 import { useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Link } from '@/i18n/routing';
@@ -20,21 +20,21 @@ const ManifestInput = ({
   fileStatus,
 }: {
   onSubmit: (url: string, tab?: string) => void;
-  // 手元の画像を開くボタンを出す（ビューアの入口だけ。画像はサーバに送らない）
-  // 複数選んだときやフォルダを選んだときは、名前順に並べて 1 冊として開く
+  // Show the buttons that open images from this computer (the viewer entry only; images are never sent to a server)
+  // Several images, or a folder, are sorted by name and opened as one book
   onOpenFile?: (files: File[]) => void;
-  // 手元の画像が開けなかったときの文言
+  // Message shown when a local image could not be opened
   fileError?: string;
-  // 読み込みの途中経過（何枚目か）
+  // Progress of reading (which image)
   fileStatus?: string;
-  // トップページ用: 大きなアイコンを出さず、入力欄とボタンを 1 行に並べる
+  // For the top page: no large icon; the input and the button sit in one row
   compact?: boolean;
-  // フォームとユースケース一覧のあいだに差し込む内容（トップページのデモ動画など）
+  // Content placed between the form and the use case list (the demo video on the top page, for example)
   children?: React.ReactNode;
-  // 見出しと説明を差し替える（地図と画像の画面など、ページ専用の入口にするとき）
+  // Replace the heading and the description (for a page's own entry, such as the map and image page)
   title?: string;
   description?: string;
-  // 並べるユースケース。既定はトップと同じ featured の 6 件
+  // Use cases to list. The default is the same 6 featured ones as the top page
   useCases?: UseCase[];
   // Recently opened items and bookmarks. On by default for the viewer entry (not the top page's compact form, nor entries with their own title)
   history?: boolean;
@@ -47,7 +47,7 @@ const ManifestInput = ({
   const folderInput = useRef<HTMLInputElement>(null);
   const pick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
-    // 同じファイルを続けて選んでも change が起きるように空にする
+    // Clear the value so that picking the same file again still fires change
     e.target.value = '';
     if (files.length) onOpenFile?.(files);
   };
@@ -138,7 +138,7 @@ const ManifestInput = ({
             <input
               ref={folderInput}
               type="file"
-              // フォルダを選ぶと、中のファイルがすべて渡る（画像でないものは開くときに除く）
+              // Picking a folder passes every file in it (non-images are left out when opening)
               {...{ webkitdirectory: '', directory: '' }}
               className="hidden"
               data-testid="local-folder-input"
@@ -161,7 +161,7 @@ const ManifestInput = ({
               </button>
             </div>
             <p className="mt-2 text-xs text-[var(--ds-fg-muted)]">{t('openLocalImageNote')}</p>
-            {/* ビューアで開くのとは別に、画像を置く場所を決めて、ほかでも使えるマニフェストにする */}
+            {/* Apart from opening in the viewer: decide where the images live and make a manifest that works elsewhere */}
             <p className="mt-2 text-xs">
               <Link href="/manifest-editor" className="underline text-[var(--ds-fg-muted)] hover:text-[var(--ds-fg)]">
                 {t('toManifestEditor')}
@@ -183,7 +183,7 @@ const ManifestInput = ({
 
       <div className="mt-8 text-sm text-[var(--ds-fg-muted)]">
         <h3 className="font-medium mb-2">{t('sampleManifest')}:</h3>
-        {/* 開いたときの画面（短い動画）つきで並べ、何ができるかを見せる。6 件を 3 列 × 2 行（主な機能の 3 列とそろえる） */}
+        {/* Each with a short clip of the opened screen, to show what it can do. 6 items in 3 columns x 2 rows (matching the 3 main-feature columns) */}
         <ul className={`grid grid-cols-2 ${useCases.length < 3 ? '' : 'sm:grid-cols-3'} gap-3 text-left`}>
           {useCases.map((u) => (
             <li key={u.id}>
@@ -191,11 +191,11 @@ const ManifestInput = ({
                 href={hrefOf(u.open)}
                 className="group block h-full rounded-lg border border-[var(--ds-border)] bg-[var(--ds-surface)] overflow-hidden hover:border-[var(--ds-primary)]"
               >
-                {/* 開いて何をすると何が起きるかを、数秒の動画で見せる。動画を撮ってあるのは featured の例だけなので、ほかはサムネイルを出す */}
+                {/* A few seconds of video show what happens when you open it and act. Only the featured examples have a clip; the others show a thumbnail */}
                 {u.featured ? (
                   <UseCaseClip src={clipOf(u, locale)} poster={thumbnailOf(u, locale)} />
                 ) : (
-                  // eslint-disable-next-line @next/next/no-img-element -- 静的書き出しなので next/image の最適化は使えない
+                  // eslint-disable-next-line @next/next/no-img-element -- the site is exported statically, so next/image optimisation is not available
                   <img
                     src={thumbnailOf(u, locale)}
                     alt=""
@@ -205,7 +205,7 @@ const ManifestInput = ({
                     className="w-full aspect-[16/10] object-cover bg-[var(--ds-surface-2)]"
                   />
                 )}
-                {/* 見出しは「何ができるか」、その下に小さく資料の名前 */}
+                {/* The heading says what you can do; the item's name is small below it */}
                 <span className="block p-2">
                   <span className="block font-medium text-[var(--ds-primary)] group-hover:underline">
                     {u.headline?.[locale] ?? u.title[locale]}
@@ -220,7 +220,7 @@ const ManifestInput = ({
             </li>
           ))}
         </ul>
-        {/* 一覧ページへの入口。ユースケースとサンプルはボタンで目立たせ、検索は文字のリンクのまま */}
+        {/* Entrances to the list pages: use cases and samples as prominent buttons, search as a plain text link */}
         <div className="mt-6 grid sm:grid-cols-2 gap-3">
           <Link href="/usecases" className={buttonClass('primary', 'lg', 'w-full')}>
             {t('sampleUseCasesAll')}

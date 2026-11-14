@@ -143,16 +143,32 @@ export function recordOpened(entry: NewEntry): boolean {
   if (!e) return false;
   return write({
     recent: [e, ...data.recent.filter((x) => !same(x.url, e.url))].slice(0, RECENT_LIMIT),
-    bookmarks: data.bookmarks.map((b) => (same(b.url, e.url) ? { ...e, at: b.at } : b)),
+    // a bookmark keeps its own url and date; only what we learned about the item is updated
+    bookmarks: data.bookmarks.map((b) => (same(b.url, e.url) ? { ...b, label: e.label || b.label, kind: e.kind, thumbnail: e.thumbnail ?? b.thumbnail } : b)),
   });
+}
+
+// Which item the viewer opened last, and how many times "Clear history" ran. A read that was started before either
+// changed is out of date and must not be written (a slow earlier item would land above the later one, or come back after Clear).
+let latestOpen: string | null = null;
+let clearGeneration = 0;
+export interface OpenTicket {
+  url: string;
+  generation: number;
+}
+/** Call when an item starts loading. Pass the ticket to recordLoaded. */
+export function beginOpen(url: string): OpenTicket {
+  latestOpen = url;
+  return { url, generation: clearGeneration };
 }
 
 /**
  * Record an item whose manifest was just read. When it could not be read (`raw` is null: 404, typo, CORS, login),
  * nothing is recorded and nothing already kept is touched. The label may be passed raw: it is cleaned here.
  */
-export function recordLoaded(url: string, raw: unknown): boolean {
+export function recordLoaded(url: string, raw: unknown, ticket?: OpenTicket): boolean {
   if (!raw || typeof raw !== 'object') return false;
+  if (ticket && (ticket.generation !== clearGeneration || latestOpen !== ticket.url)) return false;
   const r = raw as { label?: unknown; type?: unknown };
   return recordOpened({
     url,
@@ -184,7 +200,9 @@ export function removeRecent(url: string): boolean {
 /** Empty "recently opened". Returns what was there (for an undo), or null when it could not be saved. */
 export function clearRecent(): HistoryEntry[] | null {
   const data = readHistory();
-  return write({ ...data, recent: [] }) ? data.recent : null;
+  if (!write({ ...data, recent: [] })) return null;
+  clearGeneration++;
+  return data.recent;
 }
 
 /** Put back entries removed by clearRecent: merged with what was opened since, newest first. */

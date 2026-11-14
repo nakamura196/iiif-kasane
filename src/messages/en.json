@@ -131,6 +131,7 @@
     "collection": "Collection",
     "showAll": "Show all ({count})",
     "showFewer": "Show fewer",
+    "close": "Close",
     "saveFailed": "Could not save in this browser (storage is full or blocked).",
     "cleared": "Cleared.",
     "undo": "Undo",

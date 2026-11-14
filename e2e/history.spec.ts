@@ -144,10 +144,13 @@ test('bookmarks are capped on the screen like recent ones, and the note shows fo
 
 test('an item that cannot be read is not recorded', async ({ page }) => {
   await page.route(`${BASE}/**`, (route) => route.fulfill({ status: 404, headers: cors }));
+  const requested = page.waitForResponse(`${BASE}/m1.json`);
   await page.goto(viewerUrl('en', 1));
-  await expect(page.getByTestId('bookmark-toggle')).toBeVisible();
+  await requested;
   await page.waitForTimeout(1000);
+  // not recorded, and a dead URL cannot be bookmarked
   expect(await page.evaluate(() => localStorage.getItem('kasane:history:v1'))).toBeNull();
+  await expect(page.getByTestId('bookmark-toggle')).toHaveCount(0);
 });
 
 test('a slow manifest is still recorded after the user left the viewer', async ({ page }) => {
@@ -155,11 +158,13 @@ test('a slow manifest is still recorded after the user left the viewer', async (
     await new Promise((r) => setTimeout(r, 1500));
     await route.fulfill({ json: manifest(1), headers: cors });
   });
+  const requested = page.waitForRequest(`${BASE}/m1.json`);
   await page.goto(viewerUrl('en', 1));
-  await expect(page.getByTestId('bookmark-toggle')).toBeVisible();
+  await requested;
+  // the star waits for the manifest
+  await expect(page.getByTestId('bookmark-toggle')).toHaveCount(0);
   // leave inside the app (the page stays alive) before the manifest arrives
   await page.getByRole('link', { name: 'IIIF Kasane' }).first().click();
-  await expect(page.getByTestId('bookmark-toggle')).toHaveCount(0);
   await page.waitForFunction(() => (localStorage.getItem('kasane:history:v1') ?? '').includes('Postcard 1'));
 });
 
@@ -167,13 +172,16 @@ test('Clear history can be undone', async ({ page }) => {
   await page.goto('/en/viewer/');
   await page.evaluate(() => {
     const recent = [1, 2].map((i) => ({ url: `https://example.org/m${i}.json`, label: `Postcard ${i}`, kind: 'manifest', at: 10 - i }));
-    localStorage.setItem('kasane:history:v1', JSON.stringify({ recent, bookmarks: [] }));
+    const bookmarks = [{ url: 'https://example.org/b.json', label: 'Kept bookmark', kind: 'manifest', at: 1 }];
+    localStorage.setItem('kasane:history:v1', JSON.stringify({ recent, bookmarks }));
   });
   await page.reload();
   await page.getByRole('button', { name: 'Clear history' }).click();
   await expect(page.getByTestId('recent-list')).toHaveCount(0);
+  // the bookmark stays, and Undo is still offered
   await page.getByRole('button', { name: 'Undo' }).click();
   await expect(page.getByTestId('recent-list').getByRole('listitem')).toHaveCount(2);
+  await expect(page.getByTestId('bookmark-list').getByRole('listitem')).toHaveCount(1);
 });
 
 test('a full storage shows a message instead of failing silently', async ({ page }) => {
@@ -186,7 +194,14 @@ test('a full storage shows a message instead of failing silently', async ({ page
     };
   });
   await page.getByTestId('bookmark-toggle').click();
-  await expect(page.getByRole('alert').filter({ hasText: 'Could not save' })).toBeVisible();
+  const notice = page.getByRole('alert').filter({ hasText: 'Could not save' });
+  await expect(notice).toBeVisible();
+  // it can be closed, and goes away by itself
+  await notice.getByRole('button', { name: 'Close' }).click();
+  await expect(notice).toHaveCount(0);
+  await page.getByTestId('bookmark-toggle').click();
+  await expect(notice).toBeVisible();
+  await expect(notice).toHaveCount(0, { timeout: 10_000 });
 });
 
 test('long labels do not make the phone-width page scroll sideways', async ({ page }) => {

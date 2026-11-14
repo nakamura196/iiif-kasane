@@ -5,6 +5,7 @@ import {
   HISTORY_KEY,
   RECENT_LIMIT,
   addBookmark,
+  beginOpen,
   clearRecent,
   recordLoaded,
   restoreRecent,
@@ -284,6 +285,40 @@ describe('saving can fail', () => {
     expect(removeRecent(entry(1).url)).toBe(false);
     expect(clearRecent()).toBeNull();
     expect(restoreRecent([])).toBe(false);
+  });
+});
+
+describe('out-of-date reads', () => {
+  const raw = (n: number) => ({ type: 'Manifest', label: `Item ${n}` });
+  it('drops a slow earlier item when another one was opened since', () => {
+    const first = beginOpen(entry(1).url);
+    const second = beginOpen(entry(2).url);
+    expect(recordLoaded(entry(2).url, raw(2), second)).toBe(true);
+    expect(recordLoaded(entry(1).url, raw(1), first)).toBe(false);
+    expect(readHistory().recent.map((e) => e.url)).toEqual([entry(2).url]);
+  });
+  it('drops a read that started before Clear history, keeps one that started after', () => {
+    recordOpened(entry(9));
+    const before = beginOpen(entry(1).url);
+    clearRecent();
+    expect(recordLoaded(entry(1).url, raw(1), before)).toBe(false);
+    expect(readHistory().recent).toEqual([]);
+    const after = beginOpen(entry(2).url);
+    expect(recordLoaded(entry(2).url, raw(2), after)).toBe(true);
+  });
+  it('still records a read finished after the user left (no newer item, no clear)', () => {
+    const t = beginOpen(entry(1).url);
+    expect(recordLoaded(entry(1).url, raw(1), t)).toBe(true);
+  });
+});
+
+describe('a bookmark keeps its own url', () => {
+  it('updates label, kind and thumbnail but not the url or date', () => {
+    addBookmark({ url: 'http://example.org/m.json', at: 5 });
+    recordOpened({ url: 'https://example.org/m.json', label: 'Seen', kind: 'collection', thumbnail: 'https://example.org/t.jpg' });
+    const [b] = readHistory().bookmarks;
+    expect(b).toMatchObject({ url: 'http://example.org/m.json', label: 'Seen', kind: 'collection', at: 5 });
+    expect(readHistory().recent[0].url).toBe('https://example.org/m.json');
   });
 });
 
