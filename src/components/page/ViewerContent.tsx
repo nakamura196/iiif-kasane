@@ -1,7 +1,7 @@
 'use client';
 
 import type { NextPage } from 'next';
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAtom } from 'jotai';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
@@ -16,6 +16,7 @@ import Footer from '@/components/Footer';
 import { containersOf, convertToV4, fetchManifest, manifestFromParams } from 'iiif-kasane/core';
 import { HIDDEN_VIEWER_TABS, OTHER_VIEWS_TAB, viewerTabOf } from '@/lib/viewerTabs';
 import { puzzleFromParams } from '@/lib/puzzleLink';
+import { PushedLocations, locationKey } from '@/lib/pushedLocations';
 import { otherViewsPanel, type CompareTarget } from '@/components/OtherViewsPanel';
 import { LocalImageError, filesFromDataTransfer, isLocalManifestUrl, openLocalImages } from '@/lib/localImage';
 
@@ -116,6 +117,20 @@ const ViewerContent: NextPage = () => {
   // The reader opened an entry of a Collection, or went back: write where that is into the address bar, so that
   // the link opens it (and the browser's Back returns to the place before). The arguments of the item left
   // (canvas, pos, puzzle, ...) are dropped; only the tab stays. The viewer takes the new URL over without reading again.
+  const pushed = useRef(new PushedLocations());
+  const selfBack = useRef(false);
+  useEffect(() => {
+    // the browser's own Back / Forward: keep the list of entries in step (our own Back is counted already)
+    const onPop = () => {
+      if (selfBack.current) {
+        selfBack.current = false;
+        return;
+      }
+      pushed.current.browsed(window.location.search);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
   const handleShownChange = useCallback(
     (shown: ViewerShown) => {
       if (shown.origin === 'content') return;
@@ -125,12 +140,21 @@ const ViewerContent: NextPage = () => {
       const tab = new URLSearchParams(window.location.search).get('tab');
       if (tab) params.set('tab', tab);
       const next = `?${params.toString()}`;
-      if (next === window.location.search) return;
-      // going back replaces the entry: pushing would grow the history, and the browser's Back would walk
-      // forward again through the places just left. (The browser's Back then lands on the entry opened
-      // before; the viewer takes it over without reading when it is what is shown.)
-      if (shown.origin === 'back') router.replace(next);
-      else router.push(next);
+      const here = window.location.search;
+      if (locationKey(next) === locationKey(here)) return;
+      if (shown.origin === 'back') {
+        // The viewer's own Back. When the entry before is exactly that place, the history's Back goes there (no
+        // new entry; the browser's Back then continues from there). Else the current entry is replaced:
+        // pushing would grow the history and the browser's Back would walk forward through the places just left.
+        if (pushed.current.takeIfPrevious(next)) {
+          selfBack.current = true;
+          window.setTimeout(() => (selfBack.current = false), 1000);
+          router.back();
+        } else router.replace(next);
+        return;
+      }
+      pushed.current.push(here);
+      router.push(next);
     },
     [router],
   );
@@ -185,6 +209,7 @@ const ViewerContent: NextPage = () => {
     const params = new URLSearchParams(searchParams?.toString() || '');
     params.set('tab', next);
     // add to the history and update the URL
+    pushed.current.push(window.location.search);
     router.push(`?${params.toString()}`);
   };
 

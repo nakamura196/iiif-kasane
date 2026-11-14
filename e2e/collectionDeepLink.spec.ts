@@ -144,27 +144,36 @@ test("the browser's Back after opening an entry returns to the Collection", asyn
   await expect(pager(page)).toContainText('1 / 3');
 });
 
-test("the viewer's own Back replaces the address (the history does not grow) and the browser's Back is adopted without reading", async ({
+test("the viewer's own Back uses the history: one browser Back then lands on the place before, not on a copy", async ({
   page,
 }) => {
   await serve(page);
+  await page.goto(viewer(`iiif-content=${enc(TOP)}`));
+  await card(page, /Sub shelf/).click();
+  await card(page, /Alpha/).click();
+  await expect.poll(() => params(page).get('iiif-content')).toBe(ALPHA);
+  await back(page).click();
+  await expect.poll(() => params(page).get('iiif-content')).toBe(SUB);
+  expect(params(page).getAll('collection')).toEqual([TOP]);
+  // one browser Back: the Collection above (not another entry of the same place)
+  await page.goBack();
+  await expect.poll(() => params(page).get('iiif-content')).toBe(TOP);
+  await expect(card(page, /Sub shelf/)).toBeVisible();
+});
+
+test("the browser's Back to the Collection reads nothing again", async ({ page }) => {
+  await serve(page);
   const reads: string[] = [];
   page.on('request', (r) => {
-    if (r.url() === TOP || r.url() === ALPHA) reads.push(r.url());
+    if (r.url() === TOP) reads.push(r.url());
   });
   await page.goto(viewer(`iiif-content=${enc(TOP)}`));
   await card(page, /Alpha/).click();
   await expect.poll(() => params(page).get('iiif-content')).toBe(ALPHA);
-  await back(page).click();
-  await expect.poll(() => params(page).get('iiif-content')).toBe(TOP);
-  await expect(card(page, /Alpha/)).toBeVisible();
-  const before = reads.length;
-  // one entry before: the Collection as first opened (it was replaced, not pushed on)
   await page.goBack();
-  await expect(card(page, /Alpha/)).toBeVisible();
-  await expect(pager(page)).toHaveCount(0);
+  await expect(card(page, /Sub shelf/)).toBeVisible();
   expect(params(page).get('iiif-content')).toBe(TOP);
-  expect(reads.length).toBe(before);
+  expect(reads).toHaveLength(1);
 });
 
 test('a ?collection= value that is not an address is dropped; the manifest still opens', async ({ page }) => {

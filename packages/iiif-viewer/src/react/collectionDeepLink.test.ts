@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createStore } from 'jotai';
 import { manifestUrlAtom, shownManifestAtom } from './atoms';
-import { pickedPageAtom, quietSeqAtom } from './internalState';
+import { pickedPageAtom } from './internalState';
 import { collectionsFromParams, encodeContentState } from '../core';
 import { loadContent, openContent, shownLocation, takeOverContent } from './useManifest';
 import { goBack, openManifest, trailAtom } from './displays/structureState';
@@ -172,22 +172,35 @@ describe('a Collection that is slow or never answers', () => {
     expect(trailUrls(store)).toEqual([top]);
   });
 
-  it('is not attached when something else was shown meanwhile (a move or a new iiif-content)', async () => {
+  it('is put in front of the trail when the reader moved on before it arrived', async () => {
+    const store = createStore();
+    const release = hold([top]);
+    await loadContent(store, sub, () => 'en', [top]);
+    await openManifest(store, m1, true, () => 'en');
+    expect(trailUrls(store)).toEqual([sub]);
+    release[top]();
+    await settled(store, 2);
+    expect(trailUrls(store)).toEqual([top, sub]);
+    // and it arrives after the host took the new place over too
+    expect(takeOverContent(store, m1, [top, sub])).toBe(true);
+  });
+
+  it('is dropped when a new iiif-content came meanwhile', async () => {
     const store = createStore();
     const release = hold([top]);
     await loadContent(store, m1, () => 'en', [top]);
-    await openManifest(store, m2, true, () => 'en');
+    await loadContent(store, m2, () => 'en');
     release[top]();
     await new Promise((r) => setTimeout(r, 20));
-    expect(trailUrls(store)).toEqual([m1]);
+    expect(trailUrls(store)).toEqual([]);
+  });
 
-    const other = createStore();
-    const release2 = hold([top]);
-    await loadContent(other, m1, () => 'en', [top]);
-    await loadContent(other, m2, () => 'en');
-    release2[top]();
+  it('is not read at all when the manifest cannot be read', async () => {
+    const store = createStore();
+    delete served[m1];
+    await loadContent(store, m1, () => 'en', [top]);
     await new Promise((r) => setTimeout(r, 20));
-    expect(trailUrls(other)).toEqual([]);
+    expect(fetched).toEqual([m1]);
   });
 });
 
@@ -226,14 +239,16 @@ describe('a new location from the host', () => {
   });
 });
 
-describe('a dropped link', () => {
-  it('is shown but not reported to the host; a move from a Collection is', async () => {
+describe('a manifest the host is not told about', () => {
+  it('a dropped link and a map panel open are shown but flagged quiet; a move from a Collection is not', async () => {
     const store = createStore();
     await loadContent(store, top, () => 'en');
     await openManifest(store, m1, false, () => 'en', 'move');
-    expect(store.get(quietSeqAtom)).toBe(store.get(shownManifestAtom)?.seq);
-    await openManifest(store, m2, true, () => 'en');
-    expect(store.get(quietSeqAtom)).not.toBe(store.get(shownManifestAtom)?.seq);
+    expect(store.get(shownManifestAtom)?.quiet).toBe(true);
+    await openManifest(store, m2, true, () => 'en', 'move', true);
+    expect(store.get(shownManifestAtom)?.quiet).toBe(true);
+    await openManifest(store, m1, true, () => 'en');
+    expect(store.get(shownManifestAtom)?.quiet).toBeUndefined();
   });
 });
 
@@ -267,6 +282,33 @@ describe('taking over the location without reading again', () => {
     goBack(store, 'en');
     expect(takeOverContent(store, top, [])).toBe(true);
     expect(store.get(manifestUrlAtom)).toBe(top);
+  });
+
+  it('browser Back to the place before is the viewer Back: the entry position is restored, nothing is read', async () => {
+    const store = createStore();
+    await loadContent(store, sub, () => 'en', [top]);
+    await settled(store, 1);
+    store.set(pickedPageAtom, { shown: store.get(shownManifestAtom)!.seq, index: 1 });
+    await openManifest(store, m1, true, () => 'en');
+    fetched = [];
+    // the host gives the place before: the Collection, with the Collections above it
+    expect(takeOverContent(store, sub, [top])).toBe(true);
+    expect(fetched).toEqual([]);
+    expect(store.get(shownManifestAtom)?.url).toBe(sub);
+    expect(store.get(shownManifestAtom)?.origin).toBe('back');
+    expect(store.get(pickedPageAtom).index).toBe(1);
+    expect(store.get(manifestUrlAtom)).toBe(sub);
+    expect(store.get(trailAtom).owner).toBe(sub);
+    expect(trailUrls(store)).toEqual([top]);
+  });
+
+  it('does not take over a place that is not one step back', async () => {
+    const store = createStore();
+    await loadContent(store, top, () => 'en');
+    await openManifest(store, sub, true, () => 'en');
+    await openManifest(store, m1, true, () => 'en');
+    expect(takeOverContent(store, top, [])).toBe(false);
+    expect(takeOverContent(store, sub, [])).toBe(false);
   });
 
   it('does not take over a different Collection list', async () => {

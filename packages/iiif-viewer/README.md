@@ -114,7 +114,7 @@ was read), `'move'` (the reader opened an entry) or `'back'`. To write the locat
 so for `'move'` and `'back'` only, and give the new `iiifContent` + `collection` back to the viewer: when they
 are what is shown already, the viewer reads nothing again and keeps the page the reader is on. A Collection
 that cannot be read is left out of the trail.
-On the tag, use `collection="<url> <url>"` (separated by spaces) and listen for the `kasane-shown` event
+On the tag, use `collection="<url> <url>"` (separated by spaces; or a JSON array of strings, `collection='["<url>","<url>"]'`, when a value has a space in it) and listen for the `kasane-shown` event
 (`event.detail` is the same object). The Kasane site writes `?iiif-content=<manifest>&collection=<top>&collection=<sub>`.
 
 ### Starting with the side panel closed

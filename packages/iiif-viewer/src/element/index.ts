@@ -38,6 +38,23 @@ function parseOptions(raw: string | null): {
   }
 }
 
+/**
+ * The `collection` attribute: the Collections walked through to reach iiif-content, top first. Separated by
+ * spaces, or a JSON array of strings when it starts with '[' (for a value that has a space in it).
+ */
+function parseCollection(raw: string | null): string[] {
+  const text = (raw ?? '').trim();
+  if (text.startsWith('[')) {
+    try {
+      const json: unknown = JSON.parse(text);
+      return Array.isArray(json) ? json.filter((v): v is string => typeof v === 'string') : [];
+    } catch {
+      return [];
+    }
+  }
+  return text.split(/\s+/).filter(Boolean);
+}
+
 export class IiifViewerElement extends HTMLElement {
   static observedAttributes = ['iiif-content', 'collection', 'locale', 'theme', 'options'];
 
@@ -81,8 +98,7 @@ export class IiifViewerElement extends HTMLElement {
       );
       return;
     }
-    // the Collections walked through to reach iiif-content, top first, separated by spaces (a URL has none)
-    const collection = collectionsFromParams((this.getAttribute('collection') ?? '').split(/\s+/).filter(Boolean));
+        const collection = collectionsFromParams(parseCollection(this.getAttribute('collection')));
     const lang = this.getAttribute('locale') ?? document.documentElement.lang;
     const locale: ViewerProps['locale'] = lang.toLowerCase().startsWith('en') ? 'en' : 'ja';
     const themeAttr = this.getAttribute('theme');

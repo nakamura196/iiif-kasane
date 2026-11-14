@@ -14,7 +14,7 @@ import {
 import { Provider, createStore, useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { containersOf, type ContainerInfo, type ManifestV4 } from '../core';
 import { manifestAtom, manifestUrlAtom, modelChoicesAtom, shownManifestAtom } from './atoms';
-import { backFailedAtom, pickedIndex, pickedPageAtom, quietSeqAtom } from './internalState';
+import { backFailedAtom, pickedIndex, pickedPageAtom } from './internalState';
 import { navRequestAtom, nextSeq, trailAtom } from './displays/structureState';
 import { ViewerEnv, type ResolvedTheme } from './env';
 import {
@@ -184,7 +184,6 @@ function ViewerStateRoot({
   // useManifest) shows nothing new, so it reports nothing.
   const trail = useAtomValue(trailAtom);
   const owner = useAtomValue(manifestUrlAtom);
-  const quietSeq = useAtomValue(quietSeqAtom);
   const onShownChangeRef = useRef(onShownChange);
   const reportedSeq = useRef(0);
   useEffect(() => {
@@ -193,9 +192,9 @@ function ViewerStateRoot({
   useEffect(() => {
     if (!shown || shown.seq === reportedSeq.current) return;
     reportedSeq.current = shown.seq;
-    if (quietSeq === shown.seq) return;
+    if (shown.quiet) return;
     onShownChangeRef.current?.(shownLocation(shown, trail, owner));
-  }, [shown, trail, owner, quietSeq]);
+  }, [shown, trail, owner]);
 
   // The playback position of video and audio. The transcript (right panel) and the media display follow it.
   // A time given from outside (target.t) is applied when the player of that Canvas is attached.
