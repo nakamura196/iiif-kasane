@@ -14,6 +14,7 @@ import {
   rotationFromCss,
   serviceFromImageUrl,
   singleImageUrl,
+  level0BaseTiles,
   smallerBaseWidths,
   thumbnailUrlOf,
   tileSchemeOf,
@@ -256,6 +257,54 @@ describe('tiles', () => {
     expect(tileSchemeOf(l0)).toBeNull();
     expect(singleImageUrl(service, l0, 600)).toBe('https://h/i/full/1000,750/0/default.jpg');
     expect(singleImageUrl(service, l0, 5000)).toBe('https://h/i/full/1000,750/0/default.jpg');
+  });
+
+  // A static tile store (projektemacher.org): level 0, tiles, no sizes. Asking for a width of the whole
+  // (`full/3509,`) is a resize the store does not have and answers 404, which showed a broken image.
+  const store = { width: 3509, height: 2506, version: 2 as const, level: 0, tiles: [{ width: 512, height: 512, scaleFactors: [1, 2, 4] }], sizes: [] };
+  const all = { x: 0, y: 0, w: 3509, h: 2506 };
+  const v2 = { id: 'https://h/i', version: 2 as const };
+
+  it('level 0 without sizes: the whole image by keyword, never a width', () => {
+    expect(singleImageUrl(v2, store, 600)).toBe('https://h/i/full/full/0/default.jpg');
+    expect(singleImageUrl({ id: 'https://h/i', version: 3 }, { ...store, version: 3 }, 600)).toBe('https://h/i/full/max/0/default.jpg');
+    expect(singleImageUrl({ id: 'https://h/i', version: 1 }, { ...store, version: 1 }, 600)).toBe('https://h/i/full/full/0/native.jpg');
+  });
+
+  it('level 0 without sizes: the coarsest tiles are the base image', () => {
+    const base = level0BaseTiles(v2, store, all)!;
+    expect(base.map((t) => t.url)).toEqual([
+      'https://h/i/0,0,2048,2048/512,/0/default.jpg',
+      'https://h/i/2048,0,1461,2048/366,/0/default.jpg',
+      'https://h/i/0,2048,2048,458/512,/0/default.jpg',
+      'https://h/i/2048,2048,1461,458/366,/0/default.jpg',
+    ]);
+    // they cover the image exactly
+    expect(base.reduce((a, t) => a + t.w * t.h, 0)).toBe(3509 * 2506);
+  });
+
+  it('level 0 in Image API 3: the tiles use the canonical w,h size', () => {
+    const v3 = { id: 'https://h/i', version: 3 as const };
+    const base = level0BaseTiles(v3, { ...store, version: 3 }, all)!;
+    expect(base[1].url).toBe('https://h/i/2048,0,1461,2048/366,512/0/default.jpg');
+  });
+
+  it('level0BaseTiles: a large store still gets coarse tiles, not the whole image at full size', () => {
+    // 12000 x 9000 with a 2048 px coarsest span: 6 x 5 tiles
+    expect(level0BaseTiles(v2, { ...store, width: 12000, height: 9000 }, { x: 0, y: 0, w: 12000, h: 9000 })).toHaveLength(30);
+  });
+
+  it('level0BaseTiles: a region ending on a tile edge does not take the next tile', () => {
+    expect(level0BaseTiles(v2, store, { x: 0, y: 0, w: 2048, h: 2048 })!.map((t) => t.key)).toEqual(['base:4/0/0']);
+  });
+
+  it('level0BaseTiles: not when the service has sizes or cuts regions, or would need too many tiles', () => {
+    expect(level0BaseTiles(v2, { ...store, sizes: [{ width: 877, height: 626 }] }, all)).toBeNull();
+    expect(level0BaseTiles(v2, { ...store, level: 1 }, all)).toBeNull();
+    expect(level0BaseTiles(v2, { ...store, tiles: [] }, all)).toBeNull();
+    expect(level0BaseTiles(v2, { ...store, tiles: [{ width: 256, height: 256, scaleFactors: [1] }] }, all)).toBeNull();
+    // a region outside the image: no tile, so not an empty list that reads as "all failed"
+    expect(level0BaseTiles(v2, store, { x: 4000, y: 0, w: 100, h: 100 })).toBeNull();
   });
 
   it('level 1 without tiles: 512 px tiles at powers of two', () => {

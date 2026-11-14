@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   probeServiceOf,
   substituteLayer,
@@ -13,6 +13,7 @@ import {
   placementOf,
   resolveRegion,
   singleImageUrl,
+  level0BaseTiles,
   tileSchemeOf,
   tilesForView,
   smallerBaseWidths,
@@ -137,6 +138,13 @@ export default function ImageLayerView({
   // The tiles wait until the base image has come (or failed). Servers on HTTP/1.1 take 6 requests at a
   // time, so a hundred tiles asked together hold the base image back and the picture shows late.
   const [baseSettled, setBaseSettled] = useState(false);
+  // The base image that failed last. A failed <img> shows the browser's broken-image icon until the
+  // tiles cover it, so it is hidden. (Only on failure: a slow base image is still drawn as it comes.)
+  const [brokenBase, setBrokenBase] = useState<string | null>(null);
+  // base tiles of a level 0 service (see `level0BaseTiles`) that failed, by key
+  const [failedBaseTiles, setFailedBaseTiles] = useState<ReadonlySet<string>>(() => new Set());
+  // the same, at once (several tiles can fail before the next render)
+  const failedBaseRef = useRef(new Set<string>());
   // tiles that have come (or failed), by key
   const [settledTiles, setSettledTiles] = useState<ReadonlySet<string>>(() => new Set());
   const settleTile = (key: string) => setSettledTiles((s) => (s.has(key) ? s : new Set(s).add(key)));
@@ -209,6 +217,9 @@ export default function ImageLayerView({
 
   // the base image: the whole shown region, small
   const baseWidth = Math.min(region.w, Math.max(256, Math.ceil(region.w * place.k * (stage.stageW / canvasWidth) * dpr)), 1024);
+  // A static tile store (level 0, tiles but no sizes) has no small image of the whole: its coarsest tiles
+  // stand in for the base image.
+  const baseTiles = level0BaseTiles(service, info, region);
   const fullBase = fullRegion ? singleImageUrl(service, info, baseWidth) : null;
   // Some servers (e.g. the National Archives of Japan) answer 403 to the keyword `full` but serve the
   // same area given as pixels. When the `full` base image fails, ask once more with the explicit region.
@@ -227,7 +238,9 @@ export default function ImageLayerView({
   // tiles for what is visible now
   let tiles: ReturnType<typeof tilesForView> = [];
   const scheme = tileSchemeOf(info);
-  if (scheme && baseSettled && stage.boxW > 0 && stage.stageW > 0) {
+  const baseTileKeys = baseTiles?.map((tile) => `${tile.key}:${epoch}`) ?? [];
+  const baseReady = baseTiles ? baseTileKeys.every((k) => settledTiles.has(k)) : baseSettled;
+  if (scheme && baseReady && stage.boxW > 0 && stage.stageW > 0) {
     const toCanvas = canvasWidth / stage.stageW;
     // the box seen from the stage: its centre turned back, and the bounds of the turned box
     const seen = (v: { scale: number; tx: number; ty: number }) => {
@@ -266,26 +279,70 @@ export default function ImageLayerView({
       const mx = visible.x + visible.w / 2;
       const my = visible.y + visible.h / 2;
       const away = (t: { x: number; y: number; w: number; h: number }) => Math.hypot(t.x + t.w / 2 - mx, t.y + t.h / 2 - my);
-      tiles = tilesForView(service, info, scheme, screenPerSource, visible).sort((a, b) => away(a) - away(b));
+      // the base tiles already draw the coarsest level: no second <img> of the same file
+      const drawn = new Set(baseTiles?.map((tile) => tile.url));
+      tiles = tilesForView(service, info, scheme, screenPerSource, visible)
+        .filter((tile) => !drawn.has(tile.url))
+        .sort((a, b) => away(a) - away(b));
     }
   }
 
   const pending = tiles.filter((tile) => !settledTiles.has(`${tile.key}:${epoch}`)).length;
+  const baseSrc = bust(base, epoch);
+  const placeOf = (tile: { x: number; y: number; w: number; h: number }) => ({
+    left: pct((tile.x - region.x) / region.w),
+    top: pct((tile.y - region.y) / region.h),
+    width: pct(tile.w / region.w),
+    height: pct(tile.h / region.h),
+  });
 
   return (
     <div style={frame} data-auth-blurred={hidden || undefined}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
+      {baseTiles ? (
+        baseTiles.map((tile, i) => {
+          const key = baseTileKeys[i];
+          return (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              key={key}
+              src={bust(tile.url, epoch)}
+              alt=""
+              draggable={false}
+              fetchPriority="high"
+              className="absolute"
+              data-base-tile=""
+              style={{ ...placeOf(tile), ...(failedBaseTiles.has(key) ? { visibility: 'hidden' as const } : {}) }}
+              onLoad={() => {
+                settleTile(key);
+                onLoaded?.();
+              }}
+              onError={() => {
+                settleTile(key);
+                const failed = failedBaseRef.current;
+                if (failed.has(key)) return;
+                failed.add(key);
+                setFailedBaseTiles(new Set(failed));
+                // the last of the base tiles failed: the image cannot be read (told once, as for the base image)
+                if (baseTileKeys.every((k) => failed.has(k))) onFailed?.();
+              }}
+            />
+          );
+        })
+      ) : (
+      // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={bust(base, epoch)}
+        src={baseSrc}
         alt=""
         draggable={false}
         fetchPriority="high"
         className="absolute inset-0 w-full h-full"
+        style={brokenBase === baseSrc ? { visibility: 'hidden' } : undefined}
         onLoad={() => {
           setBaseSettled(true);
           onLoaded?.();
         }}
         onError={() => {
+          setBrokenBase(baseSrc);
           if (fullBase !== null && !retrying) {
             setRetriedBase(fullBase);
             return;
@@ -298,6 +355,7 @@ export default function ImageLayerView({
           if (failedUrl !== base) onFailed?.();
         }}
       />
+      )}
       {tiles.map((tile) => (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -306,12 +364,7 @@ export default function ImageLayerView({
           alt=""
           draggable={false}
           className="absolute"
-          style={{
-            left: pct((tile.x - region.x) / region.w),
-            top: pct((tile.y - region.y) / region.h),
-            width: pct(tile.w / region.w),
-            height: pct(tile.h / region.h),
-          }}
+          style={placeOf(tile)}
           // a tile drawn means the image is there, even if the small base image failed
           onLoad={() => {
             settleTile(`${tile.key}:${epoch}`);
