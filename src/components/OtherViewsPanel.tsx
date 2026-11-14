@@ -18,12 +18,14 @@ import {
   type GalleryMode,
   type GalleryQuality,
 } from '@/lib/gallery';
+import { viewersFor } from '@/lib/otherViewers';
 import { BROWSE_LAYOUTS, browseQuery, canOpenInBrowse, type BrowseLayout } from '@/lib/browse';
 
 // The "Other views" tab of the right panel: opens the shown item in Kasane's other pages (compare, map, 3D gallery).
 // These were buttons at the bottom left of the viewer, moved to a tab because they covered pictures and video.
 // Compare is offered only when the shown model or image has two or more candidates (a Choice).
 // The gallery is opened after choosing the walk mode, interior, quality and count (all /gallery/ URL arguments).
+// "Open in other viewers" links the shown manifest to other IIIF viewers' public demos (src/lib/otherViewers.ts).
 // The puzzle was a tab of the viewer, moved here (it is not a reading tool). Unlike the others it opens in place,
 // not on another page, so it is last.
 // Every link and its visibility follow the manifest shown now: after an entry of a Collection is opened, that entry.
@@ -49,16 +51,23 @@ interface Targets {
   hasGeo: boolean;
   galleryOk: boolean;
   browseOk: boolean;
+  /** Names and ids of the other viewers that can open the shown manifest (empty for a local image). */
+  viewers: ReturnType<typeof viewersFor>;
 }
 
 // what the shown manifest can be opened in; worked out once per shown manifest (georeferencing was found when it was shown)
-const NONE: Targets = { hasGeo: false, galleryOk: false, browseOk: false };
+const NONE: Targets = { hasGeo: false, galleryOk: false, browseOk: false, viewers: [] };
 const targetsCache = new WeakMap<ShownManifest, Targets>();
 function targetsOf({ shown }: PanelContext): Targets {
   if (!shown) return NONE;
   let t = targetsCache.get(shown);
   if (!t) {
-    t = { hasGeo: shown.hasGeo, galleryOk: canOpenInGallery(shown.raw), browseOk: canOpenInBrowse(shown.raw) };
+    t = {
+      hasGeo: shown.hasGeo,
+      galleryOk: canOpenInGallery(shown.raw),
+      browseOk: canOpenInBrowse(shown.raw),
+      viewers: viewersFor(shown.url, shown.raw),
+    };
     targetsCache.set(shown, t);
   }
   return t;
@@ -75,7 +84,7 @@ function OtherViews({
   const tb = useTranslations('Browse');
   // page indexes count in the shown manifest (the entry of a Collection, if one is open), so links use its URL
   const manifestUrl = ctx.shown?.url ?? pageUrl;
-  const { hasGeo, galleryOk, browseOk } = targetsOf(ctx);
+  const { hasGeo, galleryOk, browseOk, viewers } = targetsOf(ctx);
   const [browseLayout, setBrowseLayout] = useState<BrowseLayout>('table');
   const [mode, setMode] = useState<GalleryMode>('orbit');
   const [look, setLook] = useState<GalleryLook>('standard');
@@ -173,6 +182,21 @@ function OtherViews({
           </Link>
         </section>
       )}
+      {viewers.length > 0 && (
+        <section className="space-y-2">
+          <h3 className="font-semibold">{t('openInHeading')}</h3>
+          <p className="text-xs text-gray-600 dark:text-gray-300">{t('openInHint')}</p>
+          <ul className="flex flex-wrap gap-2" data-testid="open-in-viewers">
+            {viewers.map((v) => (
+              <li key={v.id}>
+                <a href={v.url(manifestUrl)} target="_blank" rel="noopener noreferrer" className={BUTTON} data-viewer={v.id}>
+                  {v.name}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {canPlayPuzzle(ctx) && (
         <section className="space-y-2">
           <h3 className="font-semibold">{t('puzzleHeading')}</h3>
@@ -203,7 +227,7 @@ export const otherViewsPanel = (props: Props, label: string): Panel => ({
   label,
   available: (ctx) => {
     const t = targetsOf(ctx);
-    return !!props.compare || t.hasGeo || t.galleryOk || t.browseOk || canPlayPuzzle(ctx);
+    return !!props.compare || t.hasGeo || t.galleryOk || t.browseOk || t.viewers.length > 0 || canPlayPuzzle(ctx);
   },
   Component: (ctx) => <OtherViews {...props} ctx={ctx} />,
 });

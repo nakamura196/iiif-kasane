@@ -429,6 +429,8 @@
     "limit": "Works",
     "limitDefault": "Default",
     "limitOption": "Up to {n}",
+    "openInHeading": "Open in other viewers",
+    "openInHint": "Open this item in another IIIF viewer, in a new tab. The viewer's own site loads it, so it must be reachable on the web.",
     "browseHeading": "Browse in 3D",
     "browseHint": "Lay out the items of this collection (or the pages of this item) as thumbnail cards in a 3D space.",
     "layout": "Layout"
