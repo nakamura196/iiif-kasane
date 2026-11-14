@@ -3,7 +3,7 @@
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import '../style.css';
-import { decodeContentState } from '../core';
+import { collectionsFromParams, decodeContentState } from '../core';
 import { Viewer, type ViewerProps } from '../react/Viewer';
 // The tag shows every kind of item, 3D Scenes included.
 import '../react/scene';
@@ -82,7 +82,7 @@ export class IiifViewerElement extends HTMLElement {
       return;
     }
     // the Collections walked through to reach iiif-content, top first, separated by spaces (a URL has none)
-    const collection = (this.getAttribute('collection') ?? '').split(/\s+/).filter(Boolean);
+    const collection = collectionsFromParams((this.getAttribute('collection') ?? '').split(/\s+/).filter(Boolean));
     const lang = this.getAttribute('locale') ?? document.documentElement.lang;
     const locale: ViewerProps['locale'] = lang.toLowerCase().startsWith('en') ? 'en' : 'ja';
     const themeAttr = this.getAttribute('theme');

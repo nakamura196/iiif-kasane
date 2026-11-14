@@ -21,6 +21,12 @@ export function pickedIndex(picked: { shown: number; index: number }, shownSeq: 
 /** Counts every manifest shown; it only grows (clearing what is shown does not take it back). */
 export const shownSeqAtom = atom(0);
 
+/**
+ * The number (ShownManifest.seq) of a manifest shown that `onShownChange` does not report: one opened from a
+ * dropped link. The host gets no location to write for it (as before `onShownChange` existed).
+ */
+export const quietSeqAtom = atom(0);
+
 /** Going back found nothing it could show (every step of the trail failed to parse): the reader is told. */
 export const backFailedAtom = atom(false);
 

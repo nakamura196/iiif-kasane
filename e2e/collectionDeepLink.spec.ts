@@ -143,3 +143,39 @@ test("the browser's Back after opening an entry returns to the Collection", asyn
   await page.goForward();
   await expect(pager(page)).toContainText('1 / 3');
 });
+
+test("the viewer's own Back replaces the address (the history does not grow) and the browser's Back is adopted without reading", async ({
+  page,
+}) => {
+  await serve(page);
+  const reads: string[] = [];
+  page.on('request', (r) => {
+    if (r.url() === TOP || r.url() === ALPHA) reads.push(r.url());
+  });
+  await page.goto(viewer(`iiif-content=${enc(TOP)}`));
+  await card(page, /Alpha/).click();
+  await expect.poll(() => params(page).get('iiif-content')).toBe(ALPHA);
+  await back(page).click();
+  await expect.poll(() => params(page).get('iiif-content')).toBe(TOP);
+  await expect(card(page, /Alpha/)).toBeVisible();
+  const before = reads.length;
+  // one entry before: the Collection as first opened (it was replaced, not pushed on)
+  await page.goBack();
+  await expect(card(page, /Alpha/)).toBeVisible();
+  await expect(pager(page)).toHaveCount(0);
+  expect(params(page).get('iiif-content')).toBe(TOP);
+  expect(reads.length).toBe(before);
+});
+
+test('a ?collection= value that is not an address is dropped; the manifest still opens', async ({ page }) => {
+  await serve(page);
+  const outside: string[] = [];
+  page.on('request', (r) => {
+    if (new URL(r.url()).hostname === 'evil.example') outside.push(r.url());
+  });
+  await page.goto(viewer(`iiif-content=${enc(ALPHA)}&collection=${enc('//evil.example/c.json')}&collection=${enc(TOP)}`));
+  await expect(pager(page)).toContainText('1 / 3');
+  await back(page).click();
+  await expect(card(page, /Sub shelf/)).toBeVisible();
+  expect(outside).toEqual([]);
+});

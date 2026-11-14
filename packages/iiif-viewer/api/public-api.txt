@@ -1789,6 +1789,7 @@ export [value] clusteringParams: (on: boolean) => Partial<Record<"annotations" |
 export [value] collectManifestAnnotations: (manifest: unknown, fetchJson: (url: string) => Promise<unknown>, props?: CollectOptions) => Promise<CollectedAnnotations>
 export [value] collectionEntriesOf: (raw: unknown) => CollectionEntry[]
 export [value] collectionReader: SearchReader
+export [value] collectionsFromParams: (values: null | readonly string[] | undefined) => string[]
 export [value] compareDetailWidthOf: (a: CompareSide, b: CompareSide) => number | undefined
 export [value] compareIndexesOf: (matched: { index: number; }[]) => number[]
 export [value] computeFocusCamera: (input: FocusInput) => FocusResult

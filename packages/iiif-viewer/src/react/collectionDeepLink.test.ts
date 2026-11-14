@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createStore } from 'jotai';
 import { manifestUrlAtom, shownManifestAtom } from './atoms';
-import { pickedPageAtom } from './internalState';
-import { loadContent, shownLocation, takeOverContent } from './useManifest';
+import { pickedPageAtom, quietSeqAtom } from './internalState';
+import { collectionsFromParams, encodeContentState } from '../core';
+import { loadContent, openContent, shownLocation, takeOverContent } from './useManifest';
 import { goBack, openManifest, trailAtom } from './displays/structureState';
 
 // A deep link into a Collection: ?iiif-content=<manifest>&collection=<top>&collection=<sub>
@@ -60,12 +61,16 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+// the Collections are attached after the manifest is shown, when they have arrived
+const settled = async (store: ReturnType<typeof createStore>, count: number) =>
+  vi.waitFor(() => expect(store.get(trailAtom).items).toHaveLength(count));
 const trailUrls = (store: ReturnType<typeof createStore>) => store.get(trailAtom).items.map((i) => i.url);
 
 describe('loading a manifest with the Collections it was reached through', () => {
   it('shows the manifest as the iiif-content and fills the trail, top first', async () => {
     const store = createStore();
     await expect(loadContent(store, m1, () => 'en', [top, sub])).resolves.toBe('shown');
+    await settled(store, 2);
     const shown = store.get(shownManifestAtom);
     expect(shown?.url).toBe(m1);
     expect(shown?.origin).toBe('content');
@@ -77,6 +82,7 @@ describe('loading a manifest with the Collections it was reached through', () =>
   it('gives each Collection the position of the next step in it', async () => {
     const store = createStore();
     await loadContent(store, m1, () => 'en', [top, sub]);
+    await settled(store, 2);
     // top lists sub second; sub lists m1 second
     expect(store.get(trailAtom).items.map((i) => i.index)).toEqual([1, 1]);
   });
@@ -84,6 +90,7 @@ describe('loading a manifest with the Collections it was reached through', () =>
   it('goes back through the Collections one step at a time, to the position that was opened', async () => {
     const store = createStore();
     await loadContent(store, m1, () => 'en', [top, sub]);
+    await settled(store, 2);
     expect(goBack(store, 'en')).toBe(true);
     expect(store.get(shownManifestAtom)?.url).toBe(sub);
     expect(store.get(shownManifestAtom)?.origin).toBe('back');
@@ -97,6 +104,7 @@ describe('loading a manifest with the Collections it was reached through', () =>
     const store = createStore();
     served[top] = collectionJson(top, [m2]);
     await loadContent(store, m1, () => 'en', [top]);
+    await settled(store, 1);
     expect(store.get(trailAtom).items.map((i) => i.index)).toEqual([0]);
   });
 
@@ -105,6 +113,7 @@ describe('loading a manifest with the Collections it was reached through', () =>
     delete served[sub];
     await expect(loadContent(store, m1, () => 'en', [top, sub])).resolves.toBe('shown');
     expect(store.get(shownManifestAtom)?.url).toBe(m1);
+    await settled(store, 1);
     expect(trailUrls(store)).toEqual([top]);
   });
 
@@ -118,6 +127,7 @@ describe('loading a manifest with the Collections it was reached through', () =>
   it('reads the manifest and the Collections together, each once', async () => {
     const store = createStore();
     await loadContent(store, m1, () => 'en', [top, sub]);
+    await settled(store, 2);
     expect([...fetched].sort()).toEqual([m1, sub, top].sort());
   });
 
@@ -136,6 +146,94 @@ describe('loading a manifest with the Collections it was reached through', () =>
     await loadContent(store, m1, () => 'en', [top]);
     // ContainerList applies canvas= / pos= only for this origin
     expect(store.get(shownManifestAtom)?.origin).toBe('content');
+  });
+});
+
+describe('a Collection that is slow or never answers', () => {
+  // fetch that answers `held` URLs only when released
+  const hold = (held: string[]) => {
+    const release: Record<string, () => void> = {};
+    const waits = Object.fromEntries(held.map((h) => [h, new Promise<void>((r) => (release[h] = r))]));
+    vi.stubGlobal('fetch', async (target: string) => {
+      await waits[target];
+      return { ok: target in served, json: async () => served[target] } as unknown as Response;
+    });
+    return release;
+  };
+
+  it('does not hold back the manifest, and the trail is attached when it arrives', async () => {
+    const store = createStore();
+    const release = hold([top]);
+    await expect(loadContent(store, m1, () => 'en', [top])).resolves.toBe('shown');
+    expect(store.get(shownManifestAtom)?.url).toBe(m1);
+    expect(trailUrls(store)).toEqual([]);
+    release[top]();
+    await settled(store, 1);
+    expect(trailUrls(store)).toEqual([top]);
+  });
+
+  it('is not attached when something else was shown meanwhile (a move or a new iiif-content)', async () => {
+    const store = createStore();
+    const release = hold([top]);
+    await loadContent(store, m1, () => 'en', [top]);
+    await openManifest(store, m2, true, () => 'en');
+    release[top]();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(trailUrls(store)).toEqual([m1]);
+
+    const other = createStore();
+    const release2 = hold([top]);
+    await loadContent(other, m1, () => 'en', [top]);
+    await loadContent(other, m2, () => 'en');
+    release2[top]();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(trailUrls(other)).toEqual([]);
+  });
+});
+
+describe('the Collections the host gives', () => {
+  it('go through the rules of iiif-content: content states are decoded, bad values are dropped', () => {
+    expect(
+      collectionsFromParams([top, encodeContentState(sub), '//evil.example/x.json', 'not a url', '/local/c.json']),
+    ).toEqual([top, sub, '/local/c.json']);
+    expect(collectionsFromParams(undefined)).toEqual([]);
+  });
+});
+
+describe('a new location from the host', () => {
+  it('a takeover does not cancel a move still in flight; a real new load does', async () => {
+    const store = createStore();
+    await loadContent(store, top, () => 'en');
+    await openManifest(store, m1, true, () => 'en');
+    // the reader clicks m2 (not answered yet), then the host gives back the location shown
+    let answer = () => {};
+    const wait = new Promise<void>((r) => (answer = r));
+    vi.stubGlobal('fetch', async (target: string) => {
+      await wait;
+      return { ok: target in served, json: async () => served[target] } as unknown as Response;
+    });
+    const move = openManifest(store, m2, true, () => 'en');
+    expect(openContent(store, m1, () => 'en', [top])).toBe('taken');
+    answer();
+    await expect(move).resolves.toBe('shown');
+    expect(store.get(shownManifestAtom)?.url).toBe(m2);
+
+    // a real new iiif-content drops a move in flight
+    const move2 = openManifest(store, m1, true, () => 'en');
+    const load = openContent(store, top, () => 'en', []);
+    await expect(move2).resolves.toBe('stale');
+    await load;
+  });
+});
+
+describe('a dropped link', () => {
+  it('is shown but not reported to the host; a move from a Collection is', async () => {
+    const store = createStore();
+    await loadContent(store, top, () => 'en');
+    await openManifest(store, m1, false, () => 'en', 'move');
+    expect(store.get(quietSeqAtom)).toBe(store.get(shownManifestAtom)?.seq);
+    await openManifest(store, m2, true, () => 'en');
+    expect(store.get(quietSeqAtom)).not.toBe(store.get(shownManifestAtom)?.seq);
   });
 });
 
@@ -200,6 +298,7 @@ describe('what onShownChange reports', () => {
   it("'content' for the iiif-content, with the Collections it was reached through", async () => {
     const store = createStore();
     await loadContent(store, m1, () => 'en', [top, sub]);
+    await settled(store, 2);
     expect(report(store)).toEqual({ url: m1, collections: [top, sub], origin: 'content' });
   });
 
@@ -215,6 +314,7 @@ describe('what onShownChange reports', () => {
   it("'back' after going back one step", async () => {
     const store = createStore();
     await loadContent(store, m1, () => 'en', [top, sub]);
+    await settled(store, 2);
     goBack(store, 'en');
     expect(report(store)).toEqual({ url: sub, collections: [top], origin: 'back' });
   });

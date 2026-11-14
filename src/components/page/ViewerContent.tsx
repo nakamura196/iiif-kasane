@@ -13,7 +13,7 @@ import ManifestInput from '@/components/Input';
 import ManifestParamWatcher from '@/components/ManifestParamWatcher';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import { containersOf, convertToV4, fetchManifest } from 'iiif-kasane/core';
+import { containersOf, convertToV4, fetchManifest, manifestFromParams } from 'iiif-kasane/core';
 import { HIDDEN_VIEWER_TABS, OTHER_VIEWS_TAB, viewerTabOf } from '@/lib/viewerTabs';
 import { puzzleFromParams } from '@/lib/puzzleLink';
 import { otherViewsPanel, type CompareTarget } from '@/components/OtherViewsPanel';
@@ -98,7 +98,11 @@ const ViewerContent: NextPage = () => {
   // Read when the page opens, and when a link on the entry screen changes the item in the URL
   // The Collections walked through to reach the item (?collection=, top first), kept with the item they belong to
   // so that no render pairs a new item with the old Collections (that would read the item again)
-  const [collections, setCollections] = useState<{ of: string | null; urls: string[] }>({ of: null, urls: [] });
+  // (first render: from the address, so that a client navigation to a deep link does not read the item without its Collections first)
+  const [collections, setCollections] = useState<{ of: string | null; urls: string[] }>(() => ({
+    of: manifestFromParams(new URLSearchParams(searchParams?.toString() ?? '')),
+    urls: searchParams?.getAll('collection') ?? [],
+  }));
   const readUrl = useCallback(
     (manifestParam: string | null, collectionParams: string[] = []) => {
       if (!manifestParam) return;
@@ -121,7 +125,12 @@ const ViewerContent: NextPage = () => {
       const tab = new URLSearchParams(window.location.search).get('tab');
       if (tab) params.set('tab', tab);
       const next = `?${params.toString()}`;
-      if (next !== window.location.search) router.push(next);
+      if (next === window.location.search) return;
+      // going back replaces the entry: pushing would grow the history, and the browser's Back would walk
+      // forward again through the places just left. (The browser's Back then lands on the entry opened
+      // before; the viewer takes it over without reading when it is what is shown.)
+      if (shown.origin === 'back') router.replace(next);
+      else router.push(next);
     },
     [router],
   );

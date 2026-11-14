@@ -95,3 +95,12 @@ export function manifestFromParams(params: URLSearchParams): string | null {
 export function contentParam(manifestUrl: string): string {
   return `iiif-content=${encodeURIComponent(manifestUrl)}`;
 }
+
+/**
+ * The values of `?collection=` (the Collections walked through to reach the item, top first) as URLs: each goes
+ * through the same rules as `iiif-content` (a content state gives its target, `//host` paths are refused);
+ * those that do not pass are dropped.
+ */
+export function collectionsFromParams(values: readonly string[] | null | undefined): string[] {
+  return (values ?? []).map((v) => decodeContentState(v)).filter((v): v is string => !!v);
+}

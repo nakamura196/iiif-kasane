@@ -100,6 +100,9 @@ export async function openManifest(
 ): Promise<OpenResult> {
   // a new iiif-content is being read: it wins, and this move (inside what was shown before) is dropped
   if (isContentLoading(store)) return 'stale';
+  // a 'move' without a push is a dropped link: it is shown but not reported to the host (there is no entry
+  // of a Collection to write into its address, and the link's targets would be lost)
+  const quiet = !push && origin === 'move';
   return loadManifest(store, url, locale, origin, () => {
     const here = store.get(shownManifestAtom);
     if (push && here) {
@@ -112,7 +115,7 @@ export async function openManifest(
     }
     // before the new manifest is shown, so what is set for it afterwards (a content state's region) stays
     resetViewState(store);
-  });
+  }, quiet);
 }
 
 /** Go back one step of the trail, to the page the reader was on. false when there is nothing to go back to. */
