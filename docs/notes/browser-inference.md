@@ -431,3 +431,53 @@ NDL デジタルコレクション「銘尽」（https://dl.ndl.go.jp/api/iiif/1
 - Image API level 1 以上のサーバでの範囲指定（作りは単純だが、実機では未確認）
 - OCR のモデルでの読み取りの質（この端末に OCR のモデルを入れていなかった）
 - 範囲を重ねて 2 回読んだときの重複は除いていない（同じ顔・行が 2 件になる）
+
+## 2026-11-13 PP-OCRv6 medium beside small
+
+### What was done
+
+Added PP-OCRv6 medium to the Inference tab as a second model (`ppocrv6-medium`). small (`ppocrv6`) is kept as it was;
+only its display name now says "small". The maintainer decided to offer both and let the viewer choose.
+
+medium needs no new code: the `inference.yml` files of `PP-OCRv6_medium_det_onnx` / `_rec_onnx` differ from small's
+only in `model_name` (same thresholds, same pre-processing, same character list of 18,708 characters), so medium reuses
+`ppocrV6.run.ts` and `ppocrV6.chars.json`. The revisions are the ones Local OCR pins
+(`det` 61323801…, `rec` 50c7eacaf…). Files: 62,032,837 + 76,554,979 bytes (139 MB; small is 31 MB).
+
+### Measurements
+
+English print: *Alice's Adventures in Wonderland* (1872, Internet Archive `alicesadventures00carruoft`), 11 pages,
+ground truth from Project Gutenberg #11. Character error rate over letters and digits only; differences between the
+editions add the same amount to every engine. Kasane's own pipeline in Node on CPU (`scripts/inference/ppocr-ours.mts`):
+
+| Model | CER | Time for 12 pages (Node, CPU) |
+|---|---|---|
+| small | 1.43% | 17 s |
+| small detection + medium recognition | 1.40% | 42 s |
+| medium | 1.35% | 74 s |
+
+For reference, on the same pages: PP-OCRv6 medium in Local OCR 1.20%, PaddleOCR-VL 1.50%, Apple Vision 1.72%.
+With punctuation counted, all engines are at 4.48–6.07%.
+
+Chinese woodblock book: Jiaxing Canon (Toyo Bunko IIIF), 177-03 to 05, 15 proofread pages, 292 lines, 5,714 characters.
+Each line read inside NDL's line box; variant forms counted as the same character.
+
+| Model | CER | Lines exactly right | Time per line (CPU, median) |
+|---|---|---|---|
+| NDL Koten OCR-Lite | 4.90% | – | – |
+| PP-OCRv6 small | 1.65% (94 chars) | 216 | 10 ms |
+| PP-OCRv6 medium | 1.45% (83 chars) | 223 | 40 ms |
+
+Browser (this Mac, WebGPU for detection + wasm for recognition), Alice canvas 20 (24 lines): small 5.2 s, medium 20.5 s
+(the second run; the first, with model preparation, 22.5 s). Both read the same 24 lines. No console errors.
+
+### Not obvious
+
+- The woodblock numbers use NDL's line boxes. When PP-OCRv6 also detects the lines, the error rate rises to 16.6%,
+  because it also reads the ruler at the edge of the scan, the block centre and seals. Kasane lets PP-OCRv6 detect,
+  so on woodblock books expect boxes outside the main text.
+
+### Not checked
+
+- medium on Japanese print (the 2026-10-16 comparison was for small only).
+- Memory use of medium on phones.

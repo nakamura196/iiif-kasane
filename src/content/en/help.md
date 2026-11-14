@@ -133,7 +133,10 @@ The "Inference" tab runs machine-learning models on the image you are viewing, i
 - **Reading text (OCR)**: reads the text line by line.
   - "NDL Kotenseki OCR-Lite": for pre-modern Japanese books, including kuzushiji (cursive script).
   - "NDLOCR-Lite": for printed Japanese material from the Meiji era on, vertical or horizontal.
-  - "PP-OCRv6" and "PP-OCRv5": for printed material, mainly horizontal, in Chinese, English and Japanese. PP-OCRv6 is newer and misses fewer characters in Japanese.
+  - "PP-OCRv6" (small and medium) and "PP-OCRv5": for printed material, mainly horizontal, in Chinese, English and Japanese. PP-OCRv6 is newer and misses fewer characters in Japanese.
+    - PP-OCRv6 comes in two sizes, small and medium. medium misreads fewer characters; small is lighter and faster.
+    - In our measurements the character error rate was 1.43% (small) and 1.35% (medium) on English print (the 1872 edition of *Alice's Adventures in Wonderland*, 11 pages), and 1.65% (small) and 1.45% (medium) on a Chinese woodblock book (the Jiaxing Canon, 15 pages and 5,714 characters, read line by line).
+    - In exchange, medium's files are about 139 MB (small: about 31 MB), and reading takes about 4 times as long (on the same English page, 5 seconds with small and 21 with medium).
   - "PP-OCRv5 (Latin script)": for printed text in French, German, Latin and other Latin-script languages.
 - **Faces in Japanese art**: finds the faces drawn in ukiyo-e, picture scrolls, modern bijin-ga and other Japanese art, and marks them with boxes. "Face outlines in Japanese art" marks each face with its traced outline instead of a box.
 - **Click to outline**: click on something in the image to trace its shape and mark it with an outline. Works on people, buildings, objects and more.
