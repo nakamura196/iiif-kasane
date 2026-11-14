@@ -1,5 +1,5 @@
-// IIIF Content State API 1.0 の `iiif-content` 引数。
-// 値は「マニフェスト URL そのもの」か「base64url の JSON」（Annotation で target がマニフェスト）。
+// The `iiif-content` argument of the IIIF Content State API 1.0.
+// The value is either the manifest URL itself or base64url JSON (an Annotation whose target is the manifest).
 
 const toBase64Url = (s: string): string => {
   const bytes = new TextEncoder().encode(s);
@@ -20,7 +20,7 @@ type Json = Record<string, unknown>;
 
 const isObject = (v: unknown): v is Json => typeof v === 'object' && v !== null;
 
-// target（文字列・オブジェクト・SpecificResource・配列）から、マニフェストの URL を取り出す。
+// The manifest URL from a target (a string, an object, a SpecificResource or an array).
 const manifestOf = (target: unknown): string | null => {
   if (typeof target === 'string') return target;
   if (Array.isArray(target)) {
@@ -33,7 +33,7 @@ const manifestOf = (target: unknown): string | null => {
   if (!isObject(target)) return null;
   if (target.type === 'Manifest' && typeof target.id === 'string') return target.id;
   const fromPartOf = (r: Json): string | null => {
-    // Canvas などの partOf に、親のマニフェストが書かれる
+    // the parent manifest is written in the partOf of a Canvas and the like
     if (!Array.isArray(r.partOf)) return null;
     for (const p of r.partOf) {
       if (isObject(p) && p.type === 'Manifest' && typeof p.id === 'string') return p.id;
@@ -49,17 +49,17 @@ const manifestOf = (target: unknown): string | null => {
   return fromPartOf(target);
 };
 
-/** `iiif-content` の値から、マニフェストの URL を取り出す。読めなければ null。 */
+/** The manifest URL from the value of `iiif-content`. null when it cannot be read. */
 export function decodeContentState(value: string | null | undefined): string | null {
   if (!value) return null;
   const v = value.trim();
   if (/^https?:\/\//i.test(v)) return v;
-  // サイト内の場所（/manifests/... など。サンプルのボタンがこの形で渡す）。// で始まるものは別のサイトになるので受けない
+  // A place on this site (/manifests/... etc.; the sample buttons pass this form). One that starts with // is another site, so it is refused
   if (/^\/(?!\/)/.test(v)) return v;
   try {
-    // 前後のどちらの書き方でも通るよう、URL エンコードされた JSON も受ける
+    // URL-encoded JSON is accepted too, so that either way of writing it works
     let text = v.startsWith('{') || v.startsWith('%7B') ? decodeURIComponent(v) : fromBase64Url(v);
-    // Cookbook 形式: URI エンコードした JSON を base64url にしたもの
+    // Cookbook form: URI-encoded JSON turned into base64url
     if (text.startsWith('%')) text = decodeURIComponent(text);
     const json: unknown = JSON.parse(text);
     if (!isObject(json)) return null;
@@ -70,7 +70,7 @@ export function decodeContentState(value: string | null | undefined): string | n
   }
 }
 
-/** マニフェスト URL を、base64url の content state（Annotation）にする。 */
+/** A manifest URL as a base64url content state (an Annotation). */
 export function encodeContentState(manifestUrl: string): string {
   return toBase64Url(
     JSON.stringify({
@@ -83,15 +83,29 @@ export function encodeContentState(manifestUrl: string): string {
 }
 
 /**
- * URL の引数から、表示するマニフェストの URL を決める。
- * `iiif-content` を優先し、無ければ従来の `manifest` を使う（既存リンクの互換）。
- * IIIF Curation Viewer と同じ `curation`（キュレーションの URL）も受ける。
+ * The URL of the manifest to show, from the URL arguments.
+ * `iiif-content` comes first; without it the earlier `manifest` is used (so that existing links keep working).
+ * `curation` (the URL of a curation) is accepted too, as in the IIIF Curation Viewer.
  */
 export function manifestFromParams(params: URLSearchParams): string | null {
   return decodeContentState(params.get('iiif-content')) ?? params.get('manifest') ?? params.get('curation') ?? null;
 }
 
-/** サイトが出すリンクの引数。マニフェスト URL そのものを `iiif-content` に入れる。 */
+/** The argument of the links the site writes: the manifest URL itself goes in `iiif-content`. */
 export function contentParam(manifestUrl: string): string {
   return `iiif-content=${encodeURIComponent(manifestUrl)}`;
+}
+
+/**
+ * The values of `?collection=` (the Collections walked through to reach the item, top first) as URLs: each goes
+ * through the same rules as `iiif-content` (a content state gives its target, `//host` paths are refused);
+ * those that do not pass are dropped.
+ */
+export function collectionsFromParams(values: readonly string[] | null | undefined): string[] {
+  return (values ?? []).map((v) => decodeContentState(v)).filter((v): v is string => !!v);
+}
+
+/** Whether two lists of URLs are the same, element by element (no joined string, which a URL could imitate). */
+export function sameUrlList(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((v, i) => v === b[i]);
 }

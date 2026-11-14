@@ -1,4 +1,4 @@
-// <iiif-kasane iiif-content="..." locale="ja" theme="auto" options='{"tab":"metadata","panelOpen":false,"pager":false,"environment":"none"}'></iiif-kasane>
+// <iiif-kasane iiif-content="..." collection="<url> <url>" locale="ja" theme="auto" options='{"tab":"metadata","panelOpen":false,"pager":false,"environment":"none"}'></iiif-kasane>
 // Light DOM (no shadow root) so that the host page can set --iiif-viewer-* variables.
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -38,8 +38,25 @@ function parseOptions(raw: string | null): {
   }
 }
 
+/**
+ * The `collection` attribute: the Collections walked through to reach iiif-content, top first. Separated by
+ * spaces, or a JSON array of strings when it starts with '[' (for a value that has a space in it).
+ */
+function parseCollection(raw: string | null): string[] {
+  const text = (raw ?? '').trim();
+  if (text.startsWith('[')) {
+    try {
+      const json: unknown = JSON.parse(text);
+      return Array.isArray(json) ? json.filter((v): v is string => typeof v === 'string') : [];
+    } catch {
+      return [];
+    }
+  }
+  return text.split(/\s+/).filter(Boolean);
+}
+
 export class IiifViewerElement extends HTMLElement {
-  static observedAttributes = ['iiif-content', 'locale', 'theme', 'options'];
+  static observedAttributes = ['iiif-content', 'collection', 'locale', 'theme', 'options'];
 
   private root: Root | null = null;
   private container: HTMLDivElement | null = null;
@@ -81,6 +98,8 @@ export class IiifViewerElement extends HTMLElement {
       );
       return;
     }
+    // the raw values: the viewer decodes them (a content state gives its target) and drops those that are no address
+    const collection = parseCollection(this.getAttribute('collection'));
     const lang = this.getAttribute('locale') ?? document.documentElement.lang;
     const locale: ViewerProps['locale'] = lang.toLowerCase().startsWith('en') ? 'en' : 'ja';
     const themeAttr = this.getAttribute('theme');
@@ -89,6 +108,10 @@ export class IiifViewerElement extends HTMLElement {
     this.root.render(
       createElement(Viewer, {
         iiifContent: content,
+        collection,
+        // lets the embedding page write the location into its own URL (and give it back as iiif-content + collection)
+        onShownChange: (shown) =>
+          this.dispatchEvent(new CustomEvent('kasane-shown', { detail: shown, bubbles: true, composed: true })),
         locale,
         theme,
         tab: this.tab,
