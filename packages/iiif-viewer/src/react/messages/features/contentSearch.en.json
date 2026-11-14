@@ -13,7 +13,6 @@
     "failed": "The search failed. The provider's service did not answer, or does not accept requests from the browser.",
     "showOnImage": "Show on image",
     "copyLink": "Copy link to this search",
-    "copied": "Copied",
     "clear": "Clear",
     "granularity": "Unit",
     "granularityAll": "All",

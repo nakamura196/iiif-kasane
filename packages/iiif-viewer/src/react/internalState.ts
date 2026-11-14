@@ -21,6 +21,13 @@ export function pickedIndex(picked: { shown: number; index: number }, shownSeq: 
 /** Counts every manifest shown; it only grows (clearing what is shown does not take it back). */
 export const shownSeqAtom = atom(0);
 
+/**
+ * The number (ShownManifest.seq) of a manifest shown that `onShownChange` does not report: a dropped link (the host
+ * has no address to write for it), or the place the host asked for with the browser's Back (it set that itself).
+ * Written in the same tick as the manifest shown. Internal: not part of ShownManifest, which hosts can read.
+ */
+export const quietSeqAtom = atom(0);
+
 /** Going back found nothing it could show (every step of the trail failed to parse): the reader is told. */
 export const backFailedAtom = atom(false);
 

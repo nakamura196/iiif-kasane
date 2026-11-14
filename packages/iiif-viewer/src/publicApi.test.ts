@@ -34,6 +34,7 @@ describe('<iiif-kasane> tag', () => {
     });
     expect(observed, 'observedAttributes not found in element/index.ts').toBeDefined();
     expect(sorted(observed!), 'Attributes changed. Removing one needs the maintainer; add a new one here on purpose').toEqual([
+      'collection',
       'iiif-content',
       'locale',
       'options',

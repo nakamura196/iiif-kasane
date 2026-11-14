@@ -33,6 +33,8 @@ import { annotationsAtom, selectedAnnotationIdAtom } from '../atoms';
 import { fmt } from '../displays/TranscriptPanel';
 import { navRequestAtom, nextSeq } from '../displays/structureState';
 import { useLocale, useTranslations } from '../env';
+import { BUTTON } from '../common/buttonClasses';
+import { CopyButton } from '../common/CopyButton';
 import { inferenceResultsAtom } from '../inference/state';
 import { localAnnotationPagesAtom, selectedCanvasAnnotationAtom, type LocalAnnotationPage } from '../overlays/canvasAnnotationState';
 import { fetchPage } from '../overlays/useCanvasAnnotations';
@@ -53,8 +55,6 @@ const MAX_MATCHES = 2000;
 /** Number of hits shown in the list at a time (Wellcome can return 1,753 in one response) */
 const LIST_STEP = 200;
 
-const BUTTON =
-  'px-2.5 py-1 rounded border border-gray-300 dark:border-gray-600 text-xs hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40';
 const PRIMARY = 'px-3 py-1 rounded text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-40';
 
 /** service: the provider's search service. local: local annotations */
@@ -214,7 +214,6 @@ export function ContentSearchPanelBody(ctx: PanelContext) {
   const scope: Scope = !service ? 'local' : !localOk ? 'service' : wantedScope;
   const [text, setText] = useState(() => current?.q ?? urlQuery());
   const [limit, setLimit] = useState(LIST_STEP);
-  const [copied, setCopied] = useState(false);
   const abort = useRef<AbortController | null>(null);
   const terms = useAutocomplete(scope === 'service' ? service : undefined, text, locale);
 
@@ -369,20 +368,13 @@ export function ContentSearchPanelBody(ctx: PanelContext) {
     setSelected(null);
   };
 
-  const copyLink = async () => {
-    if (!current) return;
+  const linkUrl = (): string => {
     const u = new URL(window.location.href);
     u.searchParams.set('tab', contentSearchPanel.id);
-    u.searchParams.set('q', current.q);
-    if (current.scope === 'local') u.searchParams.set('scope', 'local');
+    u.searchParams.set('q', current?.q ?? '');
+    if (current?.scope === 'local') u.searchParams.set('scope', 'local');
     else u.searchParams.delete('scope');
-    try {
-      await navigator.clipboard.writeText(u.toString());
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // Do nothing where the clipboard is unavailable
-    }
+    return u.toString();
   };
 
   if (!service && !localOk) return null;
@@ -480,9 +472,7 @@ export function ContentSearchPanelBody(ctx: PanelContext) {
                   {t('showOnImage')}
                 </label>
               ) : null}
-              <button type="button" className={BUTTON} onClick={copyLink}>
-                {copied ? t('copied') : t('copyLink')}
-              </button>
+              <CopyButton text={linkUrl}>{t('copyLink')}</CopyButton>
               <button type="button" className={BUTTON} onClick={clear}>
                 {t('clear')}
               </button>

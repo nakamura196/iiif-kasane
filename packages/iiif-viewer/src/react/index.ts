@@ -5,6 +5,7 @@ export {
   useViewer,
   useOptionalViewer,
   type ViewerProviderProps,
+  type ViewerShown,
   type ViewerState,
 } from './ViewerProvider';
 export { CanvasView, type CanvasViewProps } from './CanvasView';

@@ -6,7 +6,7 @@ import Info, { type InfoTab } from './layout/panels/Info';
 import SidePanel from './layout/SidePanel';
 import type { ViewerSelection, ViewerTarget } from './navigation';
 import type { Panel } from './panels/types';
-import { ViewerProvider, useViewer } from './ViewerProvider';
+import { ViewerProvider, useViewer, type ViewerProviderProps } from './ViewerProvider';
 
 export interface ViewerActionsState {
   /** The iiif-content given to the viewer. */
@@ -22,6 +22,10 @@ export interface ViewerActionsState {
 export interface ViewerProps {
   /** URL of the IIIF manifest. */
   iiifContent: string;
+  /** The Collections walked through to reach `iiifContent`, top first (see `ViewerProviderProps.collection`). */
+  collection?: ViewerProviderProps['collection'];
+  /** Called each time a manifest (or Collection) is shown (see `ViewerProviderProps.onShownChange`). */
+  onShownChange?: ViewerProviderProps['onShownChange'];
   locale?: 'ja' | 'en';
   theme?: 'light' | 'dark' | 'auto';
   /** Controlled side panel tab. Without it the viewer keeps the tab itself. */
@@ -98,6 +102,8 @@ function ViewerLayout({
  */
 export function Viewer({
   iiifContent,
+  collection,
+  onShownChange,
   locale = 'ja',
   theme = 'auto',
   target,
@@ -109,6 +115,8 @@ export function Viewer({
   return (
     <ViewerProvider
       iiifContent={iiifContent}
+      collection={collection}
+      onShownChange={onShownChange}
       locale={locale}
       theme={theme}
       target={target}

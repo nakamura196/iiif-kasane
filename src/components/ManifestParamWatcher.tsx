@@ -6,16 +6,25 @@
 import { useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { manifestFromParams } from 'iiif-kasane/core';
+import { useStableList } from '@/lib/useStableList';
 
-export default function ManifestParamWatcher({ onChange }: { onChange: (manifest: string | null) => void }) {
+// The Collections walked through to reach the item (?collection=, repeated, top first) come as the second argument.
+export default function ManifestParamWatcher({
+  onChange,
+}: {
+  onChange: (manifest: string | null, collections: string[]) => void;
+}) {
   const searchParams = useSearchParams();
-  const manifest = manifestFromParams(new URLSearchParams(searchParams?.toString() ?? ''));
+  const params = new URLSearchParams(searchParams?.toString() ?? '');
+  const manifest = manifestFromParams(params);
+  // the same array while the Collections are the same, so that the effect runs when they change (a new array each render would run it every time)
+  const collections = useStableList(params.getAll('collection'));
   const onChangeRef = useRef(onChange);
   useEffect(() => {
     onChangeRef.current = onChange;
   }, [onChange]);
   useEffect(() => {
-    onChangeRef.current(manifest);
-  }, [manifest]);
+    onChangeRef.current(manifest, collections);
+  }, [manifest, collections]);
   return null;
 }

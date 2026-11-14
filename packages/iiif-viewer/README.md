@@ -99,6 +99,24 @@ Without `canvasId`, the time applies to the Canvas that is shown, without turnin
 <Viewer iiifContent={manifestUrl} target={{ t: 60, play: true }} className="h-full" />
 ```
 
+### Deep links into a Collection
+
+A manifest opened from a Collection can have its own address. Pass the Collections walked through to reach it
+as `collection` (top first), and the viewer shows the manifest, with the Back button leading through them:
+
+```tsx
+<Viewer iiifContent={manifestUrl} collection={[topUrl, subUrl]} onShownChange={...} />
+```
+
+`onShownChange({ url, collections, origin })` is called each time a manifest (or Collection) is shown.
+`collections` is the way taken, in the form `collection` takes (the Collections after the last Manifest on the way: a Manifest, e.g. one opened from the map panel, never appears in it); `origin` is `'content'` (the `iiifContent`
+was read), `'move'` (the reader opened an entry) or `'back'`. To write the location into your own URL, do
+so for `'move'` and `'back'` only, and give the new `iiifContent` + `collection` back to the viewer: when they
+are what is shown already, the viewer reads nothing again and keeps the page the reader is on. A Collection
+that cannot be read is left out of the trail.
+On the tag, use `collection="<url> <url>"` (separated by spaces; or a JSON array of strings, `collection='["<url>","<url>"]'`, when a value has a space in it) and listen for the `kasane-shown` event
+(`event.detail` is the same object). The Kasane site writes `?iiif-content=<manifest>&collection=<top>&collection=<sub>`.
+
 ### Starting with the side panel closed
 
 The side panel (metadata, annotations, …) takes about a third of the width. Pass `panelOpen={false}`

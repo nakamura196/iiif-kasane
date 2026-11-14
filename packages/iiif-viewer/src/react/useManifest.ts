@@ -3,10 +3,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { atom, useStore, type createStore } from 'jotai';
 import {
+  containersOf,
+  collectionsFromParams,
   convertToV4,
+  decodeContentState,
   fetchManifest,
   paintedModelsOf,
   parseManifestV4,
+  sameUrlList,
   sceneOf,
   type ManifestV4,
 } from '../core';
@@ -25,7 +29,8 @@ import {
   type ShownOrigin,
 } from './atoms';
 import { useLocale } from './env';
-import { resetViewState, sceneDisplayAtom, shownSeqAtom } from './internalState';
+import { backFailedAtom, pickedPageAtom, quietSeqAtom, resetViewState, sceneDisplayAtom, shownSeqAtom } from './internalState';
+import { useStableList } from './stableList';
 
 type Store = ReturnType<typeof createStore>;
 
@@ -153,6 +158,7 @@ export function showManifest(
   source: ManifestSource,
   origin: ShownOrigin,
   prepared: PreparedShow,
+  quiet = false,
 ): void {
   const { manifest, raw } = source;
   const { hasGeo } = prepared;
@@ -164,6 +170,7 @@ export function showManifest(
   const seq = Math.max(store.get(shownSeqAtom), store.get(shownManifestAtom)?.seq ?? 0) + 1;
   store.set(shownSeqAtom, seq);
   store.set(shownManifestAtom, { url, raw, manifest, seq, origin, hasGeo });
+  if (quiet) store.set(quietSeqAtom, seq);
   store.set(manifestAtom, manifest);
   // the first Scene's notes and models go in with the manifest (no frame shows the new manifest with the old
   // one's models); a SceneDisplay then reads its own Scene
@@ -183,6 +190,63 @@ export function reparseNotes(store: Store, locale: string): void {
   if (mounted || !manifest || store.get(shownManifestAtom)?.manifest !== manifest) return;
   const read = tryPrepareShow(manifest, locale, sceneId ?? undefined);
   if (read) store.set(annotationsAtom, read.annotations);
+}
+
+/** A manifest (or Collection) shown, as reported by `onShownChange`. */
+export interface ViewerShown {
+  /** URL of the manifest (or Collection) shown. */
+  url: string;
+  /** The Collections walked through to reach it, top first (what `collection` takes). Empty at the top. */
+  collections: string[];
+  /**
+   * 'content': the iiif-content (with its `collection`) was read. 'move': the reader opened an entry of a
+   * Collection. 'back': the reader went back one step. A host that writes the location into its URL does
+   * so for 'move' and 'back' only ('content' may be a content state, which a bare manifest URL would replace).
+   */
+  origin: ShownOrigin;
+}
+
+/** The URL a value of iiif-content stands for (a content state gives its manifest). What the trail and the host's `collection` compare with. */
+export const resolveContentUrl = (url: string): string => decodeContentState(url) ?? url;
+
+/**
+ * The Collections of a deep link that are still being read. They are already part of the location: reported
+ * and compared as if they were on the trail (in front of it), until they are attached or dropped.
+ */
+export const pendingCollectionsAtom = atom<string[]>([]);
+
+/** A step of the trail that is a Collection (the converted object says so, as for IIIF 2 too). Else it is a Manifest. */
+const isCollectionStep = (item: { manifest: { type?: unknown } }): boolean => item.manifest.type === 'Collection';
+
+/**
+ * The Collections of a location: the steps of the trail after the last Manifest (a Manifest never goes in the
+ * list: it is not a Collection one reaches an item through, e.g. one the map panel opened from). When no Manifest
+ * is on the trail, the Collections of a deep link still being read come first.
+ */
+export function locationCollections(
+  items: readonly { url: string; manifest: { type?: unknown } }[],
+  pending: readonly string[] = [],
+): string[] {
+  let cut = -1;
+  items.forEach((item, i) => {
+    if (!isCollectionStep(item)) cut = i;
+  });
+  const urls = items.slice(cut + 1).map((item) => item.url);
+  return cut < 0 ? [...pending, ...urls] : urls;
+}
+
+/** The last location reported to `onShownChange`, and the manifest shown (its seq) it was for. */
+export const lastReportAtom = atom<{ seq: number; url: string; collections: string[] } | null>(null);
+
+/** Where a shown manifest is: its URL and the Collections of the trail (when the trail belongs to `owner`, the iiif-content). */
+export function shownLocation(
+  shown: { url: string; origin: ShownOrigin },
+  trail: { owner: string | null; items: { url: string; manifest: { type?: unknown } }[] },
+  owner: string | null,
+  pending: readonly string[] = [],
+): ViewerShown {
+  const collections = locationCollections(trail.owner === owner ? trail.items : [], pending);
+  return { url: resolveContentUrl(shown.url), collections, origin: shown.origin };
 }
 
 /** Result of loading a manifest: shown, could not be read, or dropped because a later request replaced it. */
@@ -210,6 +274,7 @@ export async function loadManifest(
   locale: () => string,
   origin: ShownOrigin,
   beforeShow?: (source: ManifestSource) => void,
+  quiet = false,
 ): Promise<OpenResult> {
   const isCurrent = beginLoad(store);
   const source = await readManifestSource(url);
@@ -219,7 +284,7 @@ export async function loadManifest(
   const prepared = tryPrepareShow(source.manifest, locale());
   if (!prepared) return 'failed';
   beforeShow?.(source);
-  showManifest(store, url, source, origin, prepared);
+  showManifest(store, url, source, origin, prepared, quiet);
   return 'shown';
 }
 
@@ -230,14 +295,167 @@ const contentLoadAtom = atom<object | null>(null);
 /** True while the iiif-content given to the viewer is being read. */
 export const isContentLoading = (store: Store): boolean => store.get(contentLoadAtom) !== null;
 
-/** Read the iiif-content given to the viewer and show it. Moves started meanwhile are dropped, not this load. */
-export async function loadContent(store: Store, url: string, locale: () => string): Promise<OpenResult> {
+// The load of an iiif-content that is the one the reader is in now (a new object for each real load; a
+// takeover keeps it). The Collections of a deep link attach to it however far the reader has moved since.
+const contentEpochAtom = atom<object | null>(null);
+
+/**
+ * The Collections walked through to reach the manifest are read after the manifest was shown, and do not hold
+ * it back. Each goes on the trail when its own read settles, nearest first, so that the lineage stays unbroken
+ * (Back from the manifest always reaches its parent; the ones above follow as they arrive). They are put in
+ * front of what the trail holds by then (the reader may have moved on already), as long as no new iiif-content
+ * came meanwhile. A Collection that cannot be read is dropped together with the ones above it (they could not
+ * be reached from here), and no longer counts as part of the location. One that never answers stays pending
+ * (there is no timeout). Each gets the index of the next step in it (so that Back lands on the entry that was
+ * opened); one that cannot be parsed is dropped by goBack when Back reaches it.
+ */
+function attachCollections(store: Store, url: string, collections: string[]): void {
+  const epoch = store.get(contentEpochAtom);
+  // what the last Collection lists: the iiif-content as given, or the manifest it stands for (a content state)
+  const shownId = store.get(shownManifestAtom)?.manifest.id;
+  const results: (ManifestSource | null | undefined)[] = collections.map(() => undefined);
+  // the Collections from index `waiting` up are on the trail (or dropped); the ones below it are still pending
+  let waiting = collections.length;
+  const advance = () => {
+    if (store.get(contentEpochAtom) !== epoch) return;
+    while (waiting > 0 && results[waiting - 1] !== undefined) {
+      const entry = results[waiting - 1];
+      const i = waiting - 1;
+      if (!entry) {
+        // not readable: this one and the ones above it are given up
+        waiting = 0;
+        break;
+      }
+      const next = collections[i + 1];
+      const at = (id: string | undefined) => (id ? containersOf(entry.manifest).findIndex((c) => c.id === id) : -1);
+      const index = Math.max(0, next ? at(next) : Math.max(at(resolveContentUrl(url)), at(url), at(shownId)));
+      const trail = store.get(trailAtom);
+      if (trail.owner !== store.get(manifestUrlAtom)) return;
+      store.set(trailAtom, {
+        owner: trail.owner,
+        items: [{ url: collections[i], manifest: entry.manifest, raw: entry.raw, index }, ...trail.items],
+      });
+      waiting = i;
+    }
+    store.set(pendingCollectionsAtom, collections.slice(0, waiting));
+  };
+  collections.forEach((u, i) => {
+    void readManifestSource(u).then((source) => {
+      results[i] = source;
+      advance();
+    });
+  });
+}
+
+/**
+ * Go back one step of the trail, to the page the reader was on. false when there is nothing to go back to.
+ * (Also the second form of a takeover, see takeOverContent.) `quietUrl`: not reported to the host when the place
+ * shown is this one (the place the host asked for, which it has set already).
+ */
+export function goBack(store: Store, locale: string, quietUrl?: string): boolean {
+  // a new iiif-content is being read: it wins (and the trail belongs to the old one)
+  if (isContentLoading(store)) return false;
+  const owner = store.get(manifestUrlAtom);
+  const trail = store.get(trailAtom);
+  const items = trail.owner === owner ? trail.items : [];
+  // an item that cannot be parsed again is dropped from the trail (Back would do nothing forever otherwise)
+  // and the one before it is tried
+  let rest = items;
+  while (rest.length > 0) {
+    const prev = rest[rest.length - 1];
+    const prepared = tryPrepareShow(prev.manifest, locale);
+    if (!prepared) {
+      rest = rest.slice(0, -1);
+      continue;
+    }
+    store.set(trailAtom, { owner, items: rest.slice(0, -1) });
+    resetViewState(store);
+    showManifest(store, prev.url, { raw: prev.raw, manifest: prev.manifest }, 'back', prepared, quietUrl !== undefined && prev.url === quietUrl);
+    store.set(pickedPageAtom, { shown: store.get(shownManifestAtom)?.seq ?? 0, index: prev.index });
+    return true;
+  }
+  if (rest.length !== items.length) store.set(trailAtom, { owner, items: rest });
+  // the steps could not be shown: say so, rather than leave the reader pressing a button that does nothing
+  if (items.length > 0) store.set(backFailedAtom, true);
+  return false;
+}
+
+/**
+ * The host gives an iiif-content + Collections that are the place shown already (the host wrote the location
+ * into its URL after a move), or the place one step back (the browser's Back): nothing is read.
+ * - the place shown: the new iiif-content only becomes the owner of the trail; the page and everything else stay.
+ * - the place one step back (the last item of the trail, under the items before it): the same as the viewer's
+ *   Back, to the page the reader was on there (not reported to the host, which set the place itself, unless it
+ *   landed somewhere else).
+ * false (nothing changed) when it is neither.
+ */
+export function takeOverContent(store: Store, url: string, collections: string[], locale = 'en'): boolean {
+  const shown = store.get(shownManifestAtom);
+  if (!shown || isContentLoading(store)) return false;
+  const trail = store.get(trailAtom);
+  const items = trail.owner === store.get(manifestUrlAtom) ? trail.items : [];
+  const pending = store.get(pendingCollectionsAtom);
+  const here = resolveContentUrl(url);
+  const keep = () => {
+    store.set(manifestUrlAtom, url);
+    store.set(trailAtom, { owner: url, items });
+    return true;
+  };
+  if (resolveContentUrl(shown.url) === here) {
+    if (sameUrlList(locationCollections(items, pending), collections)) return keep();
+    // the location written from our own last report (a pending Collection may have been dropped since)
+    const last = store.get(lastReportAtom);
+    if (last && last.seq === shown.seq && last.url === here && sameUrlList(last.collections, collections)) return keep();
+  }
+  // one step back (the last item of the trail): the same as the viewer's Back
+  const last = items[items.length - 1];
+  if (last && last.url === here && sameUrlList(locationCollections(items.slice(0, -1), pending), collections)) {
+    store.set(manifestUrlAtom, url);
+    store.set(trailAtom, { owner: url, items });
+    // a move still loading is cancelled by showing the place (showManifest starts a new load, as a new iiif-content
+    // does). Quiet when it lands where the host asked (it set the place itself); when steps that cannot be shown
+    // again were skipped, it is reported, so that the host corrects its address.
+    return goBack(store, locale, here);
+  }
+  return false;
+}
+
+/**
+ * What the viewer does for the iiif-content (and Collections) the host gives: 'taken' when it is what is
+ * shown already (nothing is read, nothing in flight is cancelled: a move the reader just made keeps going),
+ * else a new load, which cancels loads and moves still in flight and returns when it is done.
+ */
+export function openContent(
+  store: Store,
+  url: string,
+  locale: () => string,
+  collections: string[],
+): 'taken' | Promise<OpenResult> {
+  if (takeOverContent(store, url, collections, locale())) return 'taken';
+  cancelContentLoad(store);
+  return loadContent(store, url, locale, collections);
+}
+
+/**
+ * Read the iiif-content given to the viewer and show it. Moves started meanwhile are dropped, not this load.
+ * `collections` are the Collections walked through to reach it, top first (see attachCollections).
+ */
+export async function loadContent(
+  store: Store,
+  url: string,
+  locale: () => string,
+  collections: string[] = [],
+): Promise<OpenResult> {
   // The iiif-content is a new one whatever the load gives: the URL and the trail are set at once. When the
   // manifest cannot be read or parsed, the viewer reports the failure for this new content (failedUrl in
   // useManifest) rather than silently keeping the old one. What was shown is cleared with it (see below).
   store.set(manifestUrlAtom, url);
   // the way taken through the old iiif-content does not lead back from the new one
   store.set(trailAtom, { owner: url, items: [] });
+  const epoch = {};
+  store.set(contentEpochAtom, epoch);
+  // the Collections of a deep link are part of the location from the start, though read later
+  store.set(pendingCollectionsAtom, collections);
   const token = {};
   store.set(contentLoadAtom, token);
   const done = () => {
@@ -246,7 +464,11 @@ export async function loadContent(store: Store, url: string, locale: () => strin
   try {
     // done before it is shown: what is shown (a content state Annotation) may open its manifest right away
     const result = await loadManifest(store, url, locale, 'content', done);
+    // the Collections are read once the manifest is shown (a manifest that fails reads nothing more)
+    if (result === 'shown' && collections.length > 0) attachCollections(store, url, collections);
     // nothing of the old iiif-content stays under the new URL: only the failure is shown
+    // nothing attaches the Collections of a load that did not show: none stays pending (unless a newer load owns them)
+    if (result !== 'shown' && store.get(contentEpochAtom) === epoch) store.set(pendingCollectionsAtom, []);
     if (result === 'failed') clearShown(store);
     return result;
   } finally {
@@ -258,6 +480,9 @@ export async function loadContent(store: Store, url: string, locale: () => strin
 export function cancelContentLoad(store: Store): void {
   store.set(contentLoadAtom, null);
   beginLoad(store);
+  // the Collections of a deep link still being read are for nothing now (and attach to nothing)
+  store.set(contentEpochAtom, {});
+  store.set(pendingCollectionsAtom, []);
 }
 
 /** The locale, read when called (not a dependency of effects). */
@@ -271,25 +496,37 @@ export function useLocaleRef(): { readonly current: string } {
 }
 
 /** Load the manifest given to the viewer (iiif-content) into the current jotai store. */
-export function useManifest(iiifContent: string | null): { failed: boolean } {
+export function useManifest(iiifContent: string | null, collection?: string[]): { failed: boolean } {
   // the url that could not be read; compared with the current one so that no state is reset in the effect
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const store = useStore();
   const localeRef = useLocaleRef();
 
-  // only a new iiif-content reads again (a new locale must not send the reader back to the top of a Collection)
+  // the Collections, the same array while the URLs are the same (a new array with the same URLs is not a new
+  // location). Each goes through the rules of iiif-content: a content state gives its target, bad values are dropped
+  const collections = useStableList(collectionsFromParams(collection));
+
+  // only a new iiif-content (or other Collections) reads again (a new locale must not send the reader back to
+  // the top of a Collection)
   useEffect(() => {
-    if (!iiifContent) return;
+    if (!iiifContent) {
+      cancelContentLoad(store);
+      return;
+    }
+    // the host wrote the location that is shown into its URL: nothing to read, and nothing in flight is
+    // cancelled (a move the reader just made keeps going)
+    const opened = openContent(store, iiifContent, () => localeRef.current, collections);
+    if (opened === 'taken') return;
     let cancelled = false;
-    void loadContent(store, iiifContent, () => localeRef.current).then((result) => {
+    void opened.then((result) => {
       if (!cancelled && result === 'failed') setFailedUrl(iiifContent);
     });
     return () => {
       cancelled = true;
-      // a load (or a move inside a Collection) still in flight is for the old iiif-content
-      cancelContentLoad(store);
     };
-  }, [iiifContent, store, localeRef]);
+  }, [iiifContent, collections, store, localeRef]);
+  // the viewer is removed: nothing in flight is for anyone
+  useEffect(() => () => cancelContentLoad(store), [store]);
 
   // a new locale: the notes' labels are read again (see reparseNotes)
   const locale = useLocale();
