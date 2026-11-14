@@ -1,7 +1,7 @@
 'use client';
 
 // The one row of filter buttons that every annotation list uses: the 3D list (creators, tags, kinds), the 2D
-// annotations tab (kinds, units, tags) and the pages grid (kinds, classes). An "All" button comes first and is
+// annotations tab (kinds, units, tags) and the pages tab (kinds, classes). An "All" button comes first and is
 // pressed while nothing is chosen; pressing a value shows only the annotations with one of the chosen values.
 // The rules (what is shown under the limit, what a press does) are plain functions so they can be tested alone.
 

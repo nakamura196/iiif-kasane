@@ -1,5 +1,5 @@
 // Kinds of annotation for filtering: what an annotation is for, read from its W3C / IIIF motivation.
-// The 3D list, the 2D annotations tab and the pages grid filter by the same kinds, so that a reader can, for
+// The 3D list, the 2D annotations tab and the pages tab filter by the same kinds, so that a reader can, for
 // example, show only the transcribed text (supplementing) and hide the regions that a model only classified
 // (tagging). Nothing here knows about a particular model: the kinds are the motivations themselves.
 //

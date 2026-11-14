@@ -1,6 +1,6 @@
 'use client';
 
-// In the pages grid: the controls that run a model over every page, and the marks drawn over the thumbnails of
+// In the pages tab: the controls that run a model over every page, and the marks drawn over the thumbnails of
 // pages already read. The marks come from the inference tab's results (inferenceResultsAtom), so pages read one at a
 // time in the inference tab get them too. The class buttons share the annotations tab's tag filter
 // (canvasAnnotationTagsAtom): choosing a class here also narrows the marks on the image and the annotations list.
@@ -23,7 +23,7 @@ const BUTTON =
   'px-2.5 py-1 rounded border border-gray-300 dark:border-gray-600 text-xs hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40';
 const PRIMARY = 'px-2.5 py-1 rounded text-xs text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-40';
 
-/** The model whose results the thumbnails show (the one chosen in the pages grid). */
+/** The model whose results the thumbnails show (the one chosen in the pages tab). */
 export const batchModelAtom = atom<string | null>(null);
 
 // Do not rebuild the marks of the same result again (during a run the classes are counted after every page).
@@ -292,7 +292,7 @@ const READING_CSS = `
 }
 `;
 
-/** The animation styles for the pages grid; render once next to the grid. */
+/** The animation styles for the pages tab; render once next to the list. */
 export function PagesReadingStyle() {
   return <style>{READING_CSS}</style>;
 }
@@ -313,7 +313,7 @@ export function PageThumbMarks({ page }: { page: ContainerInfo }) {
   const marks = marksOf(result?.page);
   const reading = useAtomValue(readingPageAtom) === page.id;
   // The page read last flashes once and its marks fade in (the animations end on their own, so nothing has to
-  // remove the classes). Results already there when the grid opens, or read in the inference tab, show plainly.
+  // remove the classes). Results already there when the pages tab opens, or read in the inference tab, show plainly.
   const justRead = !!result && batch?.modelId === shown && batch?.lastRead === page.id;
   // With classes chosen, every page shows only those classes (pages without them lose their marks, so the others stand out)
   const visible = useMemo(

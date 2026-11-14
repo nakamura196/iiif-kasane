@@ -35,7 +35,7 @@ const render = (state: BatchState | null, withResult: boolean) => {
   return renderToStaticMarkup(createElement(Provider, { store }, createElement(PageThumbMarks, { page })));
 };
 
-describe('how a page looks in the pages grid during a run', () => {
+describe('how a page looks in the pages tab during a run', () => {
   it('shows the scan line and the glowing frame on the page being read', () => {
     const html = render(batch({ current: 'c1' }), false);
     expect(html).toContain('kasane-scan-frame');
