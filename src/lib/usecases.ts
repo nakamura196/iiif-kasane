@@ -428,6 +428,7 @@ export const USE_CASES: UseCase[] = [
     },
     open: { page: 'viewer', manifest: `${SITE_URL}/manifests/si-triceratops.json`, tab: 'story' },
     features: ['3d', 'annotations', 'story'],
+    video: { ja: 'LFyxu_WN9ZQ', en: 'Exb79TAWS7A' },
     site: 'https://3d-api.si.edu/voyager/3d_package:d8c623be-4ebc-11ea-b77f-2e728ce88125',
   },
   {
