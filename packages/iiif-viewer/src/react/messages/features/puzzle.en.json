@@ -19,7 +19,6 @@
     "solvedTitle": "Solved!",
     "solvedStats": "{total} pieces in {moves} moves · {time}",
     "copyLink": "Copy link",
-    "copied": "Copied",
     "copyFailed": "Could not copy. Select the link and copy it yourself"
   }
 }

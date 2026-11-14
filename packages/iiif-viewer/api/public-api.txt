@@ -170,6 +170,8 @@ export [type] type ViewerLocale = 'ja' | 'en';
 export [type] type ViewerMessages = Record<string, Record<string, string>>;
 export [type] interface ViewerProps {
     iiifContent: string;
+    collection?: ViewerProviderProps['collection'];
+    onShownChange?: ViewerProviderProps['onShownChange'];
     locale?: 'ja' | 'en';
     theme?: 'light' | 'dark' | 'auto';
     tab?: InfoTab;
@@ -187,6 +189,8 @@ export [type] interface ViewerProps {
 export [value] ViewerProvider: (props: ViewerProviderProps) => Element
 export [type] interface ViewerProviderProps {
     iiifContent: string;
+    collection?: string[];
+    onShownChange?: (shown: ViewerShown) => void;
     locale?: 'ja' | 'en';
     theme?: 'light' | 'dark' | 'auto';
     target?: ViewerTarget;
@@ -198,6 +202,11 @@ export [type] interface ViewerProviderProps {
 export [type] interface ViewerSelection {
     canvasId: string;
     index: number;
+}
+export [type] interface ViewerShown {
+    url: string;
+    collections: string[];
+    origin: ShownOrigin;
 }
 export [type] interface ViewerState {
     iiifContent: string;
@@ -249,7 +258,7 @@ export [value] useAuthStates: (probes: (AuthProbeRef | undefined)[], locale: str
 export [value] useCanvasImages: (iiifContent: null | string, canvasId: string | undefined) => CanvasImages | undefined
 export [value] useCompareSources: (urls: string[], locale: string) => Found & { ready: boolean; }
 export [value] useLocale: () => string
-export [value] useManifest: (iiifContent: null | string) => { failed: boolean; }
+export [value] useManifest: (iiifContent: null | string, collection?: string[] | undefined) => { failed: boolean; }
 export [value] useOptionalViewer: () => ViewerState | null
 export [value] useSceneEnvironment: () => string | undefined
 export [value] useTheme: () => { resolvedTheme: ResolvedTheme; }
@@ -1780,6 +1789,7 @@ export [value] clusteringParams: (on: boolean) => Partial<Record<"annotations" |
 export [value] collectManifestAnnotations: (manifest: unknown, fetchJson: (url: string) => Promise<unknown>, props?: CollectOptions) => Promise<CollectedAnnotations>
 export [value] collectionEntriesOf: (raw: unknown) => CollectionEntry[]
 export [value] collectionReader: SearchReader
+export [value] collectionsFromParams: (values: null | readonly string[] | undefined) => string[]
 export [value] compareDetailWidthOf: (a: CompareSide, b: CompareSide) => number | undefined
 export [value] compareIndexesOf: (matched: { index: number; }[]) => number[]
 export [value] computeFocusCamera: (input: FocusInput) => FocusResult
@@ -2040,6 +2050,7 @@ export [value] sam2Outline: (masks: ArrayLike<number>, iou: ArrayLike<number>, c
 export [value] sam2PointInput: (points: Sam2Point[], crop: Sam2Box) => { coords: number[]; labels: number[]; }
 export [value] sam2Tensor: (px: Uint8ClampedArray<ArrayBufferLike>, size?: number) => Float32Array<ArrayBufferLike>
 export [value] sam2ViewCrop: (view: Sam2Box, w: number, h: number, min?: number) => Sam2Box
+export [value] sameUrlList: (a: readonly string[], b: readonly string[]) => boolean
 export [value] sanitizeAboutHtml: (html: unknown) => string
 export [value] sanitizeAnnotationHtml: (html: string) => string
 export [value] sanitizeDeclaration: (property: string, value: string) => [string, string] | null

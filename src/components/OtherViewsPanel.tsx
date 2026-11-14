@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Puzzle, canPlayPuzzle, type Panel, type PanelContext, type ShownManifest } from 'iiif-kasane';
 import { Link } from '@/i18n/routing';
@@ -18,12 +18,14 @@ import {
   type GalleryMode,
   type GalleryQuality,
 } from '@/lib/gallery';
+import { fetchServedManifest, isPublicManifestUrl, mediaFactsOf, viewersFor, type MediaFacts, type ServedManifest } from '@/lib/otherViewers';
 import { BROWSE_LAYOUTS, browseQuery, canOpenInBrowse, type BrowseLayout } from '@/lib/browse';
 
 // The "Other views" tab of the right panel: opens the shown item in Kasane's other pages (compare, map, 3D gallery).
 // These were buttons at the bottom left of the viewer, moved to a tab because they covered pictures and video.
 // Compare is offered only when the shown model or image has two or more candidates (a Choice).
 // The gallery is opened after choosing the walk mode, interior, quality and count (all /gallery/ URL arguments).
+// "Open in other viewers" links the shown manifest to other IIIF viewers' public demos (src/lib/otherViewers.ts).
 // The puzzle was a tab of the viewer, moved here (it is not a reading tool). Unlike the others it opens in place,
 // not on another page, so it is last.
 // Every link and its visibility follow the manifest shown now: after an entry of a Collection is opened, that entry.
@@ -49,19 +51,45 @@ interface Targets {
   hasGeo: boolean;
   galleryOk: boolean;
   browseOk: boolean;
+  /** Kinds of content the shown manifest paints (for choosing the other viewers). */
+  media: MediaFacts;
 }
 
 // what the shown manifest can be opened in; worked out once per shown manifest (georeferencing was found when it was shown)
-const NONE: Targets = { hasGeo: false, galleryOk: false, browseOk: false };
+const NONE: Targets = { hasGeo: false, galleryOk: false, browseOk: false, media: { image: false, av: false } };
 const targetsCache = new WeakMap<ShownManifest, Targets>();
 function targetsOf({ shown }: PanelContext): Targets {
   if (!shown) return NONE;
   let t = targetsCache.get(shown);
   if (!t) {
-    t = { hasGeo: shown.hasGeo, galleryOk: canOpenInGallery(shown.raw), browseOk: canOpenInBrowse(shown.raw) };
+    t = {
+      hasGeo: shown.hasGeo,
+      galleryOk: canOpenInGallery(shown.raw),
+      browseOk: canOpenInBrowse(shown.raw),
+      media: mediaFactsOf(containersOf(shown.manifest)),
+    };
     targetsCache.set(shown, t);
   }
   return t;
+}
+
+// What the file at the shown URL really is. The viewer's copy is already upgraded to Presentation 3 and wrapped
+// (info.json, curation...), so the version and "is it a Manifest" come from the file as served.
+type ServedState = 'checking' | 'none' | ServedManifest;
+function useServedManifest(url: string | undefined): ServedState {
+  const [state, setState] = useState<{ url: string; result: ServedManifest | null } | null>(null);
+  useEffect(() => {
+    if (!url) return;
+    let cancelled = false;
+    fetchServedManifest(url).then((result) => {
+      if (!cancelled) setState({ url, result });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [url]);
+  if (!state || state.url !== url) return 'checking';
+  return state.result ?? 'none';
 }
 
 function OtherViews({
@@ -75,7 +103,12 @@ function OtherViews({
   const tb = useTranslations('Browse');
   // page indexes count in the shown manifest (the entry of a Collection, if one is open), so links use its URL
   const manifestUrl = ctx.shown?.url ?? pageUrl;
-  const { hasGeo, galleryOk, browseOk } = targetsOf(ctx);
+  const { hasGeo, galleryOk, browseOk, media } = targetsOf(ctx);
+  const served = useServedManifest(ctx.shown?.url);
+  const links = typeof served === 'string' ? [] : viewersFor(served, media).map((v) => ({ v, href: v.url(served.url) }));
+  // The tab can be there only because of this section (the check needs a request, so the tab cannot wait for it):
+  // then say what is going on, so that the tab is never empty.
+  const onlyThis = !compare && !hasGeo && !galleryOk && !browseOk && !canPlayPuzzle(ctx);
   const [browseLayout, setBrowseLayout] = useState<BrowseLayout>('table');
   const [mode, setMode] = useState<GalleryMode>('orbit');
   const [look, setLook] = useState<GalleryLook>('standard');
@@ -173,6 +206,26 @@ function OtherViews({
           </Link>
         </section>
       )}
+      {links.length > 0 && (
+        <section className="space-y-2">
+          <h3 className="font-semibold">{t('openInHeading')}</h3>
+          <p className="text-xs text-gray-600 dark:text-gray-300">{t('openInHint')}</p>
+          <ul className="flex flex-wrap gap-2" data-testid="open-in-viewers">
+            {links.map(({ v, href }) => (
+              <li key={v.id}>
+                <a href={href} target="_blank" rel="noopener noreferrer" className={BUTTON} data-viewer={v.id}>
+                  {v.name}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {links.length === 0 && onlyThis && (
+        <p className="text-xs text-gray-600 dark:text-gray-300" data-testid="open-in-status">
+          {served === 'checking' ? t('openInChecking') : t('openInNone')}
+        </p>
+      )}
       {canPlayPuzzle(ctx) && (
         <section className="space-y-2">
           <h3 className="font-semibold">{t('puzzleHeading')}</h3>
@@ -195,6 +248,11 @@ const puzzleShareUrl = (manifestUrl: string, ctx: PanelContext, size: number) =>
   return `${window.location.origin}${window.location.pathname}?${puzzleQuery(manifestUrl, index, size)}`;
 };
 
+// Known without a request: a public URL and content other viewers can show. The file itself is checked
+// when the tab is open (useServedManifest), which can still leave the section out.
+const couldOpenElsewhere = (ctx: PanelContext, media: MediaFacts) =>
+  isPublicManifestUrl(ctx.shown?.url) && (media.image || media.av);
+
 /** Shown when the item can go to the compare page, the map or the gallery, or the image can be a puzzle. */
 export const otherViewsPanel = (props: Props, label: string): Panel => ({
   id: OTHER_VIEWS_TAB,
@@ -203,7 +261,7 @@ export const otherViewsPanel = (props: Props, label: string): Panel => ({
   label,
   available: (ctx) => {
     const t = targetsOf(ctx);
-    return !!props.compare || t.hasGeo || t.galleryOk || t.browseOk || canPlayPuzzle(ctx);
+    return !!props.compare || t.hasGeo || t.galleryOk || t.browseOk || couldOpenElsewhere(ctx, t.media) || canPlayPuzzle(ctx);
   },
   Component: (ctx) => <OtherViews {...props} ctx={ctx} />,
 });

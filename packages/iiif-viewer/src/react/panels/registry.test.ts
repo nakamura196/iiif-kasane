@@ -20,6 +20,7 @@ describe('PANELS', () => {
       'inference',
       'download',
       'puzzle',
+      'share',
     ]);
   });
 

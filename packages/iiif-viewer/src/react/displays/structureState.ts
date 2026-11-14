@@ -20,7 +20,6 @@ import {
 } from '../../core';
 import { manifestUrlAtom, shownManifestAtom, type ShownOrigin } from '../atoms';
 import {
-  backFailedAtom,
   focusAtom,
   pickedPageAtom,
   resetViewState,
@@ -29,8 +28,8 @@ import {
 import {
   isContentLoading,
   loadManifest,
-  tryPrepareShow,
-  showManifest,
+  goBack,
+  resolveContentUrl,
   trailAtom,
   useLocaleRef,
   type OpenResult,
@@ -49,7 +48,7 @@ export interface NavRequest {
 
 export const navRequestAtom = atom<NavRequest | null>(null);
 
-export { trailAtom, type OpenResult, type TrailItem };
+export { goBack, trailAtom, type OpenResult, type TrailItem };
 
 /** How an opened manifest counts: part of the iiif-content (its content state), or a move from what was shown. */
 type OpenOrigin = Exclude<ShownOrigin, 'back'>;
@@ -100,48 +99,22 @@ export async function openManifest(
 ): Promise<OpenResult> {
   // a new iiif-content is being read: it wins, and this move (inside what was shown before) is dropped
   if (isContentLoading(store)) return 'stale';
+  // a 'move' without a push is a dropped link: it is shown but not reported to the host (there is no entry
+  // of a Collection to write into its address, and the link's targets would be lost)
+  const silent = !push && origin === 'move';
   return loadManifest(store, url, locale, origin, () => {
     const here = store.get(shownManifestAtom);
     if (push && here) {
       // what goes on the trail is the one being left (its own URL, not the one being opened), with its page
       const picked = store.get(pickedPageAtom);
       const index = picked.shown === here.seq ? picked.index : 0;
-      const item: TrailItem = { url: here.url, manifest: here.manifest, raw: here.raw, index };
+      const item: TrailItem = { url: resolveContentUrl(here.url), manifest: here.manifest, raw: here.raw, index };
       const owner = store.get(manifestUrlAtom);
       store.set(trailAtom, (t) => ({ owner, items: t.owner === owner ? [...t.items, item] : [item] }));
     }
     // before the new manifest is shown, so what is set for it afterwards (a content state's region) stays
     resetViewState(store);
-  });
-}
-
-/** Go back one step of the trail, to the page the reader was on. false when there is nothing to go back to. */
-export function goBack(store: Store, locale: string): boolean {
-  // a new iiif-content is being read: it wins (and the trail belongs to the old one)
-  if (isContentLoading(store)) return false;
-  const owner = store.get(manifestUrlAtom);
-  const trail = store.get(trailAtom);
-  const items = trail.owner === owner ? trail.items : [];
-  // an item that cannot be parsed again is dropped from the trail (Back would do nothing forever otherwise)
-  // and the one before it is tried
-  let rest = items;
-  while (rest.length > 0) {
-    const prev = rest[rest.length - 1];
-    const prepared = tryPrepareShow(prev.manifest, locale);
-    if (!prepared) {
-      rest = rest.slice(0, -1);
-      continue;
-    }
-    store.set(trailAtom, { owner, items: rest.slice(0, -1) });
-    resetViewState(store);
-    showManifest(store, prev.url, { raw: prev.raw, manifest: prev.manifest }, 'back', prepared);
-    store.set(pickedPageAtom, { shown: store.get(shownManifestAtom)?.seq ?? 0, index: prev.index });
-    return true;
-  }
-  if (rest.length !== items.length) store.set(trailAtom, { owner, items: rest });
-  // the steps could not be shown: say so, rather than leave the reader pressing a button that does nothing
-  if (items.length > 0) store.set(backFailedAtom, true);
-  return false;
+  }, silent);
 }
 
 /**

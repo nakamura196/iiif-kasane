@@ -13,9 +13,9 @@ import {
 } from 'react';
 import { Provider, createStore, useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { containersOf, type ContainerInfo, type ManifestV4 } from '../core';
-import { manifestAtom, modelChoicesAtom, shownManifestAtom } from './atoms';
-import { backFailedAtom, pickedIndex, pickedPageAtom } from './internalState';
-import { navRequestAtom, nextSeq } from './displays/structureState';
+import { manifestAtom, manifestUrlAtom, modelChoicesAtom, shownManifestAtom } from './atoms';
+import { backFailedAtom, pickedIndex, pickedPageAtom, quietSeqAtom } from './internalState';
+import { navRequestAtom, nextSeq, trailAtom } from './displays/structureState';
 import { ViewerEnv, type ResolvedTheme } from './env';
 import {
   CanvasNavigationContext,
@@ -28,11 +28,22 @@ import {
   type ViewerTarget,
 } from './navigation';
 import { PlaybackContext, type Playback } from './playback';
-import { useManifest } from './useManifest';
+import { lastReportAtom, pendingCollectionsAtom, shownLocation, useManifest, type ViewerShown } from './useManifest';
+
+export type { ViewerShown };
 
 export interface ViewerProviderProps {
   /** URL of the IIIF manifest (or a IIIF Content State). */
   iiifContent: string;
+  /**
+   * The Collections walked through to reach `iiifContent`, top first (the way the reader came: the Back
+   * button returns through them). Empty or without it: `iiifContent` is the start. A Collection that cannot
+   * be read is left out. When `iiifContent` and `collection` are what is shown already (a host that wrote the
+   * location into its URL after `onShownChange`), nothing is read again.
+   */
+  collection?: string[];
+  /** Called each time a manifest (or Collection) is shown, with where it is (see `ViewerShown`). */
+  onShownChange?: (shown: ViewerShown) => void;
   locale?: 'ja' | 'en';
   theme?: 'light' | 'dark' | 'auto';
   /**
@@ -108,6 +119,8 @@ function usePrefersDark(enabled: boolean): boolean {
  */
 export function ViewerProvider({
   iiifContent,
+  collection,
+  onShownChange,
   locale = 'ja',
   theme = 'auto',
   target,
@@ -123,7 +136,14 @@ export function ViewerProvider({
   return (
     <Provider store={store}>
       <ViewerEnv locale={locale} resolvedTheme={resolvedTheme} environment={environment}>
-        <ViewerStateRoot iiifContent={iiifContent} target={target} onSelect={onSelect} resolvedTheme={resolvedTheme}>
+        <ViewerStateRoot
+          iiifContent={iiifContent}
+          collection={collection}
+          onShownChange={onShownChange}
+          target={target}
+          onSelect={onSelect}
+          resolvedTheme={resolvedTheme}
+        >
           <div className={`iiif-viewer ${resolvedTheme === 'dark' ? 'dark' : ''} ${className}`.trim()}>{children}</div>
         </ViewerStateRoot>
       </ViewerEnv>
@@ -133,11 +153,13 @@ export function ViewerProvider({
 
 function ViewerStateRoot({
   iiifContent,
+  collection,
+  onShownChange,
   target,
   onSelect,
   resolvedTheme,
   children,
-}: Pick<ViewerProviderProps, 'iiifContent' | 'target' | 'onSelect' | 'children'> & {
+}: Pick<ViewerProviderProps, 'iiifContent' | 'collection' | 'onShownChange' | 'target' | 'onSelect' | 'children'> & {
   resolvedTheme: ResolvedTheme;
 }) {
   const manifest = useAtomValue(manifestAtom);
@@ -156,7 +178,29 @@ function ViewerStateRoot({
   useEffect(() => {
     setBackFailed(false);
   }, [selected, shown, setBackFailed]);
-  const { failed } = useManifest(iiifContent);
+  const { failed } = useManifest(iiifContent, collection);
+
+  // Report each manifest shown (a new seq) with the Collections it was reached through. A takeover (see
+  // useManifest) shows nothing new, or (the browser's Back) shows a manifest flagged quiet (quietSeqAtom): it reports nothing.
+  const trail = useAtomValue(trailAtom);
+  const owner = useAtomValue(manifestUrlAtom);
+  const pending = useAtomValue(pendingCollectionsAtom);
+  const setLastReport = useSetAtom(lastReportAtom);
+  const quietSeq = useAtomValue(quietSeqAtom);
+  const onShownChangeRef = useRef(onShownChange);
+  const reportedSeq = useRef(0);
+  useEffect(() => {
+    onShownChangeRef.current = onShownChange;
+  });
+  useEffect(() => {
+    if (!shown || shown.seq === reportedSeq.current) return;
+    reportedSeq.current = shown.seq;
+    if (quietSeq === shown.seq) return;
+    const location = shownLocation(shown, trail, owner, pending);
+    // remembered: the host writes it into its address, and gives it back (a takeover matches it)
+    setLastReport({ seq: shown.seq, url: location.url, collections: location.collections });
+    onShownChangeRef.current?.(location);
+  }, [shown, trail, owner, pending, setLastReport, quietSeq]);
 
   // The playback position of video and audio. The transcript (right panel) and the media display follow it.
   // A time given from outside (target.t) is applied when the player of that Canvas is attached.
