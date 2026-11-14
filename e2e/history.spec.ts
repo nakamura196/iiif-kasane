@@ -66,10 +66,10 @@ test('an opened item shows in Recently opened, can be bookmarked and removed', a
   await page.waitForFunction(() => (localStorage.getItem('kasane:history:v1') ?? '').includes('Postcard 1'));
   await page.goto(viewerUrl('en', 2));
   await page.waitForFunction(() => (localStorage.getItem('kasane:history:v1') ?? '').includes('Postcard 2'));
-  const star = page.getByTestId('bookmark-toggle');
-  await expect(star).toHaveAttribute('aria-pressed', 'false');
+  // one fixed name; only the pressed state changes
+  const star = page.getByRole('button', { name: 'Bookmark this item', pressed: false });
   await star.click();
-  await expect(star).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'Bookmark this item', pressed: true })).toBeVisible();
 
   // the entry screen: newest first, the bookmark in its own list
   await page.goto('/en/viewer/');
@@ -110,11 +110,36 @@ test('the lists are in the page language and survive storage that holds junk', a
   await expect(page.getByTestId('recent-list')).toContainText('絵葉書 1');
 });
 
-test('a local image is not recorded', async ({ page }) => {
+test('a local image is not recorded and cannot be bookmarked', async ({ page }) => {
+  await page.goto('/en/viewer/');
+  await page.getByTestId('local-image-input').setInputFiles({ name: 'cat.png', mimeType: 'image/png', buffer: PNG });
+  await expect(page.getByRole('status').filter({ hasText: 'cat.png' })).toBeVisible();
+  await expect(page.locator('img[src^="blob:"]')).toBeVisible();
+  await expect(page.getByTestId('bookmark-toggle')).toHaveCount(0);
+  // give a (wrong) recorder time to write, then check that nothing was kept
+  await page.waitForTimeout(500);
+  expect(await page.evaluate(() => localStorage.getItem('kasane:history:v1'))).toBeNull();
+});
+
+test('a stored blob: entry is ignored', async ({ page }) => {
   await page.goto('/en/viewer/');
   await page.evaluate(() => localStorage.setItem('kasane:history:v1', JSON.stringify({ recent: [{ url: 'blob:http://x/1', label: 'x', kind: 'manifest', at: 1 }], bookmarks: [] })));
   await page.reload();
   await expect(page.getByTestId('history-lists')).toHaveCount(0);
+});
+
+test('bookmarks are capped on the screen like recent ones, and the note shows for either list', async ({ page }) => {
+  await page.goto('/en/viewer/');
+  await page.evaluate(() => {
+    const bookmarks = Array.from({ length: 8 }, (_, i) => ({ url: `https://example.org/b${i}.json`, label: `Bookmark ${i}`, kind: 'manifest', at: 100 - i }));
+    localStorage.setItem('kasane:history:v1', JSON.stringify({ recent: [], bookmarks }));
+  });
+  await page.reload();
+  const items = page.getByTestId('bookmark-list').getByRole('listitem');
+  await expect(items).toHaveCount(6);
+  await expect(page.getByText('Kept only in this browser.')).toBeVisible();
+  await page.getByRole('button', { name: 'Show all (8)' }).click();
+  await expect(items).toHaveCount(8);
 });
 
 test('long labels do not make the phone-width page scroll sideways', async ({ page }) => {

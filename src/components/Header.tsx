@@ -7,6 +7,7 @@ import { useTranslations, useLocale } from 'next-intl';
 import { useRouter, usePathname } from 'next/navigation';
 import { Link } from '@/i18n/routing';
 import HistoryRecorder from '@/components/history/HistoryRecorder';
+import { isViewerPath } from '@/lib/history';
 import BookmarkButton from '@/components/history/BookmarkButton';
 import { ThemeToggle, LanguageSwitcher, buttonClass } from '@nakamura196/react-ui';
 
@@ -18,7 +19,7 @@ const Header = ({ compact = false }: { compact?: boolean }) => {
   const locale = useLocale();
   const t = useTranslations('Header');
 
-  const onViewer = /\/viewer\/?$/.test(pathname ?? '');
+  const onViewer = isViewerPath(pathname);
 
   const handleHomeClick = () => {
     setManifestUrl(null);

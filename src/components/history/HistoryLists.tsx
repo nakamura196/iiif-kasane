@@ -55,9 +55,11 @@ function Item({ entry, onRemove, removeLabel }: { entry: HistoryEntry; onRemove:
 export default function HistoryLists() {
   const t = useTranslations('History');
   const { recent, bookmarks } = useHistory();
-  const [all, setAll] = useState(false);
+  const [allRecent, setAllRecent] = useState(false);
+  const [allBookmarks, setAllBookmarks] = useState(false);
   if (recent.length === 0 && bookmarks.length === 0) return null;
-  const shown = all ? recent : recent.slice(0, SHOWN);
+  const shownRecent = allRecent ? recent : recent.slice(0, SHOWN);
+  const shownBookmarks = allBookmarks ? bookmarks : bookmarks.slice(0, SHOWN);
   return (
     <div className="mt-8 space-y-6 text-left" data-testid="history-lists">
       {bookmarks.length > 0 && (
@@ -66,10 +68,15 @@ export default function HistoryLists() {
             {t('bookmarks')}
           </h3>
           <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2" data-testid="bookmark-list">
-            {bookmarks.map((e) => (
+            {shownBookmarks.map((e) => (
               <Item key={e.url} entry={e} removeLabel={t('removeBookmark')} onRemove={() => removeBookmark(e.url)} />
             ))}
           </ul>
+          {bookmarks.length > SHOWN && (
+            <button type="button" onClick={() => setAllBookmarks(!allBookmarks)} className="mt-2 text-xs underline text-[var(--ds-fg-muted)] hover:text-[var(--ds-fg)]">
+              {allBookmarks ? t('showFewer') : t('showAll', { count: bookmarks.length })}
+            </button>
+          )}
         </section>
       )}
       {recent.length > 0 && (
@@ -83,18 +90,18 @@ export default function HistoryLists() {
             </button>
           </div>
           <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2" data-testid="recent-list">
-            {shown.map((e) => (
+            {shownRecent.map((e) => (
               <Item key={e.url} entry={e} removeLabel={t('removeRecent')} onRemove={() => removeRecent(e.url)} />
             ))}
           </ul>
           {recent.length > SHOWN && (
-            <button type="button" onClick={() => setAll(!all)} className="mt-2 text-xs underline text-[var(--ds-fg-muted)] hover:text-[var(--ds-fg)]">
-              {all ? t('showFewer') : t('showAll', { count: recent.length })}
+            <button type="button" onClick={() => setAllRecent(!allRecent)} className="mt-2 text-xs underline text-[var(--ds-fg-muted)] hover:text-[var(--ds-fg)]">
+              {allRecent ? t('showFewer') : t('showAll', { count: recent.length })}
             </button>
           )}
-          <p className="mt-2 text-xs text-[var(--ds-fg-muted)]">{t('note')}</p>
         </section>
       )}
+      <p className="text-xs text-[var(--ds-fg-muted)]">{t('note')}</p>
     </div>
   );
 }

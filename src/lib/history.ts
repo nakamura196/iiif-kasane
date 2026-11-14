@@ -1,3 +1,5 @@
+import { labelIn } from 'iiif-kasane/core';
+
 // Recently opened items and bookmarks, kept only in this browser (localStorage).
 // Both lists live under one versioned key, so the shape can change later without reading old junk.
 // Every read and write is guarded: the site must work when storage is missing, full or holds something else.
@@ -23,9 +25,16 @@ export interface HistoryData {
 export const HISTORY_KEY = 'kasane:history:v1';
 export const HISTORY_EVENT = 'kasane:history-change';
 export const RECENT_LIMIT = 30;
-export const BOOKMARK_LIMIT = 200;
+// Bookmarks have no cap: the user chose each one, so none is dropped silently.
 
-const EMPTY: HistoryData = { recent: [], bookmarks: [] };
+export const EMPTY_HISTORY: HistoryData = { recent: [], bookmarks: [] };
+const EMPTY = EMPTY_HISTORY;
+
+// The viewer page is the only place that records and bookmarks (the Header does it).
+// TODO: move the recorder and the star into ViewerContent once #356 has landed (that file is being changed there),
+// and drop this path check.
+export const isViewerPath = (pathname: string | null | undefined): boolean => /\/viewer\/?$/.test(pathname ?? '');
+
 
 /** A local image (blob:) cannot be opened again after a reload, so it is never kept. Only http(s) is. */
 export const isRecordable = (url: unknown): url is string =>
@@ -77,7 +86,7 @@ export function readHistory(): HistoryData {
     if (!text) return EMPTY;
     const v: unknown = JSON.parse(text);
     if (!isObject(v)) return EMPTY;
-    return { recent: cleanList(v.recent, RECENT_LIMIT), bookmarks: cleanList(v.bookmarks, BOOKMARK_LIMIT) };
+    return { recent: cleanList(v.recent, RECENT_LIMIT), bookmarks: cleanList(v.bookmarks, Infinity) };
   } catch {
     return EMPTY;
   }
@@ -97,44 +106,49 @@ function write(data: HistoryData): void {
   }
 }
 
-export type NewEntry = Omit<HistoryEntry, 'at'> & { at?: number };
-
-const stamp = (e: NewEntry): HistoryEntry | null => cleanEntry({ ...e, at: e.at ?? Date.now() });
-
-/** Put the item at the top of "recently opened" (once per URL), keeping at most RECENT_LIMIT. */
-export function recordOpened(entry: NewEntry): void {
-  const e = stamp(entry);
-  if (!e) return;
-  const data = readHistory();
-  const old = data.recent.find((x) => x.url === e.url);
-  // keep what we knew when the new fetch gave nothing
-  if (old) {
-    if (!e.label && old.label) e.label = old.label;
-    if (!e.thumbnail && old.thumbnail) e.thumbnail = old.thumbnail;
-  }
-  write({ ...data, recent: [e, ...data.recent.filter((x) => x.url !== e.url)].slice(0, RECENT_LIMIT) });
-  // a bookmarked item learns its label and thumbnail too
-  if (data.bookmarks.some((b) => b.url === e.url)) refreshBookmark(e);
+/** What is known about an item. A missing field means "not known now" (for example the load failed): it never overwrites. */
+export interface NewEntry {
+  url: string;
+  label?: HistoryLabel;
+  kind?: HistoryKind;
+  thumbnail?: string;
+  at?: number;
 }
 
-function refreshBookmark(e: HistoryEntry): void {
+/** Fields of `e` that are known, over what was known before. */
+function merged(e: NewEntry, old: HistoryEntry | undefined, at: number): HistoryEntry | null {
+  const label = cleanLabel(e.label);
+  return cleanEntry({
+    url: e.url,
+    label: label ?? old?.label ?? '',
+    kind: e.kind ?? old?.kind ?? 'manifest',
+    thumbnail: e.thumbnail ?? old?.thumbnail,
+    at,
+  });
+}
+
+/**
+ * Put the item at the top of "recently opened" (once per URL), keeping at most RECENT_LIMIT.
+ * A bookmarked copy learns the label, kind and thumbnail too. One read, one write, one event.
+ */
+export function recordOpened(entry: NewEntry): void {
   const data = readHistory();
+  const at = entry.at ?? Date.now();
+  const e = merged(entry, data.recent.find((x) => x.url === entry.url) ?? data.bookmarks.find((x) => x.url === entry.url), at);
+  if (!e) return;
   write({
-    ...data,
-    bookmarks: data.bookmarks.map((b) =>
-      b.url === e.url ? { ...b, label: e.label || b.label, thumbnail: e.thumbnail ?? b.thumbnail, kind: e.kind } : b,
-    ),
+    recent: [e, ...data.recent.filter((x) => x.url !== e.url)].slice(0, RECENT_LIMIT),
+    bookmarks: data.bookmarks.map((b) => (b.url === e.url ? { ...e, at: b.at } : b)),
   });
 }
 
 /** Bookmark the item (newest first). Bookmarking again keeps the first date. */
 export function addBookmark(entry: NewEntry): void {
-  const e = stamp(entry);
-  if (!e) return;
   const data = readHistory();
-  const old = data.bookmarks.find((x) => x.url === e.url);
-  const next = old ? { ...e, at: old.at } : e;
-  write({ ...data, bookmarks: [next, ...data.bookmarks.filter((x) => x.url !== e.url)].slice(0, BOOKMARK_LIMIT) });
+  const old = data.bookmarks.find((x) => x.url === entry.url);
+  const e = merged(entry, old ?? data.recent.find((x) => x.url === entry.url), old?.at ?? entry.at ?? Date.now());
+  if (!e) return;
+  write({ ...data, bookmarks: [e, ...data.bookmarks.filter((x) => x.url !== e.url)] });
 }
 
 export function removeBookmark(url: string): void {
@@ -154,12 +168,8 @@ export function clearRecent(): void {
 export const isBookmarked = (data: HistoryData, url: string | null | undefined): boolean =>
   !!url && data.bookmarks.some((b) => b.url === url);
 
-/** The label in the reader's language: that language, then English, then no language, then the first one. */
-export function labelText(label: HistoryLabel, locale: string): string {
-  if (typeof label === 'string') return label;
-  const pick = (k: string) => label[k]?.[0];
-  return pick(locale) ?? pick('en') ?? pick('none') ?? pick('@none') ?? Object.values(label)[0]?.[0] ?? '';
-}
+/** The label in the reader's language (the viewer package's rule: that language, none, English, then any). */
+export const labelText = (label: HistoryLabel, locale: string): string => labelIn(label, locale);
 
 /** The site name of a URL ("example.org"), for the small line under a label. */
 export function hostOf(url: string): string {

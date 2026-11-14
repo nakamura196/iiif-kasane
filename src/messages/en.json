@@ -122,13 +122,12 @@
     }
   },
   "History": {
-    "title": "History",
     "recent": "Recently opened",
     "bookmarks": "Bookmarks",
     "clear": "Clear history",
     "removeRecent": "Remove from recently opened",
     "removeBookmark": "Remove bookmark",
-    "addBookmark": "Bookmark this item",
+    "bookmarkItem": "Bookmark this item",
     "collection": "Collection",
     "showAll": "Show all ({count})",
     "showFewer": "Show fewer",

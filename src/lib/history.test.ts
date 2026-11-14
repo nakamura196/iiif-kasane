@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  BOOKMARK_LIMIT,
   HISTORY_EVENT,
   HISTORY_KEY,
   RECENT_LIMIT,
   addBookmark,
   clearRecent,
   hostOf,
+  isViewerPath,
   isBookmarked,
   labelText,
   readHistory,
@@ -70,7 +70,7 @@ describe('recently opened', () => {
 
   it('keeps the old label and thumbnail when the new fetch found none', () => {
     recordOpened(entry(1, { thumbnail: 'https://example.org/t.jpg' }));
-    recordOpened({ url: entry(1).url, label: '', kind: 'manifest' });
+    recordOpened({ url: entry(1).url });
     const [e] = readHistory().recent;
     expect(e.label).toBe('Item 1');
     expect(e.thumbnail).toBe('https://example.org/t.jpg');
@@ -120,17 +120,45 @@ describe('bookmarks', () => {
     expect(readHistory().bookmarks).toHaveLength(1);
   });
 
-  it('is capped', () => {
-    for (let i = 0; i < BOOKMARK_LIMIT + 3; i++) addBookmark(entry(i));
-    expect(readHistory().bookmarks).toHaveLength(BOOKMARK_LIMIT);
+  it('never drops a bookmark silently (no cap, also when read back)', () => {
+    for (let i = 0; i < 250; i++) addBookmark(entry(i));
+    const { bookmarks } = readHistory();
+    expect(bookmarks).toHaveLength(250);
+    expect(bookmarks.at(-1)?.url).toBe(entry(0).url);
   });
 
   it('fills in label and thumbnail when a bookmarked item is opened later', () => {
-    addBookmark({ url: entry(1).url, label: '', kind: 'manifest' });
+    addBookmark({ url: entry(1).url });
     recordOpened(entry(1, { thumbnail: 'https://example.org/t.jpg' }));
     const [b] = readHistory().bookmarks;
     expect(b.label).toBe('Item 1');
     expect(b.thumbnail).toBe('https://example.org/t.jpg');
+  });
+
+  it('keeps kind, label and thumbnail of a known item when a later load fails (only the url is known)', () => {
+    recordOpened(entry(1, { kind: 'collection', thumbnail: 'https://example.org/t.jpg' }));
+    addBookmark(entry(1, { kind: 'collection', thumbnail: 'https://example.org/t.jpg' }));
+    recordOpened({ url: entry(1).url });
+    const data = readHistory();
+    for (const e of [data.recent[0], data.bookmarks[0]]) {
+      expect(e.kind).toBe('collection');
+      expect(e.label).toBe('Item 1');
+      expect(e.thumbnail).toBe('https://example.org/t.jpg');
+    }
+    // a bookmark made from an item opened earlier takes what the recent entry knew
+    removeBookmark(entry(1).url);
+    addBookmark({ url: entry(1).url });
+    expect(readHistory().bookmarks[0].kind).toBe('collection');
+  });
+
+  it('reads once, writes once and fires one event when a bookmarked item is opened', () => {
+    addBookmark(entry(1));
+    const onChange = vi.fn();
+    subscribeHistory(onChange);
+    const setItem = vi.spyOn(localStorage, 'setItem');
+    recordOpened(entry(1, { thumbnail: 'https://example.org/t.jpg' }));
+    expect(setItem).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledTimes(1);
   });
 
   it('keeps a language map label', () => {
@@ -204,10 +232,22 @@ describe('change events', () => {
   });
 });
 
+describe('isViewerPath', () => {
+  it('is true only for the viewer page, with or without the trailing slash', () => {
+    expect(isViewerPath('/en/viewer')).toBe(true);
+    expect(isViewerPath('/ja/viewer/')).toBe(true);
+    expect(isViewerPath('/en/compare')).toBe(false);
+    expect(isViewerPath('/en/viewer/extra')).toBe(false);
+    expect(isViewerPath(null)).toBe(false);
+  });
+});
+
 describe('labelText and hostOf', () => {
   it('picks the reader language, then English, then the rest', () => {
     const map = { fr: ['Français'], en: ['English'] };
     expect(labelText(map, 'ja')).toBe('English');
+    // the same rule as the viewer package: the language, then "none", then English
+    expect(labelText({ en: ['English'], none: ['Plain'] }, 'ja')).toBe('Plain');
     expect(labelText({ none: ['Plain'] }, 'ja')).toBe('Plain');
     expect(labelText({ fr: ['Français'] }, 'ja')).toBe('Français');
     expect(labelText('Already text', 'ja')).toBe('Already text');

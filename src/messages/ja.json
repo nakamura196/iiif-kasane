@@ -122,13 +122,12 @@
     }
   },
   "History": {
-    "title": "履歴",
     "recent": "最近開いたもの",
     "bookmarks": "ブックマーク",
     "clear": "履歴を消す",
     "removeRecent": "最近開いたものから外す",
     "removeBookmark": "ブックマークを外す",
-    "addBookmark": "この資料をブックマークする",
+    "bookmarkItem": "この資料をブックマークする",
     "collection": "コレクション",
     "showAll": "すべて表示（{count}件）",
     "showFewer": "件数を減らす",

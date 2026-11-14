@@ -14,9 +14,10 @@ export default function BookmarkButton({ url }: { url: string | null }) {
   const known = data.recent.find((e) => e.url === url) ?? data.bookmarks.find((e) => e.url === url);
   const toggle = () => {
     if (on) removeBookmark(url);
-    else addBookmark({ url, label: known?.label ?? '', kind: known?.kind ?? 'manifest', thumbnail: known?.thumbnail });
+    else addBookmark({ url, label: known?.label, kind: known?.kind, thumbnail: known?.thumbnail });
   };
-  const text = on ? t('removeBookmark') : t('addBookmark');
+  // one fixed name; the pressed state says whether it is on
+  const text = t('bookmarkItem');
   return (
     <button
       type="button"
