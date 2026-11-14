@@ -264,7 +264,7 @@ describe('annotations tab', () => {
   it('offers the classes of read lines as tags', () => {
     expect(panel(canvasStore())).toMatch(/data-value="line_main"[^>]*>line_main<span[^>]*>2</);
   });
-  it('has the marks switch, the same one as the 3D list and the pages grid', () => {
+  it('has the marks switch, the same one as the 3D list and the pages tab', () => {
     expect(panel(canvasStore())).toContain('data-show-marks');
     expect(panel(canvasStore(), 'ja')).toContain('印を表示');
   });

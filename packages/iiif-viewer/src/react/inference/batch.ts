@@ -1,6 +1,6 @@
 'use client';
 
-// From the pages grid, run one model over every page in turn. Each page's result is stored the same way as when the
+// From the pages tab, run one model over every page in turn. Each page's result is stored the same way as when the
 // inference tab reads one page (inferenceResultsAtom, and localAnnotationPagesAtom for the marks over the image).
 // A run belongs to the Viewer's store and goes on when the panel is closed; only stopBatch stops it.
 // There is one Worker, so pages are read one at a time. Only the next PREFETCH images are fetched ahead, so the
@@ -28,7 +28,7 @@ export interface BatchState {
   /** The page being read. */
   current: string | null;
   /**
-   * The page whose result has just arrived (the pages grid flashes it once). Cleared again after JUST_READ_MS, so a
+   * The page whose result has just arrived (the pages tab flashes it once). Cleared again after JUST_READ_MS, so a
    * thumbnail shown later does not flash.
    */
   lastRead?: string | null;
@@ -49,7 +49,7 @@ export const readingPageAtom = atom((get) => {
   return b?.running ? b.current : null;
 });
 
-/** How long a page counts as just read (a little longer than the flash in the pages grid). */
+/** How long a page counts as just read (a little longer than the flash in the pages tab). */
 const JUST_READ_MS = 1000;
 
 /** Images fetched ahead of the page being read. */
