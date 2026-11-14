@@ -1,0 +1,23 @@
+{
+  "Info": {
+    "share": "Share"
+  },
+  "Share": {
+    "unavailable": "Nothing to share yet.",
+    "hint": "Share this place as an IIIF Content State: a small piece of data that other IIIF viewers can open.",
+    "includePage": "Include current page",
+    "includeRegion": "Include visible area",
+    "includeTime": "Include current time ({time} s)",
+    "jsonLabel": "Content State (JSON)",
+    "encodedLabel": "Content State (encoded, base64url)",
+    "copy": "Copy",
+    "copied": "Copied",
+    "copyJson": "Copy the Content State JSON",
+    "copyEncoded": "Copy the encoded Content State",
+    "viewerLink": "Link to this viewer",
+    "copyViewerLink": "Copy the link to this viewer",
+    "dragLabel": "Drag and drop",
+    "dragIcon": "IIIF link",
+    "dragHint": "Drag this link onto another IIIF viewer to open the same place there."
+  }
+}

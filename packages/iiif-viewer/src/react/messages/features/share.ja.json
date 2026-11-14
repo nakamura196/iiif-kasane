@@ -1,0 +1,23 @@
+{
+  "Info": {
+    "share": "共有"
+  },
+  "Share": {
+    "unavailable": "共有できるものがありません。",
+    "hint": "いまの場所を、IIIF Content State（ほかの IIIF ビューアでも開ける小さなデータ）にして共有します。",
+    "includePage": "いまのページを含める",
+    "includeRegion": "表示中の範囲を含める",
+    "includeTime": "いまの時刻を含める（{time} 秒）",
+    "jsonLabel": "Content State（JSON）",
+    "encodedLabel": "Content State（符号化、base64url）",
+    "copy": "コピー",
+    "copied": "コピーしました",
+    "copyJson": "Content State の JSON をコピー",
+    "copyEncoded": "符号化した Content State をコピー",
+    "viewerLink": "このビューアへのリンク",
+    "copyViewerLink": "このビューアへのリンクをコピー",
+    "dragLabel": "ドラッグして渡す",
+    "dragIcon": "IIIF リンク",
+    "dragHint": "このリンクをほかの IIIF ビューアに落とすと、同じ場所を開きます。"
+  }
+}
