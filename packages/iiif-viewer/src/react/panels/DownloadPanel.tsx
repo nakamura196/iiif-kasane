@@ -30,6 +30,8 @@ import {
   type DownloadRegion,
 } from '../../core/features/_download';
 import { layerOrderAtom, layerSettingsAtom, manifestAtom } from '../atoms';
+import { BUTTON } from '../common/buttonClasses';
+import { CopyButton } from '../common/CopyButton';
 import { useAuth } from '../auth/authStore';
 import { useImageInfo } from '../displays/ImageTiles';
 import { useLocale, useTranslations, type Translator } from '../env';
@@ -41,37 +43,9 @@ import type { Panel, PanelContext } from './types';
 // API when the image has a service), or the media file of a video, audio or 3D model. What is offered comes from
 // core/features/_download.ts, which only gives URLs the image server promises to serve.
 
-const BUTTON =
-  'px-2.5 py-1 rounded border border-gray-300 dark:border-gray-600 text-xs hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40 disabled:hover:bg-transparent';
 const PRIMARY =
   'px-3 py-1.5 rounded text-xs text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:hover:bg-blue-600';
 const LINK = 'text-blue-600 dark:text-blue-400 hover:underline break-words';
-
-// TODO: switch to the shared copy button of the viewer package once #359 is merged.
-function CopyButton({ url, t }: { url: string; t: Translator }) {
-  const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
-  useEffect(() => {
-    if (state !== 'copied') return;
-    const id = window.setTimeout(() => setState('idle'), 2000);
-    return () => window.clearTimeout(id);
-  }, [state]);
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(url);
-      setState('copied');
-    } catch {
-      setState('failed');
-    }
-  };
-  return (
-    <>
-      <button type="button" className={BUTTON} onClick={copy}>
-        {state === 'copied' ? t('copied') : t('copy')}
-      </button>
-      {state === 'failed' && <span className="basis-full text-xs text-amber-700 dark:text-amber-400">{t('copyFailed')}</span>}
-    </>
-  );
-}
 
 // The download button, the address of the file (to copy), and what happened. The file is fetched here and saved under a
 // readable name. When that fails, nothing is opened for the reader (a window opened after the wait is blocked as a
@@ -157,7 +131,7 @@ function DownloadAction({
           className="min-w-0 flex-1 rounded border border-gray-300 dark:border-gray-600 bg-transparent px-1.5 py-0.5 text-xs"
           data-testid="download-url"
         />
-        <CopyButton url={url} t={t} />
+        <CopyButton text={url} />
       </div>
     </div>
   );
