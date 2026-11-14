@@ -159,7 +159,7 @@ function PagesView({ container, manifest }: PanelContext) {
   const readBefore = useRef<HTMLElement | null>(null);
   const running = !!reading;
   useEffect(() => {
-    if (!grid || !running || !list.current) return;
+    if (!running || !list.current) return;
     const box: HTMLElement | Window = scrollBoxOf(list.current) ?? window;
     const stop = () => {
       following.current = false;
@@ -172,9 +172,10 @@ function PagesView({ container, manifest }: PanelContext) {
       box.removeEventListener('touchmove', stop);
       box.removeEventListener('keydown', stop);
     };
-  }, [grid, running]);
+    // The layout decides which element scrolls, so the listeners move with it
+  }, [running, layout]);
   useEffect(() => {
-    if (!grid || !reading) {
+    if (!reading) {
       following.current = true;
       readBefore.current = null;
       return;
@@ -184,7 +185,8 @@ function PagesView({ container, manifest }: PanelContext) {
     if (!following.current && before?.isConnected && inView(before, head.current)) following.current = true;
     if (following.current) el?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
     readBefore.current = el;
-  }, [grid, reading]);
+    // Also after a layout switch, which runs after the effect above that brings the shown page into view
+  }, [reading, layout]);
 
   const toggle = (value: Layout, label: string, icon: ReactNode) => (
     <button
@@ -231,8 +233,8 @@ function PagesView({ container, manifest }: PanelContext) {
             </svg>,
           )}
         </div>
-        {grid ? <PagesReadingStyle /> : null}
-        {grid ? <PagesBatchBar pages={pages} manifest={m} /> : null}
+        <PagesReadingStyle />
+        <PagesBatchBar pages={pages} manifest={m} />
       </div>
       <ol
         ref={list}
@@ -252,7 +254,7 @@ function PagesView({ container, manifest }: PanelContext) {
                 type="button"
                 onClick={() => setRequest({ seq: nextSeq(), target: { canvasId: c.id } })}
                 aria-current={active ? 'true' : undefined}
-                data-reading={grid && c.id === reading ? 'true' : undefined}
+                data-reading={c.id === reading ? 'true' : undefined}
                 style={headHeight ? { scrollMarginTop: headHeight } : undefined}
                 title={grid ? label : undefined}
                 className={`w-full ${grid ? 'flex flex-col gap-1 p-1' : 'flex items-center gap-3 p-2'} rounded text-left text-sm transition-colors ${
@@ -280,7 +282,7 @@ function PagesView({ container, manifest }: PanelContext) {
                       return <MediaIcon kind={media} label={t(MEDIA_LABEL_KEYS[media])} size={grid ? 40 : 28} />;
                     })()
                   )}
-                  {grid && thumb && !broken[c.id] ? <PageThumbMarks page={c} /> : null}
+                  {thumb && !broken[c.id] ? <PageThumbMarks page={c} /> : null}
                 </span>
                 {grid ? (
                   <span className="min-w-0 flex gap-1 text-xs">

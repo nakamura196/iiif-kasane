@@ -27,11 +27,11 @@ export const localPageCountOn = (pages: LocalAnnotationPage[], canvasId: string 
 // The text in the annotations tab's search box. The marks over the image are narrowed to the matching annotations too.
 export const canvasAnnotationQueryAtom = atom<string>('');
 
-// Tags ("key: value") chosen in the annotations tab or the pages grid. Only annotations with one of them are shown in
+// Tags ("key: value") chosen in the annotations tab or the pages tab. Only annotations with one of them are shown in
 // the list and over the image. Tags the current Canvas lacks are ignored (the choice is kept when moving to another Canvas).
 export const canvasAnnotationTagsAtom = atom<string[]>([]);
 
-// Kinds (motivations) chosen in the annotations tab or the pages grid; empty shows every kind. The list, the marks over
+// Kinds (motivations) chosen in the annotations tab or the pages tab; empty shows every kind. The list, the marks over
 // the image and the marks over the page thumbnails all follow it. Kinds the current Canvas lacks are ignored.
 export const canvasAnnotationKindsAtom = atom<string[]>([]);
 
