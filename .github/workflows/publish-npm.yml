@@ -58,6 +58,18 @@ jobs:
       - name: Smoke test the packed package
         run: npm run test:package -- --pack-dir "$RUNNER_TEMP/pack"
 
+      # Hands the tested tarball to npm the way the publish job does, without publishing.
+      # Same version source (the release tag), same dist-tag rule, absolute path; --provenance is left out
+      # because it needs the id-token, which this job deliberately does not have.
+      # npm reads a relative "pack/x.tgz" as the GitHub repository pack/x.tgz (0.5.0 failed so).
+      - name: Dry-run the publish command
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          v="${TAG#iiif-kasane-v}"
+          if [[ "$v" == *-* ]]; then dist=(--tag next); else dist=(); fi
+          npm publish "$RUNNER_TEMP/pack/iiif-kasane-$v.tgz" --access public --dry-run "${dist[@]}"
+
       - name: Upload the tested tarball
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
@@ -102,10 +114,13 @@ jobs:
         env:
           TAG: ${{ github.event.release.tag_name }}
         run: |
-          ls pack
-          [ "$(ls pack | wc -l)" = 1 ] || { echo "expected exactly one tarball"; exit 1; }
-          [ -f "pack/iiif-kasane-${TAG#iiif-kasane-v}.tgz" ] || { echo "the tarball does not match tag $TAG"; exit 1; }
-          # A version with a prerelease part (0.6.0-rc.1) goes to the "next" dist-tag, so that it never becomes "latest".
           v="${TAG#iiif-kasane-v}"
+          # An absolute path: npm reads a relative "pack/x.tgz" as the GitHub repository pack/x.tgz (0.5.0 failed so).
+          tgz="$GITHUB_WORKSPACE/pack/iiif-kasane-$v.tgz"
+          ls "$GITHUB_WORKSPACE/pack"
+          [ "$(ls "$GITHUB_WORKSPACE/pack" | wc -l)" = 1 ] || { echo "expected exactly one tarball"; exit 1; }
+          [ -f "$tgz" ] || { echo "the tarball does not match tag $TAG"; exit 1; }
+          # A version with a prerelease part (0.6.0-rc.1) goes to the "next" dist-tag, so that it never becomes "latest".
+          # The smoke job dry-runs this same command; keep the two in step.
           if [[ "$v" == *-* ]]; then dist=(--tag next); else dist=(); fi
-          npm publish "pack/iiif-kasane-$v.tgz" --access public --provenance "${dist[@]}"
+          npm publish "$tgz" --access public --provenance "${dist[@]}"
