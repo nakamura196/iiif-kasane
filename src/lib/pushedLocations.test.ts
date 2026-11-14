@@ -18,6 +18,12 @@ describe('PushedLocations', () => {
     );
   });
 
+  it('reads the earlier manifest= argument as the same place as iiif-content=', () => {
+    expect(locationKey('?manifest=https%3A%2F%2Fexample.org%2Fc.json')).toBe(
+      locationKey('?iiif-content=https%3A%2F%2Fexample.org%2Fc.json'),
+    );
+  });
+
   it('is the entry before only when it is exactly the place returned to', () => {
     const h = new PushedLocations();
     h.push(top);

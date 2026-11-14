@@ -96,13 +96,12 @@ export async function openManifest(
   push: boolean,
   locale: () => string,
   origin: OpenOrigin = 'move',
-  quiet = false,
 ): Promise<OpenResult> {
   // a new iiif-content is being read: it wins, and this move (inside what was shown before) is dropped
   if (isContentLoading(store)) return 'stale';
   // a 'move' without a push is a dropped link: it is shown but not reported to the host (there is no entry
   // of a Collection to write into its address, and the link's targets would be lost)
-  const silent = quiet || (!push && origin === 'move');
+  const silent = !push && origin === 'move';
   return loadManifest(store, url, locale, origin, () => {
     const here = store.get(shownManifestAtom);
     if (push && here) {
@@ -145,8 +144,8 @@ export function useManifestSwitch() {
 
   /** Open the manifest (or Collection) at the URL. With push, "back" returns to what is shown now. */
   const open = useCallback(
-    (url: string, push: boolean, origin?: OpenOrigin, quiet?: boolean): Promise<OpenResult> =>
-      openManifest(store, url, push, () => locale.current, origin, quiet),
+    (url: string, push: boolean, origin?: OpenOrigin): Promise<OpenResult> =>
+      openManifest(store, url, push, () => locale.current, origin),
     [store, locale],
   );
 

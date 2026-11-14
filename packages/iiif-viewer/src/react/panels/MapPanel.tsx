@@ -102,9 +102,8 @@ function MapPanel({ manifest, container }: PanelContext) {
   const choose = async (p: MapPlace) => {
     setSelected(p.key);
     setFailed(null);
-    // quiet: the host is not told (a Manifest opened from the map is not an entry of a Collection, so it never goes into ?collection=)
     if (p.scope === 'item' && p.resourceId) {
-      if ((await open(p.resourceId, true, 'move', true)) === 'failed') setFailed(p.key);
+      if ((await open(p.resourceId, true)) === 'failed') setFailed(p.key);
       return;
     }
     if (p.containerId && p.containerId !== current) setRequest({ seq: nextSeq(), target: { canvasId: p.containerId } });

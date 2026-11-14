@@ -3,8 +3,17 @@ import { createStore } from 'jotai';
 import { manifestUrlAtom, shownManifestAtom } from './atoms';
 import { pickedPageAtom } from './internalState';
 import { collectionsFromParams, encodeContentState, sameUrlList } from '../core';
-import { loadContent, openContent, pendingCollectionsAtom, shownLocation, takeOverContent } from './useManifest';
+import {
+  cancelContentLoad,
+  lastReportAtom,
+  loadContent,
+  openContent,
+  pendingCollectionsAtom,
+  shownLocation,
+  takeOverContent,
+} from './useManifest';
 import { goBack, openManifest, trailAtom } from './displays/structureState';
+import { convertToV4 } from '../core';
 
 // A deep link into a Collection: ?iiif-content=<manifest>&collection=<top>&collection=<sub>
 
@@ -240,12 +249,10 @@ describe('a new location from the host', () => {
 });
 
 describe('a manifest the host is not told about', () => {
-  it('a dropped link and a map panel open are shown but flagged quiet; a move from a Collection is not', async () => {
+  it('a dropped link is shown but flagged quiet; a move from a Collection is not', async () => {
     const store = createStore();
     await loadContent(store, top, () => 'en');
     await openManifest(store, m1, false, () => 'en', 'move');
-    expect(store.get(shownManifestAtom)?.quiet).toBe(true);
-    await openManifest(store, m2, true, () => 'en', 'move', true);
     expect(store.get(shownManifestAtom)?.quiet).toBe(true);
     await openManifest(store, m1, true, () => 'en');
     expect(store.get(shownManifestAtom)?.quiet).toBeUndefined();
@@ -438,5 +445,114 @@ describe('round 3', () => {
     expect(sameUrlList(['a', 'b'], ['a', 'b'])).toBe(true);
     expect(sameUrlList(['a\nb'], ['a', 'b'])).toBe(false);
     expect(sameUrlList(['a'], ['a', 'b'])).toBe(false);
+  });
+});
+
+describe('round 4', () => {
+  const where = (store: ReturnType<typeof createStore>) =>
+    shownLocation(
+      store.get(shownManifestAtom)!,
+      store.get(trailAtom),
+      store.get(manifestUrlAtom),
+      store.get(pendingCollectionsAtom),
+    );
+
+  it("the browser's Back cancels a move still loading, as a new load does", async () => {
+    const store = createStore();
+    await loadContent(store, top, () => 'en');
+    await openManifest(store, m1, true, () => 'en');
+    let answer = () => {};
+    const wait = new Promise<void>((r) => (answer = r));
+    vi.stubGlobal('fetch', async (target: string) => {
+      await wait;
+      return { ok: target in served, json: async () => served[target] } as unknown as Response;
+    });
+    const move = openManifest(store, m2, true, () => 'en');
+    expect(takeOverContent(store, top, [])).toBe(true);
+    answer();
+    await expect(move).resolves.toBe('stale');
+    expect(store.get(shownManifestAtom)?.url).toBe(top);
+  });
+
+  it('a Manifest never goes into the collections: they are the trail after the last Manifest', async () => {
+    const store = createStore();
+    await loadContent(store, m1, () => 'en', [top]);
+    await settled(store, 1);
+    // a map panel opens m2 from m1 (a normal pushed move)
+    await openManifest(store, m2, true, () => 'en');
+    expect(trailUrls(store)).toEqual([top, m1]);
+    expect(where(store)).toEqual({ url: m2, collections: [], origin: 'move' });
+    // the browser's Back: m1 under the Collection
+    expect(takeOverContent(store, m1, [top])).toBe(true);
+    expect(store.get(shownManifestAtom)?.url).toBe(m1);
+    expect(trailUrls(store)).toEqual([top]);
+  });
+
+  it('an entry opened from a Collection that the map panel opened reports that Collection', async () => {
+    const store = createStore();
+    await loadContent(store, m1, () => 'en', [top]);
+    await settled(store, 1);
+    await openManifest(store, sub, true, () => 'en');
+    await openManifest(store, m2, true, () => 'en');
+    expect(where(store)).toEqual({ url: m2, collections: [sub], origin: 'move' });
+    expect(takeOverContent(store, m2, [sub])).toBe(true);
+  });
+
+  it('matches the last location reported to the host, even when a pending Collection was dropped', async () => {
+    const store = createStore();
+    const bad = `${sub}.bad`;
+    let fail = () => {};
+    const wait = new Promise<void>((r) => (fail = r));
+    vi.stubGlobal('fetch', async (target: string) => {
+      if (target === bad) await wait;
+      return { ok: target in served, json: async () => served[target] } as unknown as Response;
+    });
+    await loadContent(store, sub, () => 'en', [bad]);
+    await openManifest(store, m1, true, () => 'en');
+    const reported = where(store);
+    expect(reported.collections).toEqual([bad, sub]);
+    store.set(lastReportAtom, { seq: store.get(shownManifestAtom)!.seq, url: reported.url, collections: reported.collections });
+    fail();
+    await vi.waitFor(() => expect(store.get(pendingCollectionsAtom)).toEqual([]));
+    expect(trailUrls(store)).toEqual([sub]);
+    expect(takeOverContent(store, m1, [bad, sub])).toBe(true);
+    expect(store.get(manifestUrlAtom)).toBe(m1);
+  });
+
+  it('goes back to an earlier place than the one asked for: not quiet, so the host is told', async () => {
+    const store = createStore();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    await loadContent(store, top, () => 'en');
+    await openManifest(store, m1, true, () => 'en');
+    // a step of the trail that cannot be shown again
+    const brokenId = `${sub}.broken`;
+    const brokenRaw = { ...collectionJson(brokenId, []), items: {} };
+    const broken = { ...convertToV4(collectionJson(brokenId, [])), items: [{ id: `${brokenId}/s`, type: 'Scene', items: {} }] };
+    const trail = store.get(trailAtom);
+    store.set(trailAtom, { owner: trail.owner, items: [...trail.items, { url: brokenId, manifest: broken as never, raw: brokenRaw, index: 0 }] });
+    expect(takeOverContent(store, brokenId, [top])).toBe(true);
+    expect(store.get(shownManifestAtom)?.url).toBe(top);
+    expect(store.get(shownManifestAtom)?.quiet).toBeUndefined();
+  });
+
+  it('no Collection stays pending when its load ends without attaching', async () => {
+    const store = createStore();
+    delete served[m1];
+    await loadContent(store, m1, () => 'en', [top]);
+    expect(store.get(pendingCollectionsAtom)).toEqual([]);
+
+    let answer = () => {};
+    const wait = new Promise<void>((r) => (answer = r));
+    served[m2] = manifestJson(m2);
+    vi.stubGlobal('fetch', async (target: string) => {
+      await wait;
+      return { ok: target in served, json: async () => served[target] } as unknown as Response;
+    });
+    const load = loadContent(store, m2, () => 'en', [top]);
+    expect(store.get(pendingCollectionsAtom)).toEqual([top]);
+    cancelContentLoad(store);
+    answer();
+    await expect(load).resolves.toBe('stale');
+    expect(store.get(pendingCollectionsAtom)).toEqual([]);
   });
 });

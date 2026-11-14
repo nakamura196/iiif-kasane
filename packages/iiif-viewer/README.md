@@ -109,7 +109,7 @@ as `collection` (top first), and the viewer shows the manifest, with the Back bu
 ```
 
 `onShownChange({ url, collections, origin })` is called each time a manifest (or Collection) is shown.
-`collections` is the way taken, in the form `collection` takes; `origin` is `'content'` (the `iiifContent`
+`collections` is the way taken, in the form `collection` takes (the Collections after the last Manifest on the way: a Manifest, e.g. one opened from the map panel, never appears in it); `origin` is `'content'` (the `iiifContent`
 was read), `'move'` (the reader opened an entry) or `'back'`. To write the location into your own URL, do
 so for `'move'` and `'back'` only, and give the new `iiifContent` + `collection` back to the viewer: when they
 are what is shown already, the viewer reads nothing again and keeps the page the reader is on. A Collection
