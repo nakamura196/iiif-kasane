@@ -30,7 +30,7 @@ import {
   useManifestSwitch,
 } from './displays/structureState';
 import { useLocale, useTranslations } from './env';
-import { readManifest } from './useManifest';
+import { readManifestSource } from './useManifest';
 
 interface Props {
   containers: ContainerInfo[];
@@ -111,19 +111,31 @@ export default function ContainerList({ containers, selected, onSelect, pager = 
       const run = ++multiRun.current;
       const nameOf = (m: { label?: unknown }, url: string) => labelIn(m.label as never, locale) || url.split('/').pop() || url;
       void (async () => {
-        const sources = [{ label: nameOf(manifest, manifest.id), containers }] as Array<{
+        const sources = [
+          {
+            label: nameOf(manifest, manifest.id),
+            containers,
+            raw: shown && shown.manifest === manifest ? shown.raw : undefined,
+          },
+        ] as Array<{
           manifestUrl?: string;
           label: string;
           containers: ContainerInfo[];
+          raw?: unknown;
         }>;
         const failed: string[] = [];
         await Promise.all(
           remote.map(async (g) => {
             // one source that cannot be read goes to `failed`; the others are still shown
             try {
-              const m = await readManifest(g.manifestUrl);
-              if (!m) throw new Error('The manifest could not be read');
-              sources.push({ manifestUrl: g.manifestUrl, label: nameOf(m, g.manifestUrl), containers: containersOf(m) });
+              const s = await readManifestSource(g.manifestUrl);
+              if (!s) throw new Error('The manifest could not be read');
+              sources.push({
+                manifestUrl: g.manifestUrl,
+                label: nameOf(s.manifest, g.manifestUrl),
+                containers: containersOf(s.manifest),
+                raw: s.raw,
+              });
             } catch {
               failed.push(g.manifestUrl);
             }
@@ -131,10 +143,10 @@ export default function ContainerList({ containers, selected, onSelect, pager = 
         );
         if (run !== multiRun.current) return;
         const items = resolveCompareItems(targets, sources);
-        setCompareMulti({ anchor, items, failed });
+        setCompareMulti({ anchor, items, failed, raws: sources.map((s) => s.raw) });
       })();
     },
-    [manifest, containers, locale, setCompareMulti],
+    [manifest, shown, containers, locale, setCompareMulti],
   );
 
   // --- requests from the table of contents ---

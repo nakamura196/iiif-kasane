@@ -45,6 +45,8 @@ export interface CompareMulti {
   anchor: number;
   items: CompareItem[];
   failed: string[];
+  /** Served JSON of each source (indexed by CompareItem.sourceIndex), when available. */
+  raws?: Array<unknown | undefined>;
 }
 export const compareMultiAtom = atom<CompareMulti | null>(null);
 

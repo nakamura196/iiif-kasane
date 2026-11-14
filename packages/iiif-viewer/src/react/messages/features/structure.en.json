@@ -41,6 +41,7 @@
     "orderDate": "By date",
     "undated": "No date",
     "itemCount": "{count} items",
-    "timeline": "Timeline"
+    "timeline": "Timeline",
+    "compareFailed": "Some manifests could not be loaded (showing the rest): {urls}"
   }
 }
