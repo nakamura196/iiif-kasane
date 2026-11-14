@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Puzzle, canPlayPuzzle, type Panel, type PanelContext, type ShownManifest } from 'iiif-kasane';
 import { Link } from '@/i18n/routing';
@@ -18,7 +18,7 @@ import {
   type GalleryMode,
   type GalleryQuality,
 } from '@/lib/gallery';
-import { viewersFor } from '@/lib/otherViewers';
+import { fetchServedManifest, isPublicManifestUrl, mediaFactsOf, viewersFor, type MediaFacts, type ServedManifest } from '@/lib/otherViewers';
 import { BROWSE_LAYOUTS, browseQuery, canOpenInBrowse, type BrowseLayout } from '@/lib/browse';
 
 // The "Other views" tab of the right panel: opens the shown item in Kasane's other pages (compare, map, 3D gallery).
@@ -51,12 +51,12 @@ interface Targets {
   hasGeo: boolean;
   galleryOk: boolean;
   browseOk: boolean;
-  /** Names and ids of the other viewers that can open the shown manifest (empty for a local image). */
-  viewers: ReturnType<typeof viewersFor>;
+  /** Kinds of content the shown manifest paints (for choosing the other viewers). */
+  media: MediaFacts;
 }
 
 // what the shown manifest can be opened in; worked out once per shown manifest (georeferencing was found when it was shown)
-const NONE: Targets = { hasGeo: false, galleryOk: false, browseOk: false, viewers: [] };
+const NONE: Targets = { hasGeo: false, galleryOk: false, browseOk: false, media: { image: false, av: false } };
 const targetsCache = new WeakMap<ShownManifest, Targets>();
 function targetsOf({ shown }: PanelContext): Targets {
   if (!shown) return NONE;
@@ -66,11 +66,28 @@ function targetsOf({ shown }: PanelContext): Targets {
       hasGeo: shown.hasGeo,
       galleryOk: canOpenInGallery(shown.raw),
       browseOk: canOpenInBrowse(shown.raw),
-      viewers: viewersFor(shown.url, shown.raw),
+      media: mediaFactsOf(containersOf(shown.manifest)),
     };
     targetsCache.set(shown, t);
   }
   return t;
+}
+
+// What the file at the shown URL really is. The viewer's copy is already upgraded to Presentation 3 and wrapped
+// (info.json, curation...), so the version and "is it a Manifest" come from the file as served.
+function useServedManifest(url: string | undefined): ServedManifest | null {
+  const [state, setState] = useState<{ url: string; result: ServedManifest | null } | null>(null);
+  useEffect(() => {
+    if (!url) return;
+    let cancelled = false;
+    fetchServedManifest(url).then((result) => {
+      if (!cancelled) setState({ url, result });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [url]);
+  return state && state.url === url ? state.result : null;
 }
 
 function OtherViews({
@@ -84,7 +101,9 @@ function OtherViews({
   const tb = useTranslations('Browse');
   // page indexes count in the shown manifest (the entry of a Collection, if one is open), so links use its URL
   const manifestUrl = ctx.shown?.url ?? pageUrl;
-  const { hasGeo, galleryOk, browseOk, viewers } = targetsOf(ctx);
+  const { hasGeo, galleryOk, browseOk, media } = targetsOf(ctx);
+  const served = useServedManifest(ctx.shown?.url);
+  const viewers = viewersFor(served, media);
   const [browseLayout, setBrowseLayout] = useState<BrowseLayout>('table');
   const [mode, setMode] = useState<GalleryMode>('orbit');
   const [look, setLook] = useState<GalleryLook>('standard');
@@ -189,7 +208,7 @@ function OtherViews({
           <ul className="flex flex-wrap gap-2" data-testid="open-in-viewers">
             {viewers.map((v) => (
               <li key={v.id}>
-                <a href={v.url(manifestUrl)} target="_blank" rel="noopener noreferrer" className={BUTTON} data-viewer={v.id}>
+                <a href={v.url(served?.url ?? manifestUrl)} target="_blank" rel="noopener noreferrer" className={BUTTON} data-viewer={v.id}>
                   {v.name}
                 </a>
               </li>
@@ -219,6 +238,11 @@ const puzzleShareUrl = (manifestUrl: string, ctx: PanelContext, size: number) =>
   return `${window.location.origin}${window.location.pathname}?${puzzleQuery(manifestUrl, index, size)}`;
 };
 
+// Known without a request: a public URL and content other viewers can show. The file itself is checked
+// when the tab is open (useServedManifest), which can still leave the section out.
+const couldOpenElsewhere = (ctx: PanelContext, media: MediaFacts) =>
+  isPublicManifestUrl(ctx.shown?.url) && (media.image || media.av);
+
 /** Shown when the item can go to the compare page, the map or the gallery, or the image can be a puzzle. */
 export const otherViewsPanel = (props: Props, label: string): Panel => ({
   id: OTHER_VIEWS_TAB,
@@ -227,7 +251,7 @@ export const otherViewsPanel = (props: Props, label: string): Panel => ({
   label,
   available: (ctx) => {
     const t = targetsOf(ctx);
-    return !!props.compare || t.hasGeo || t.galleryOk || t.browseOk || t.viewers.length > 0 || canPlayPuzzle(ctx);
+    return !!props.compare || t.hasGeo || t.galleryOk || t.browseOk || couldOpenElsewhere(ctx, t.media) || canPlayPuzzle(ctx);
   },
   Component: (ctx) => <OtherViews {...props} ctx={ctx} />,
 });

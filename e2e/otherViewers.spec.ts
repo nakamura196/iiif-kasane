@@ -44,6 +44,46 @@ const collection = {
   ],
 };
 
+// Presentation 2 manifest: the viewer upgrades it to 3, but the links follow the version as served
+const v2 = {
+  '@context': 'http://iiif.io/api/presentation/2/context.json',
+  '@id': `${BASE}/v2.json`,
+  '@type': 'sc:Manifest',
+  label: 'v2',
+  sequences: [
+    {
+      '@type': 'sc:Sequence',
+      canvases: [
+        {
+          '@id': `${BASE}/v2/c1`,
+          '@type': 'sc:Canvas',
+          label: '1',
+          width: 100,
+          height: 100,
+          images: [
+            {
+              '@type': 'oa:Annotation',
+              motivation: 'sc:painting',
+              on: `${BASE}/v2/c1`,
+              resource: { '@id': `${BASE}/p.png`, '@type': 'dctypes:Image', format: 'image/png', width: 100, height: 100 },
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+// an image's info.json: the viewer wraps it in a stand-in Manifest, which must not be offered to other viewers
+const info = {
+  '@context': 'http://iiif.io/api/image/3/context.json',
+  id: `${BASE}/img`,
+  type: 'ImageService3',
+  protocol: 'http://iiif.io/api/image',
+  profile: 'level0',
+  width: 100,
+  height: 100,
+};
+
 async function serve(page: Page) {
   await page.route(`${BASE}/**`, (route) => {
     const url = route.request().url();
@@ -51,6 +91,8 @@ async function serve(page: Page) {
     if (url.includes('collection.json')) return json(collection);
     if (url.includes('image.json')) return json(image);
     if (url.includes('video.json')) return json(video);
+    if (url.includes('v2.json')) return json(v2);
+    if (url.includes('/img/info.json')) return json(info);
     return route.fulfill({ body: PNG, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' } });
   });
 }
@@ -109,5 +151,21 @@ test('a local image (blob: URL) gets no links', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Inference' })).toBeVisible();
   // nothing else is on offer for a local image, so the tab is absent and so are the links
   await expect(page.getByRole('button', { name: 'Other views' })).toHaveCount(0);
+  await expect(page.locator('[data-testid="open-in-viewers"]')).toHaveCount(0);
+});
+
+test('a Presentation 2 manifest gets only the viewers that read 2', async ({ page }) => {
+  await serve(page);
+  await page.goto(`/en/viewer/?iiif-content=${encodeURIComponent(v2['@id'])}&tab=views`);
+  await expect(page.locator('[data-testid="open-in-viewers"]')).toBeVisible();
+  expect(await names(page)).toEqual(['Universal Viewer', 'Mirador', 'IIIF Curation Viewer', 'Theseus']);
+});
+
+test('the info.json of an image gets no links (the viewer shows it as a stand-in Manifest)', async ({ page }) => {
+  await serve(page);
+  await page.goto(`/en/viewer/?iiif-content=${encodeURIComponent(`${BASE}/img/info.json`)}&tab=views`);
+  // the tab is there (the gallery can take the image); wait for it, then the links must be absent
+  await expect(page.getByRole('heading', { name: 'View in 3D gallery' })).toBeVisible();
+  await page.waitForTimeout(1500);
   await expect(page.locator('[data-testid="open-in-viewers"]')).toHaveCount(0);
 });
