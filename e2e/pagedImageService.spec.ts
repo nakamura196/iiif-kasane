@@ -168,8 +168,8 @@ test('a spread (behavior: paged) reads info.json and tiles for both pages when b
   expect(Math.abs(b2.x + b2.width - b3.x)).toBeLessThan(3);
 
   // Opening the Pages tab does not request the bare service URLs as thumbnails either.
-  await page.getByRole('tab', { name: 'Pages' }).click();
-  await expect(page.getByRole('button', { name: /page2/ })).toBeVisible();
+  await page.getByRole('button', { name: 'Pages', exact: true }).click();
+  await expect(page.getByRole('list', { name: 'Pages' }).getByRole('button', { name: /page2/ })).toBeVisible();
   expect(bareAsked).toEqual([]);
   expect(await broken(page)).toEqual([]);
 });
