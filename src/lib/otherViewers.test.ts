@@ -4,7 +4,7 @@ import { fetchManifest } from '../../packages/iiif-viewer/src/core/services/util
 import {
   OTHER_VIEWERS,
   fetchServedManifest,
-  forgetServedManifests,
+  isSecretParam,
   isPublicManifestUrl,
   mediaFactsOf,
   servedManifestOf,
@@ -59,6 +59,9 @@ describe('isPublicManifestUrl', () => {
     expect(isPublicManifestUrl('https://iiif.io/m.json')).toBe(true);
     expect(isPublicManifestUrl('http://example.org/m.json')).toBe(true);
     expect(isPublicManifestUrl('http://172.32.0.1/m.json')).toBe(true);
+    expect(isPublicManifestUrl('http://[2001:4860:4860::8888]/m.json')).toBe(true);
+    expect(isPublicManifestUrl('http://[::ffff:8.8.8.8]/m.json')).toBe(true); // the IPv4 inside decides
+    expect(isPublicManifestUrl('http://[::808:808]/m.json')).toBe(true); // IPv4-compatible with a public IPv4 inside
     expect(isPublicManifestUrl('https://example.org/m.json?lang=ja&page=2')).toBe(true);
   });
   it('refuses local images, other schemes and addresses only this computer or its network can reach', () => {
@@ -80,6 +83,15 @@ describe('isPublicManifestUrl', () => {
       'http://[fe80::1]/m.json',
       'http://[::ffff:127.0.0.1]/m.json',
       'http://[::ffff:10.0.0.1]/m.json',
+      'http://[::]/m.json',
+      'http://[::7f00:1]/m.json',
+      'http://[::127.0.0.1]/m.json',
+      'http://[::a00:1]/m.json',
+      'http://[::10.1.2.3]/m.json',
+      'http://[::c0a8:101]/m.json',
+      'http://[0:0:0:0:0:0:0:1]/m.json',
+      'http://[64:ff9b::a00:1]/m.json',
+      'http://[ff02::1]/m.json',
       'http://nas/m.json',
       'http://nas.local/m.json',
       'http://nas.internal/m.json',
@@ -131,7 +143,6 @@ describe('servedManifestOf', () => {
 describe('through the real loader (fetchManifest)', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
-    forgetServedManifests();
   });
   const serve = (json: unknown) => {
     const fetchMock = vi.fn(async () => ({ ok: true, json: async () => JSON.parse(JSON.stringify(json)) }));
@@ -186,26 +197,54 @@ describe('through the real loader (fetchManifest)', () => {
 describe('fetchServedManifest', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
-    forgetServedManifests();
   });
+  const stub = (impl: () => Promise<unknown>) => {
+    const m = vi.fn(impl);
+    vi.stubGlobal('fetch', m);
+    return m;
+  };
   it('asks for an http item as https, and links to the https URL', async () => {
-    const fetchMock = vi.fn(async () => ({ ok: true, json: async () => v3({ type: 'Image' }) }));
-    const got = await fetchServedManifest('http://example.org/m.json', fetchMock as never);
-    expect(fetchMock).toHaveBeenCalledWith('https://example.org/m.json');
+    const m = stub(async () => ({ ok: true, json: async () => v3({ type: 'Image' }) }));
+    const got = await fetchServedManifest('http://example.org/m.json');
+    expect(m).toHaveBeenCalledWith('https://example.org/m.json');
     expect(got).toEqual({ url: 'https://example.org/m.json', version: 3 });
   });
   it('offers nothing when the https URL does not answer, or the request fails', async () => {
-    expect(await fetchServedManifest('http://example.org/a.json', (async () => ({ ok: false })) as never)).toBeNull();
-    expect(
-      await fetchServedManifest('https://example.org/b.json', (async () => {
-        throw new Error('network');
-      }) as never),
-    ).toBeNull();
+    stub(async () => ({ ok: false }));
+    expect(await fetchServedManifest('http://example.org/a.json')).toBeNull();
+    stub(async () => {
+      throw new Error('network');
+    });
+    expect(await fetchServedManifest('https://example.org/b.json')).toBeNull();
+  });
+  it('does not remember a failure: the same URL is asked again and can succeed', async () => {
+    let ok = false;
+    stub(async () => (ok ? { ok: true, json: async () => v3({ type: 'Image' }) } : { ok: false }));
+    expect(await fetchServedManifest('https://example.org/retry.json')).toBeNull();
+    ok = true;
+    expect(await fetchServedManifest('https://example.org/retry.json')).toEqual({ url: 'https://example.org/retry.json', version: 3 });
   });
   it('does not even ask for a private URL', async () => {
-    const fetchMock = vi.fn();
-    expect(await fetchServedManifest('http://192.168.0.2/m.json', fetchMock as never)).toBeNull();
-    expect(fetchMock).not.toHaveBeenCalled();
+    const m = stub(async () => ({ ok: true, json: async () => ({}) }));
+    expect(await fetchServedManifest('http://192.168.0.2/m.json')).toBeNull();
+    expect(m).not.toHaveBeenCalled();
+  });
+});
+
+describe('isSecretParam', () => {
+  it('matches credential names in their usual forms', () => {
+    for (const n of ['token', 'access_token', 'accessToken', 'access-token', 'accesstoken', 'api_key', 'api-key', 'apikey', 'key', 'X-Amz-Signature', 'X-Amz-Credential', 'sig', 'auth', 'Authorization', 'jwt', 'sessionid', 'client_secret', 'password']) {
+      expect(isSecretParam(n), n).toBe(true);
+    }
+  });
+  it('does not match names that only contain such letters', () => {
+    for (const n of ['author', 'authority', 'keyword', 'keywords', 'design', 'monkey', 'signal', 'tokenize', 'secretary', 'lang', 'page', 'canvas']) {
+      expect(isSecretParam(n), n).toBe(false);
+    }
+  });
+  it('a manifest URL with such a name is still offered', () => {
+    expect(isPublicManifestUrl('https://example.org/m.json?author=a&keyword=b&design=c&monkey=d')).toBe(true);
+    expect(isPublicManifestUrl('https://example.org/m.json?access_token=a')).toBe(false);
   });
 });
 

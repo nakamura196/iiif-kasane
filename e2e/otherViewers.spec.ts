@@ -169,3 +169,17 @@ test('the info.json of an image gets no links (the viewer shows it as a stand-in
   await page.waitForTimeout(1500);
   await expect(page.locator('[data-testid="open-in-viewers"]')).toHaveCount(0);
 });
+
+test('an item with nothing else on offer is never an empty tab: it says so when the served file cannot be read', async ({ page }) => {
+  await serve(page);
+  // the loader gets the video manifest on its first request; the second request (ours, for the links) fails
+  let n = 0;
+  await page.route(`${BASE}/video-once.json**`, (route) => {
+    n += 1;
+    if (n === 1) return route.fulfill({ json: { ...video, id: `${BASE}/video-once.json` }, headers: { 'access-control-allow-origin': '*' } });
+    return route.fulfill({ status: 500, body: 'no', headers: { 'access-control-allow-origin': '*' } });
+  });
+  await page.goto(`/en/viewer/?iiif-content=${encodeURIComponent(`${BASE}/video-once.json`)}&tab=views`);
+  await expect(page.getByTestId('open-in-status')).toHaveText('This item cannot be opened in other viewers.');
+  await expect(page.locator('[data-testid="open-in-viewers"]')).toHaveCount(0);
+});

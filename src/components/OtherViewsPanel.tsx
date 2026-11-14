@@ -75,7 +75,8 @@ function targetsOf({ shown }: PanelContext): Targets {
 
 // What the file at the shown URL really is. The viewer's copy is already upgraded to Presentation 3 and wrapped
 // (info.json, curation...), so the version and "is it a Manifest" come from the file as served.
-function useServedManifest(url: string | undefined): ServedManifest | null {
+type ServedState = 'checking' | 'none' | ServedManifest;
+function useServedManifest(url: string | undefined): ServedState {
   const [state, setState] = useState<{ url: string; result: ServedManifest | null } | null>(null);
   useEffect(() => {
     if (!url) return;
@@ -87,7 +88,8 @@ function useServedManifest(url: string | undefined): ServedManifest | null {
       cancelled = true;
     };
   }, [url]);
-  return state && state.url === url ? state.result : null;
+  if (!state || state.url !== url) return 'checking';
+  return state.result ?? 'none';
 }
 
 function OtherViews({
@@ -103,7 +105,10 @@ function OtherViews({
   const manifestUrl = ctx.shown?.url ?? pageUrl;
   const { hasGeo, galleryOk, browseOk, media } = targetsOf(ctx);
   const served = useServedManifest(ctx.shown?.url);
-  const viewers = viewersFor(served, media);
+  const links = typeof served === 'string' ? [] : viewersFor(served, media).map((v) => ({ v, href: v.url(served.url) }));
+  // The tab can be there only because of this section (the check needs a request, so the tab cannot wait for it):
+  // then say what is going on, so that the tab is never empty.
+  const onlyThis = !compare && !hasGeo && !galleryOk && !browseOk && !canPlayPuzzle(ctx);
   const [browseLayout, setBrowseLayout] = useState<BrowseLayout>('table');
   const [mode, setMode] = useState<GalleryMode>('orbit');
   const [look, setLook] = useState<GalleryLook>('standard');
@@ -201,20 +206,25 @@ function OtherViews({
           </Link>
         </section>
       )}
-      {viewers.length > 0 && (
+      {links.length > 0 && (
         <section className="space-y-2">
           <h3 className="font-semibold">{t('openInHeading')}</h3>
           <p className="text-xs text-gray-600 dark:text-gray-300">{t('openInHint')}</p>
           <ul className="flex flex-wrap gap-2" data-testid="open-in-viewers">
-            {viewers.map((v) => (
+            {links.map(({ v, href }) => (
               <li key={v.id}>
-                <a href={v.url(served?.url ?? manifestUrl)} target="_blank" rel="noopener noreferrer" className={BUTTON} data-viewer={v.id}>
+                <a href={href} target="_blank" rel="noopener noreferrer" className={BUTTON} data-viewer={v.id}>
                   {v.name}
                 </a>
               </li>
             ))}
           </ul>
         </section>
+      )}
+      {links.length === 0 && onlyThis && (
+        <p className="text-xs text-gray-600 dark:text-gray-300" data-testid="open-in-status">
+          {served === 'checking' ? t('openInChecking') : t('openInNone')}
+        </p>
       )}
       {canPlayPuzzle(ctx) && (
         <section className="space-y-2">
