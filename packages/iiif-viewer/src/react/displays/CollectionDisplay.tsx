@@ -36,6 +36,7 @@ const thumbnailFromManifest = (id: string) => {
 function EntryThumbnail({ entry, className }: { entry: CollectionEntry; className: string }) {
   const ref = useRef<HTMLSpanElement>(null);
   const [fetched, setFetched] = useState<{ id: string; url?: string } | null>(null);
+  const [brokenUrl, setBrokenUrl] = useState<string | null>(null);
   const need = !entry.thumbnail;
 
   useEffect(() => {
@@ -66,9 +67,20 @@ function EntryThumbnail({ entry, className }: { entry: CollectionEntry; classNam
   }, [need, entry.id]);
 
   const url = entry.thumbnail ?? (fetched?.id === entry.id ? fetched.url : undefined);
-  if (url) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={url} alt="" loading="lazy" className={`object-contain bg-white/60 ${className}`} />;
+  if (url && brokenUrl !== url) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={url}
+        alt=""
+        loading="lazy"
+        onError={(e) => {
+          e.currentTarget.style.visibility = 'hidden';
+          setBrokenUrl(url);
+        }}
+        className={`object-contain bg-white/60 ${className}`}
+      />
+    );
   }
   // nothing yet (or nothing found): keep the place empty, so the card does not jump when the picture arrives
   return need && fetched?.id !== entry.id ? <span ref={ref} aria-hidden className={className} /> : null;

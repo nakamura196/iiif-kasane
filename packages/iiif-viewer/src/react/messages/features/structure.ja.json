@@ -41,6 +41,7 @@
     "orderDate": "年代順",
     "undated": "日付なし",
     "itemCount": "{count} 件",
-    "timeline": "年表"
+    "timeline": "年表",
+    "compareFailed": "読み込めなかったマニフェストがあります（残りを表示しています）: {urls}"
   }
 }

@@ -659,23 +659,51 @@ export function collectionEntriesOf(raw: unknown): CollectionEntry[] {
 // Thumbnails
 // ---------------------------------------------------------------------------
 
-/** From the body of an image (the first option of a Choice), makes the URL of a small image. Shrunk through the Image API when there is one. */
-const imageBodyThumbnail = (body: unknown, height: number): string | undefined => {
+const shrinkImageApiUrl = (url: string, height: number): string =>
+  url.replace(/\/full\/[^/]+\/(\d+)\/(default|native|color)\.(\w+)$/, `/full/,${height}/$1/$2.$3`);
+
+/** From the body of an image (the first option of a Choice), makes the URL of a small image. Shrunk through the Image API when supported. */
+const imageBodyThumbnail = (body: unknown, height: number): { url?: string; handled: boolean } => {
   const b = isObject(body) && body.type === 'Choice' ? asList(body.items)[0] : body;
-  if (!isObject(b) || b.type !== 'Image') return undefined;
+  if (!isObject(b) || b.type !== 'Image') return { handled: false };
+  const own = firstThumbnail(b.thumbnail);
+  if (own) return { url: own, handled: true };
+  const bodyId = str(b.id);
   for (const s of asList(b.service)) {
     if (!isObject(s)) continue;
-    const base = str(s.id) ?? str(s['@id']);
+    const rawBase = str(s.id) ?? str(s['@id']);
     const kind = str(s.type) ?? str(s['@type']) ?? 'ImageService3';
-    if (base && /^ImageService[23]$/.test(kind)) return `${base.replace(/\/$/, '')}/full/,${height}/0/default.jpg`;
+    if (!rawBase || !/^ImageService[123]?$/i.test(kind)) continue;
+    const base = rawBase.replace(/\/+$/, '');
+    const isV3 =
+      /ImageService3/i.test(kind) ||
+      asList(s['@context']).some((c) => typeof c === 'string' && c.includes('image/3'));
+    const sizes = asList(s.sizes)
+      .filter(isObject)
+      .map((sz) => ({ width: Number(sz.width), height: Number(sz.height) }))
+      .filter((sz) => Number.isFinite(sz.width) && sz.width > 0 && Number.isFinite(sz.height) && sz.height > 0)
+      .sort((x, y) => x.height - y.height);
+    if (sizes.length > 0) {
+      const picked = sizes.find((sz) => sz.height >= height) ?? sizes[sizes.length - 1];
+      const sizeParam = isV3 ? `${picked.width},${picked.height}` : `${picked.width},`;
+      return { url: `${base}/full/${sizeParam}/0/default.jpg`, handled: true };
+    }
+    const profileText = asList(s.profile)
+      .filter((p): p is string => typeof p === 'string')
+      .join(' ');
+    if (/level\s*0|compliance\.html#level0/i.test(profileText)) {
+      const standalone = bodyId && bodyId.replace(/\/+$/, '') !== base ? bodyId : undefined;
+      return { url: standalone, handled: true };
+    }
+    return { url: `${base}/full/,${height}/0/default.jpg`, handled: true };
   }
-  return str(b.id);
+  return { url: bodyId ? shrinkImageApiUrl(bodyId, height) : undefined, handled: Boolean(bodyId) };
 };
 
 /**
  * From the Manifest (or Collection) itself, chooses the URL of a small image for a list card.
  * Used when a Collection item has no thumbnail (Cookbook 0230 and others): the Manifest is fetched.
- * In order: the body's thumbnail, the first Canvas's thumbnail, the first Canvas's image (shrunk when it is an Image API one).
+ * In order: the Manifest's thumbnail, the first Canvas's thumbnail, the first Canvas's image (shrunk when supported).
  */
 export function manifestThumbnailOf(raw: unknown, height = 192): string | undefined {
   if (!isObject(raw)) return undefined;
@@ -689,8 +717,8 @@ export function manifestThumbnailOf(raw: unknown, height = 192): string | undefi
     if (!isObject(page)) continue;
     for (const anno of asList(page.items)) {
       if (!isObject(anno) || anno.motivation !== 'painting') continue;
-      const url = imageBodyThumbnail(anno.body, height);
-      if (url) return url;
+      const res = imageBodyThumbnail(anno.body, height);
+      if (res.handled) return res.url;
     }
   }
   return undefined;
@@ -698,17 +726,25 @@ export function manifestThumbnailOf(raw: unknown, height = 192): string | undefi
 
 /**
  * The URL of a small image for paging. Uses the Canvas's thumbnail when there is one.
- * Otherwise turns an IIIF Image API image URL (…/full/<size>/0/default.jpg) into a small size.
+ * Otherwise inspects the raw painting body (respecting Image API level 0 services) or shrinks an Image API request URL.
  */
 export function pageThumbnailUrl(container: ContainerInfo, rawCanvas?: unknown, height = 96): string | undefined {
   if (isObject(rawCanvas)) {
     const t = firstThumbnail(rawCanvas.thumbnail);
     if (t) return t;
+    for (const page of asList(rawCanvas.items)) {
+      if (!isObject(page)) continue;
+      for (const anno of asList(page.items)) {
+        if (!isObject(anno) || anno.motivation !== 'painting') continue;
+        const res = imageBodyThumbnail(anno.body, height);
+        if (res.handled) return res.url;
+      }
+    }
   }
   for (const p of container.painting) {
     for (const o of p.options) {
       if (o.kind !== 'Image') continue;
-      return o.url.replace(/\/full\/[^/]+\/(\d+)\/(default|native|color)\.(\w+)$/, `/full/,${height}/$1/$2.$3`);
+      return shrinkImageApiUrl(o.url, height);
     }
   }
   return undefined;
