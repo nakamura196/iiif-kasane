@@ -119,9 +119,16 @@ const summarize = (resources: AnnotationResource[]) => {
  * place (an accordion), so a list with many pictures stays easy to scan and the model stays visible.
  * The same in the 2D and the 3D lists.
  */
-export default function AnnotationResources({ resources }: { resources?: AnnotationResource[] }) {
+export default function AnnotationResources({
+  resources,
+  defaultOpen = false,
+}: {
+  resources?: AnnotationResource[];
+  /** Start opened (the detail view). */
+  defaultOpen?: boolean;
+}) {
   const t = useTranslations('AnnotationResources');
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const panelId = useId();
 
   if (!resources || resources.length === 0) return null;

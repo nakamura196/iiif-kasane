@@ -1,15 +1,16 @@
 import {
   annotationFilterAtom,
   annotationsAtom,
+  manifestAtom,
   selectedAnnotationIdAtom,
   visibleAnnotationsAtom,
 } from '../atoms';
 import { useAtom } from 'jotai';
-import { useEffect, useMemo, useRef } from 'react';
-import { useTranslations } from '../env';
-import AnnotationCard from '../annotation/AnnotationCard';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useLocale, useTranslations } from '../env';
+import AnnotationCard, { AnnotationCardDetail } from '../annotation/AnnotationCard';
 import { RegionGroupFrame } from '../annotation/AnnotationCardFrame';
-import { groupByRegion } from '../../core';
+import { buildAnnotationGraph, groupByRegion, labelIn, opensDetail } from '../../core';
 import {
   EMPTY_FILTER,
   annotationKindFacets,
@@ -29,6 +30,8 @@ export default function AnnotationList() {
   const [visibleAnnotations] = useAtom(visibleAnnotationsAtom);
   const [filter, setFilter] = useAtom(annotationFilterAtom);
   const [selectedAnnotationId, setSelectedAnnotationId] = useAtom(selectedAnnotationIdAtom);
+  const [manifest] = useAtom(manifestAtom);
+  const locale = useLocale();
   const selectedRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -62,6 +65,47 @@ export default function AnnotationList() {
     [annotations],
   );
 
+  // An annotation with connections opens in a detail view in place of the list
+  const detail = useMemo(() => {
+    const a = selectedAnnotationId ? annotations.find((x) => x.id === selectedAnnotationId) : undefined;
+    return a && opensDetail({ id: a.id, regionId: a.regionId, resources: a.resources }) ? a : undefined;
+  }, [annotations, selectedAnnotationId]);
+  // The connections of every annotation (not only the ones the filter leaves); built only while a detail view is open
+  const opened = !!detail;
+  const graph = useMemo(
+    () =>
+      opened
+        ? buildAnnotationGraph(
+            annotations.map((a) => ({
+              id: a.id,
+              label: a.data.body.label,
+              number: numberOf.get(a.id),
+              regionId: a.regionId,
+              resources: a.resources,
+            })),
+            manifest ? { id: manifest.id, label: labelIn(manifest.label, locale) || undefined } : undefined,
+            locale,
+          )
+        : undefined,
+    [opened, annotations, numberOf, manifest, locale],
+  );
+  const listRef = useRef<HTMLDivElement>(null);
+  const returnTo = useRef<string | null>(null);
+  const back = useCallback(() => {
+    returnTo.current = selectedAnnotationId;
+    setSelectedAnnotationId(null);
+  }, [selectedAnnotationId, setSelectedAnnotationId]);
+  // Back: scroll the list to the card the detail view was about
+  useEffect(() => {
+    const id = returnTo.current;
+    if (detail || !id) return;
+    returnTo.current = null;
+    const card = [...(listRef.current?.querySelectorAll<HTMLElement>('[data-annotation-id]') ?? [])].find(
+      (el) => el.dataset.annotationId === id,
+    );
+    card?.scrollIntoView({ block: 'center' });
+  }, [detail]);
+
   const renderCard = (annotation: Annotation) => (
     <AnnotationCard
       key={annotation.id}
@@ -73,8 +117,22 @@ export default function AnnotationList() {
     />
   );
 
+  if (detail && graph) {
+    return (
+      <div className="p-6 bg-white dark:bg-gray-900">
+        <AnnotationCardDetail
+          annotation={detail}
+          number={numberOf.get(detail.id)}
+          graph={graph}
+          onBack={back}
+          onSelectAnnotation={focusOnAnnotation}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="p-6 bg-white dark:bg-gray-900">
+    <div ref={listRef} className="p-6 bg-white dark:bg-gray-900">
       <div className="mb-6 flex items-center justify-between gap-3">
         <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">{t('annotations')}</h2>
         {/* Whether the marks are drawn over the model (the same switch as over images and page thumbnails) */}

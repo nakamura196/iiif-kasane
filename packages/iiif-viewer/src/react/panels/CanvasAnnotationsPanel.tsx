@@ -15,6 +15,9 @@ import {
   type RegionGroup,
   embeddedCanvasAnnotations,
   groupByRegion,
+  buildAnnotationGraph,
+  opensDetail,
+  type AnnotationGraph,
   isAnnotationAt,
   rawCanvasOf,
   labelIn,
@@ -39,6 +42,7 @@ import { useCanvasAnnotations } from '../overlays/useCanvasAnnotations';
 import AnnotationBody from '../annotation/AnnotationBody';
 import AnnotationResources from '../annotation/AnnotationResources';
 import { AnnotationCardFrame, RegionGroupFrame } from '../annotation/AnnotationCardFrame';
+import { AnnotationDetail } from '../annotation/AnnotationDetail';
 import { FilterChips } from '../annotation/FilterChips';
 import { ShowMarksToggle } from '../annotation/ShowMarksToggle';
 import { useGranularityLabel, useKindLabel, useKindOptions } from '../annotation/kindLabels';
@@ -49,6 +53,44 @@ import type { Panel, PanelContext } from './types';
 
 // Show tag chips up to this number, most frequent first (the rest open with "Show all"), so tags with scattered values do not fill the panel
 const TAG_LIMIT = 20;
+
+// The small notes on the right of a card's heading (kind, unit, layer, time)
+function useItemMeta(annotation: CanvasAnnotation) {
+  const t = useTranslations('Info');
+  const locale = useLocale();
+  const kindLabel = useKindLabel();
+  const granularityLabel = useGranularityLabel();
+  const motivation = annotation.painted ? 'painting' : annotation.motivations[0];
+  // Do not label "comment" (the default purpose) or "region" for annotations with a frame, because the numbered chip corresponds to the frame on the image
+  const notes: string[] = [];
+  if (motivation && motivation !== 'commenting')
+    notes.push(kindLabel(motivation));
+  if (annotation.region.type === 'canvas') notes.push(t('canvasAnnotationsAbout'));
+  if (annotation.granularity) notes.push(granularityLabel(annotation.granularity));
+  if (annotation.layer)
+    notes.push(t('canvasAnnotationsLayer', { label: labelIn(annotation.layer.label, locale) || annotation.layer.id }));
+  if (annotation.time)
+    notes.push(
+      fmt(annotation.time.start) +
+        (annotation.time.end !== undefined && fmt(annotation.time.end) !== fmt(annotation.time.start)
+          ? `–${fmt(annotation.time.end)}`
+          : ''),
+    );
+  return notes.length > 0 ? notes.map((n, i) => <span key={i} className="tabular-nums">{n}</span>) : undefined;
+}
+
+// What a card says (its bodies, without the related resources). Also shown in the annotation's detail view.
+function ItemBodies({ annotation, canvasLabels }: { annotation: CanvasAnnotation; canvasLabels: Map<string, string> }) {
+  const locale = useLocale();
+  const bodies = pickBodies(annotation.bodies, locale).filter((b) => !isResourceBody(b));
+  return (
+    <>
+      {bodies.map((b, i) => (
+        <AnnotationBody key={i} body={b} canvasLabels={canvasLabels} />
+      ))}
+    </>
+  );
+}
 
 function Item({
   annotation,
@@ -69,32 +111,13 @@ function Item({
   onSelect: () => void;
   canvasLabels: Map<string, string>;
 }) {
-  const t = useTranslations('Info');
   const locale = useLocale();
-  const bodies = pickBodies(annotation.bodies, locale).filter((b) => !isResourceBody(b));
-  const kindLabel = useKindLabel();
-  const granularityLabel = useGranularityLabel();
-  const motivation = annotation.painted ? 'painting' : annotation.motivations[0];
-  // Do not label "comment" (the default purpose) or "region" for annotations with a frame, because the numbered chip corresponds to the frame on the image
-  const notes: string[] = [];
-  if (motivation && motivation !== 'commenting')
-    notes.push(kindLabel(motivation));
-  if (annotation.region.type === 'canvas') notes.push(t('canvasAnnotationsAbout'));
-  if (annotation.granularity) notes.push(granularityLabel(annotation.granularity));
-  if (annotation.layer)
-    notes.push(t('canvasAnnotationsLayer', { label: labelIn(annotation.layer.label, locale) || annotation.layer.id }));
-  if (annotation.time)
-    notes.push(
-      fmt(annotation.time.start) +
-        (annotation.time.end !== undefined && fmt(annotation.time.end) !== fmt(annotation.time.start)
-          ? `–${fmt(annotation.time.end)}`
-          : ''),
-    );
+  const meta = useItemMeta(annotation);
   return (
     <AnnotationCardFrame
       number={number}
       title={labelIn(annotation.title, locale) || undefined}
-      meta={notes.length > 0 ? notes.map((n, i) => <span key={i} className="tabular-nums">{n}</span>) : undefined}
+      meta={meta}
       selected={selected}
       playing={playing}
       onSelect={onSelect}
@@ -102,11 +125,47 @@ function Item({
       bodyStyle={bodyStyle}
       bodyClassName={bodyStyle?.color ? '[&_*]:!text-inherit' : ''}
     >
-      {bodies.map((b, i) => (
-        <AnnotationBody key={i} body={b} canvasLabels={canvasLabels} />
-      ))}
+      <ItemBodies annotation={annotation} canvasLabels={canvasLabels} />
       <AnnotationResources resources={annotation.resources} />
     </AnnotationCardFrame>
+  );
+}
+
+// The detail view of one annotation in the 2D list (in place of the list)
+function ItemDetail({
+  annotation,
+  number,
+  canvasLabels,
+  bodyStyle,
+  graph,
+  onBack,
+  onSelectAnnotation,
+}: {
+  annotation: CanvasAnnotation;
+  number?: number;
+  canvasLabels: Map<string, string>;
+  bodyStyle?: StyleDeclarations;
+  graph: AnnotationGraph;
+  onBack: () => void;
+  onSelectAnnotation: (id: string) => void;
+}) {
+  const locale = useLocale();
+  const meta = useItemMeta(annotation);
+  return (
+    <AnnotationDetail
+      annotationId={annotation.id}
+      number={number}
+      title={labelIn(annotation.title, locale) || undefined}
+      meta={meta}
+      bodyStyle={bodyStyle}
+      bodyClassName={bodyStyle?.color ? '[&_*]:!text-inherit' : ''}
+      resources={annotation.resources}
+      graph={graph}
+      onBack={onBack}
+      onSelectAnnotation={onSelectAnnotation}
+    >
+      <ItemBodies annotation={annotation} canvasLabels={canvasLabels} />
+    </AnnotationDetail>
   );
 }
 
@@ -241,11 +300,62 @@ export function CanvasAnnotationsPanelBody({ container, manifest }: PanelContext
     setSelected(isSelected ? null : selectionKeyOf(a));
   };
 
+  const chooseById = (id: string) => {
+    const a = all.find((x) => x.id === id);
+    if (a) choose(a, false);
+  };
+
+  // An annotation with connections opens in a detail view over the list (a search hit keeps the plain selection)
+  const detail = useMemo(
+    () => (selected ? all.find((a) => a.id === selected && opensDetail(a)) : undefined),
+    [all, selected],
+  );
+  // The connections of every annotation on the shown page(s), not only the ones the filters leave;
+  // built only while a detail view is open
+  const opened = !!detail;
+  const graph = useMemo(
+    () =>
+      opened
+        ? buildAnnotationGraph(
+            all.map((a) => ({
+              id: a.id,
+              label: labelIn(a.title, locale) || undefined,
+              number: numbers?.get(a.id),
+              regionId: a.regionId,
+              resources: a.resources,
+            })),
+            manifest ? { id: manifest.id, label: labelIn(manifest.label, locale) || undefined } : undefined,
+            locale,
+          )
+        : undefined,
+    [opened, all, numbers, manifest, locale],
+  );
+  const back = () => {
+    if (!detail) return;
+    // the list under the detail view is kept, so it is already scrolled to the annotation's row
+    choose(detail, true);
+    const i = rowOf.get(selectionKeyOf(detail));
+    if (i !== undefined) scrollRowIntoView(scroller.current, list.offsets, i, LIST_TOP);
+  };
+
   const searching = query.trim().length > 0 || tags.length > 0 || narrowing;
 
   return (
-    <div className="h-full min-h-0 flex flex-col">
-      <div className="p-3 pb-2 space-y-2 border-b border-gray-200 dark:border-gray-700">
+    <div className="h-full min-h-0 flex flex-col relative">
+      {detail && graph ? (
+        <div className="absolute inset-0 z-10 overflow-auto bg-white dark:bg-gray-900 p-3" data-annotation-detail-pane>
+          <ItemDetail
+            annotation={detail}
+            number={numbers?.get(detail.id)}
+            canvasLabels={canvasLabels}
+            bodyStyle={styleOf(detail).body}
+            graph={graph}
+            onBack={back}
+            onSelectAnnotation={chooseById}
+          />
+        </div>
+      ) : null}
+      <div className="p-3 pb-2 space-y-2 border-b border-gray-200 dark:border-gray-700" inert={detail ? true : undefined}>
         {loading ? <p className="text-sm text-gray-500 dark:text-gray-300">{t('canvasAnnotationsLoading')}</p> : null}
         {failed ? (
           <p className="text-sm text-red-600 dark:text-red-400" role="alert">
@@ -315,6 +425,7 @@ export function CanvasAnnotationsPanelBody({ container, manifest }: PanelContext
         className="flex-1 min-h-0 overflow-auto px-3 pb-3 [overflow-anchor:none]"
         style={{ paddingTop: LIST_TOP }}
         data-annotation-list
+        inert={detail ? true : undefined}
       >
         <div className="relative" style={{ height: list.offsets[list.offsets.length - 1] }}>
           <div className="absolute inset-x-0" style={{ top: list.offsets[list.start] }}>

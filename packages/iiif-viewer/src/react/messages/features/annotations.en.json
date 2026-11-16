@@ -58,5 +58,24 @@
     "granularity": "Unit",
     "tags": "Tags",
     "showMarks": "Show marks"
+  },
+  "AnnotationConnections": {
+    "title": "Connections of this annotation",
+    "reset": "Reset",
+    "openResource": "Open",
+    "hint": "Click a point to see what it links to",
+    "kindAnnotation": "Annotation",
+    "kindRegion": "Shared region",
+    "kindObject": "Whole item",
+    "kind_wikidata": "Wikidata",
+    "kind_wikipedia": "Wikipedia",
+    "kind_web": "Web page",
+    "kind_citation": "Reference",
+    "kind_image": "Image",
+    "backToList": "← Back to the list",
+    "goToAnnotation": "Go to this annotation",
+    "annotationOnRegion": "1 annotation on this region",
+    "annotationsOnRegion": "{count} annotations on this region",
+    "close": "Close"
   }
 }

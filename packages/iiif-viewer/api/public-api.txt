@@ -465,6 +465,11 @@ export [type] interface AnnotationFilter {
     tags: string[];
     kinds?: string[];
 }
+export [type] interface AnnotationGraph {
+    nodes: Map<string, GraphNode>;
+    edges: GraphEdge[];
+    adjacency: Map<string, string[]>;
+}
 export [type] interface AnnotationImage {
     id: string;
     label?: string;
@@ -874,6 +879,7 @@ export [type] interface Detection {
 }
 export [type] type DisplayUnit = 'mm' | 'cm' | 'in';
 export [value] EMPTY_FILTER: AnnotationFilter
+export [value] EXPAND_LIMIT: 24
 export [value] FALLBACK_PALETTE: readonly string[]
 export [value] FIT_MARGIN: 1.2
 export [value] FOCUS_DISTANCE_FACTOR: 0.9
@@ -917,6 +923,7 @@ export [type] interface Fragment {
     xywh?: Xywh;
     t?: TocTimeRange;
 }
+export [value] GRAPH_VIEW: { readonly width: 480; readonly height: 280; }
 export [type] interface GeoCanvas {
     id: string;
     label?: unknown;
@@ -1019,6 +1026,35 @@ export [type] interface GeorefUrlState {
     id?: string;
     canvas?: string;
 }
+export [type] interface GraphEdge {
+    a: string;
+    b: string;
+}
+export [type] interface GraphItem {
+    id: string;
+    label?: string;
+    number?: number;
+    regionId?: string;
+    resources?: AnnotationResource[];
+}
+export [type] interface GraphNode {
+    id: string;
+    kind: GraphNodeKind;
+    label: string;
+    number?: number;
+    annotationId?: string;
+    resourceKind?: AnnotationResource['kind'];
+    url?: string;
+}
+export [type] type GraphNodeKind = 'annotation' | 'region' | 'resource' | 'object';
+export [type] interface GraphObject {
+    id: string;
+    label?: string;
+}
+export [type] type GraphPositions = ReadonlyMap<string, {
+    x: number;
+    y: number;
+}>;
 export [type] interface IIIFAnnotation {
     id: string;
     type: string;
@@ -1300,6 +1336,7 @@ export [type] interface NmsOptions {
     topK?: number;
     maxKeep?: number;
 }
+export [value] OBJECT_NODE_ID: "o:object"
 export [value] PHYSDIM_PROFILE: "http://iiif.io/api/annex/services/physdim"
 export [value] PPOCR: { readonly thresh: 0.3; readonly boxThresh: 0.6; readonly unclipRatio: 1.5; readonly minSize: 3; readonly maxCandidates: 1000; readonly detMinSide: 64; readonly detMaxSide: 4000; readonly recH: 48; readonly recMinW: 320; readonly recMaxW: 3200; }
 export [type] interface PageMark {
@@ -1357,6 +1394,11 @@ export [type] interface Physdim {
     scale: number;
     units: SourceUnit;
 }
+export [type] interface PlacedNode extends GraphNode {
+    x: number;
+    y: number;
+    ring: number;
+}
 export [type] interface Placement {
     cx: number;
     cy: number;
@@ -1387,6 +1429,11 @@ export [type] interface PointSelectorV4 {
         number
     ];
 }
+export [type] interface PopoverPlacement {
+    left: number;
+    top: number;
+    side: 'left' | 'right';
+}
 export [type] interface PpocrBox {
     quad: XY[];
     score: number;
@@ -1411,6 +1458,7 @@ export [type] interface PpocrRunners {
     progress(stage: 'detect' | 'read', done: number, total: number): void;
 }
 export [type] type PuzzleBoard = number[];
+export [value] REGION_OPEN_LIMIT: 12
 export [type] interface ReadContext {
     url: string;
     fetchJson: FetchJson;
@@ -1702,6 +1750,10 @@ export [type] interface ViewingInfo {
     behavior: string[];
 }
 export [type] type ViewingMode = 'individuals' | 'paged' | 'continuous' | 'unordered';
+export [type] interface VisibleGraph {
+    nodes: GraphNode[];
+    edges: GraphEdge[];
+}
 export [type] interface VttCue {
     start: number;
     end: number;
@@ -1744,6 +1796,7 @@ export [value] alignmentOf: (alignment: Alignment, a: string | undefined, b: str
 export [value] annotationKindFacets: (annotations: Annotation[]) => Facet[]
 export [value] annotationKindOf: (a: { motivations?: readonly string[] | undefined; painted?: boolean | undefined; }) => string
 export [value] annotationListSearchText: (a: Annotation) => string
+export [value] annotationNodeId: (id: string) => string
 export [value] annotationPlainText: (a: CanvasAnnotation) => string
 export [value] annotationSearchText: (a: Pick<CanvasAnnotation, "bodies" | "resources" | "title">) => string
 export [value] annotationSourcesOf: (canvas: Json | undefined) => CanvasAnnotationSources
@@ -1751,6 +1804,7 @@ export [value] annotationStyles: (anno: AnnotationStyleSource, external?: Record
 export [value] annotationTitleOf: (anno: Json) => unknown
 export [value] annotationsOfSelection: <T extends { id: string; hitId?: string; }>(annotations: T[], selectedHit: null | string) => T[]
 export [value] annotationsParams: (on: boolean) => Partial<Record<"annotations" | "autoRotateOnSelect" | "canvas" | "centerX" | "centerY" | "clustering" | "id" | "license" | "mapLat" | "mapLng" | "mapZoom" | "rotation" | "search" | "zoom", null | string>>
+export [value] annotationsTouching: (graph: AnnotationGraph, nodeId: string) => number
 export [value] applyGeorefPatch: (search: string, patch: Partial<Record<"annotations" | "autoRotateOnSelect" | "canvas" | "centerX" | "centerY" | "clustering" | "id" | "license" | "mapLat" | "mapLng" | "mapZoom" | "rotation" | "search" | "zoom", null | string>>) => string
 export [value] applyMatrix: (m: M4, p: [number, number, number]) => [number, number, number]
 export [value] articleBodiesOf: (bodies: AnnotationBodyItem[]) => AnnotationBodyItem[]
@@ -1760,6 +1814,7 @@ export [value] autoRotateOnSelectParams: (on: boolean) => Partial<Record<"annota
 export [value] bboxOf: (rings: Point[][]) => Box
 export [value] bgrTensor: (px: Uint8ClampedArray<ArrayBufferLike>, w: number, h: number, mean: number[], std: number[]) => Float32Array<ArrayBufferLike>
 export [value] bodySearchParts: (b: AnnotationBodyItem, assumeHtml?: boolean) => string[]
+export [value] buildAnnotationGraph: (items: GraphItem[], object?: GraphObject | undefined, locale?: string) => AnnotationGraph
 export [value] buildTicks: (physicalLength: number, pixelsPerUnit: number, originPx: number, viewPx: number, startPx?: number) => { ticks: Tick[]; interval: number; }
 export [value] cachedSearchText: (key: object, build: () => string[]) => string
 export [value] candidatesOfManifest: (raw: unknown, locale: string, fallbackLabel?: string) => CompareCandidate[]
@@ -1858,6 +1913,7 @@ export [value] groupMatchesByCanvas: (matches: ContentSearchMatch[]) => Map<stri
 export [value] groupSpreads: (order: number[], mode: ViewingMode, standalone: (index: number) => boolean) => number[][]
 export [value] hasAnnotationBody: (d: { text?: string | undefined; label?: string | undefined; }) => boolean
 export [value] hasChronology: (entries: CollectionEntry[]) => boolean
+export [value] hasConnections: (item: GraphItem) => boolean
 export [value] hasToc: (manifest: unknown) => boolean
 export [value] highlightParts: (text: string, q: string) => { text: string; hit: boolean; }[]
 export [value] hitUnionXywh: (regions: ContentSearchRegion[], canvasId: string) => undefined | { box: [number, number, number, number]; count: number; }
@@ -1873,6 +1929,7 @@ export [value] imageToCanvasOf: (layer: { target?: undefined | { x: number; y: n
 export [value] imageViewParams: (v: GeorefImageView) => Partial<Record<"annotations" | "autoRotateOnSelect" | "canvas" | "centerX" | "centerY" | "clustering" | "id" | "license" | "mapLat" | "mapLng" | "mapZoom" | "rotation" | "search" | "zoom", null | string>>
 export [value] imageViewToStage: (v: GeorefImageView, stage: StageGeometry, canvasWidth: number, canvasHeight: number, rotation?: number) => StageView
 export [value] infoCandidateOf: (json: unknown, url: string) => CompareCandidate | null
+export [value] initialExpansion: (graph: AnnotationGraph, rootId: string, limit?: number) => Set<string>
 export [value] inlineSharedServices: <T>(manifest: T) => T
 export [value] intersect: (a: ImageRegion, b: ImageRegion) => ImageRegion | null
 export [value] iouOf: (boxes: ArrayLike<number>, a: number, b: number) => number
@@ -1905,6 +1962,7 @@ export [value] largestPart: (mask: ArrayLike<number>, w: number, h: number) => n
 export [value] layerItemsOf: (paintings: CanvasPainting[]) => LayerItem[]
 export [value] layerOpacity: (item: LayerItem, settings: Record<string, LayerSetting>) => number
 export [value] layerThumbnailUrl: (layer: ImageLayer, height?: number) => string
+export [value] layoutGraph: (shown: VisibleGraph, rootId: string, previous?: GraphPositions | undefined) => PlacedNode[]
 export [value] level0BaseTiles: (service: ImageServiceRef, info: ImageInfo, region: ImageRegion, limit?: number) => Tile[] | null
 export [value] loadSearchSource: (ctx: Omit<ReadContext, "onPartial"> & { onPartial?: ((partial: SearchSource) => void) | undefined; }, readers?: SearchReader[]) => Promise<SearchSource>
 export [value] localNorthUpRotation: (pairs: GeorefPair[], index: number) => null | number
@@ -1949,6 +2007,7 @@ export [value] normalizeAngle: (degrees: number) => number
 export [value] normalizeSearchText: (s: string) => string
 export [value] northUpRotation: (pairs: GeorefPair[]) => null | number
 export [value] openingStep: (story: Story, index: number, selected: null | string) => null | number
+export [value] opensDetail: (item: GraphItem & { hitId?: string | undefined; }) => boolean
 export [value] orderLayers: (items: LayerItem[], order: string[] | undefined) => LayerItem[]
 export [value] orderOf: (containers: ContainerInfo[], sequence?: SequenceInfo | null | undefined) => number[]
 export [value] otherBodies: (bodies: AnnotationBodyItem[]) => AnnotationBodyItem[]
@@ -1994,6 +2053,7 @@ export [value] playbackGroups: (items: LayerItem[]) => number[]
 export [value] playbackSettings: (settings: Record<string, LayerSetting>, ids: string[], groups: number[], step: number, direction: PlaybackDirection) => Record<string, LayerSetting>
 export [value] playbackStepCount: (groups: number[]) => number
 export [value] pointPercent: (x: number, y: number, canvasW: number, canvasH: number) => { left: number; top: number; }
+export [value] popoverPlacement: (x: number, y: number) => PopoverPlacement
 export [value] ppocrBoxes: (prob: Float32Array<ArrayBufferLike>, dw: number, dh: number, W: number, H: number) => PpocrBox[]
 export [value] ppocrCrop: (px: Uint8ClampedArray<ArrayBufferLike>, W: number, H: number, quad: XY[]) => { px: Uint8ClampedArray<ArrayBufferLike>; w: number; h: number; }
 export [value] ppocrDetSize: (w: number, h: number) => [number, number]
@@ -2020,6 +2080,7 @@ export [value] readingOrder: <T extends LineDetection>(lines: T[]) => ReadingOrd
 export [value] readingTime: (step: StoryStep, locale: string) => number
 export [value] recentManifests: (start: Json, fetchJson: FetchJson, props?: { maxItems?: number | undefined; maxPages?: number | undefined; }) => Promise<ManifestRef[]>
 export [value] regionBoxPercent: (region: AnnotationRegion, canvasW: number, canvasH: number) => PercentBox | null
+export [value] regionNodeId: (regionId: string) => string
 export [value] regionOf: (id: string) => Region | undefined
 export [value] regionToCanvasOf: (region: ImageRegion, target: ImageRegion, imageWidth: number, imageHeight: number, outWidth: number, outHeight: number) => ImageToCanvas
 export [value] regionXywh: (region: AnnotationRegion, pad?: number) => Xywh | undefined
@@ -2121,6 +2182,7 @@ export [value] upgradeToV3: (json: unknown) => unknown
 export [value] upgradeUrl: (model: PaintedModel, choices: Record<string, number>) => null | string
 export [value] valuesIn: (map: unknown, locale: string) => string[]
 export [value] viewingOf: (manifest: unknown) => ViewingInfo
+export [value] visibleSubgraph: (graph: AnnotationGraph, rootId: string, expanded: ReadonlySet<string>, limit?: number) => VisibleGraph
 export [value] warpAt: (w: AlignWarp, x: number, y: number) => [number, number]
 export [value] wikidataIdOf: (url: string | undefined) => string | undefined
 export [value] wikidataLabelUrl: (id: string, locale: string) => string
