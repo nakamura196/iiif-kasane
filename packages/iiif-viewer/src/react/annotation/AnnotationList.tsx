@@ -65,28 +65,30 @@ export default function AnnotationList() {
     [annotations],
   );
 
-  // The connections of every annotation (not only the ones the filter leaves), built once
-  const graph = useMemo(
-    () =>
-      buildAnnotationGraph(
-        annotations.map((a, i) => ({
-          id: a.id,
-          label: a.data.body.label,
-          number: i + 1,
-          regionId: a.regionId,
-          resources: a.resources,
-        })),
-        manifest ? { id: manifest.id, label: labelIn(manifest.label, locale) || undefined } : undefined,
-        locale,
-      ),
-    [annotations, manifest, locale],
-  );
-
   // An annotation with connections opens in a detail view in place of the list
   const detail = useMemo(() => {
     const a = selectedAnnotationId ? annotations.find((x) => x.id === selectedAnnotationId) : undefined;
     return a && opensDetail({ id: a.id, regionId: a.regionId, resources: a.resources }) ? a : undefined;
   }, [annotations, selectedAnnotationId]);
+  // The connections of every annotation (not only the ones the filter leaves); built only while a detail view is open
+  const opened = !!detail;
+  const graph = useMemo(
+    () =>
+      opened
+        ? buildAnnotationGraph(
+            annotations.map((a) => ({
+              id: a.id,
+              label: a.data.body.label,
+              number: numberOf.get(a.id),
+              regionId: a.regionId,
+              resources: a.resources,
+            })),
+            manifest ? { id: manifest.id, label: labelIn(manifest.label, locale) || undefined } : undefined,
+            locale,
+          )
+        : undefined,
+    [opened, annotations, numberOf, manifest, locale],
+  );
   const listRef = useRef<HTMLDivElement>(null);
   const returnTo = useRef<string | null>(null);
   const back = useCallback(() => {
@@ -115,7 +117,7 @@ export default function AnnotationList() {
     />
   );
 
-  if (detail) {
+  if (detail && graph) {
     return (
       <div className="p-6 bg-white dark:bg-gray-900">
         <AnnotationCardDetail

@@ -4,6 +4,7 @@ import {
   OBJECT_NODE_ID,
   annotationNodeId,
   annotationsTouching,
+  EXPAND_LIMIT,
   buildAnnotationGraph,
   hasConnections,
   initialExpansion,
@@ -64,7 +65,7 @@ describe('visibleSubgraph', () => {
   const root = annotationNodeId('a1');
   it('starts with the root and its neighbours only', () => {
     const v = visibleSubgraph(g, root, new Set());
-    expect(ids(v).sort()).toEqual([root, regionNodeId('reg1'), 'x:https://www.wikidata.org/wiki/Q144'].sort());
+    expect(ids(v).sort()).toEqual([root, regionNodeId('reg1'), 'x:wd:Q144'].sort());
     expect(v.edges).toHaveLength(2);
   });
   it('shows a lone annotation together with the object', () => {
@@ -72,7 +73,7 @@ describe('visibleSubgraph', () => {
     expect(ids(visibleSubgraph(lone, annotationNodeId('z'), new Set()))).toEqual([annotationNodeId('z'), OBJECT_NODE_ID]);
   });
   it('reveals the other annotation when the shared resource is expanded', () => {
-    const q = 'x:https://www.wikidata.org/wiki/Q144';
+    const q = 'x:wd:Q144';
     expect(ids(visibleSubgraph(g, root, new Set())).includes(annotationNodeId('a8'))).toBe(false);
     const v = visibleSubgraph(g, root, new Set([q]));
     expect(ids(v)).toContain(annotationNodeId('a8'));
@@ -90,7 +91,7 @@ describe('visibleSubgraph', () => {
 describe('layoutGraph', () => {
   const g = buildAnnotationGraph(items, object);
   const root = annotationNodeId('a1');
-  const shown = visibleSubgraph(g, root, new Set(['x:https://www.wikidata.org/wiki/Q144', regionNodeId('reg1')]));
+  const shown = visibleSubgraph(g, root, new Set(['x:wd:Q144', regionNodeId('reg1')]));
   it('is deterministic', () => {
     expect(layoutGraph(shown, root)).toEqual(layoutGraph(shown, root));
   });
@@ -193,5 +194,25 @@ describe('initialExpansion', () => {
     expect(initialExpansion(g, 'a:n0').size).toBe(0);
     expect(initialExpansion(g, 'a:n0', 13)).toEqual(new Set(['r:r']));
     expect(initialExpansion(g, 'a:lone').size).toBe(0);
+  });
+});
+
+describe('review fixes', () => {
+  it('makes one node of a Wikidata item written in different address forms', () => {
+    const g = buildAnnotationGraph([
+      { id: 'w1', resources: [{ ...dog, url: 'https://www.wikidata.org/wiki/Q144' }] },
+      { id: 'w2', resources: [{ ...dog, url: 'http://www.wikidata.org/entity/Q144' }] },
+    ]);
+    const q = [...g.nodes.values()].filter((n) => n.kind === 'resource');
+    expect(q).toHaveLength(1);
+    expect(g.adjacency.get(q[0].id)).toEqual([annotationNodeId('w1'), annotationNodeId('w2')]);
+  });
+  it('reveals at most EXPAND_LIMIT nodes when a node with many neighbours is expanded', () => {
+    const many = Array.from({ length: 2000 }, (_, i) => ({ id: `line${i}` }));
+    const g = buildAnnotationGraph([{ id: 'root', resources: [dog] }, ...many], object);
+    const shown = visibleSubgraph(g, annotationNodeId('root'), new Set([OBJECT_NODE_ID]));
+    // the root, its Wikidata item and the whole item, then at most EXPAND_LIMIT lines
+    expect(shown.nodes.length).toBeLessThanOrEqual(3 + EXPAND_LIMIT);
+    expect(g.adjacency.get(OBJECT_NODE_ID)).toHaveLength(2001);
   });
 });

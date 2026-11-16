@@ -284,22 +284,6 @@ export function CanvasAnnotationsPanelBody({ container, manifest }: PanelContext
     return () => cancelAnimationFrame(id);
   }, [selectedHit]);
 
-  // The connections of every annotation on the shown page(s), not only the ones the filters leave
-  const graph = useMemo(
-    () =>
-      buildAnnotationGraph(
-        all.map((a) => ({
-          id: a.id,
-          label: labelIn(a.title, locale) || undefined,
-          number: numbers?.get(a.id),
-          regionId: a.regionId,
-          resources: a.resources,
-        })),
-        manifest ? { id: manifest.id, label: labelIn(manifest.label, locale) || undefined } : undefined,
-        locale,
-      ),
-    [all, numbers, manifest, locale],
-  );
   const choose = (a: CanvasAnnotation, isSelected: boolean) => {
     // an annotation on a moment of a video or audio: go there, so that its frame is shown
     // (a little past the start: a seek may land a hair before the asked position)
@@ -326,6 +310,26 @@ export function CanvasAnnotationsPanelBody({ container, manifest }: PanelContext
     () => (selected ? all.find((a) => a.id === selected && opensDetail(a)) : undefined),
     [all, selected],
   );
+  // The connections of every annotation on the shown page(s), not only the ones the filters leave;
+  // built only while a detail view is open
+  const opened = !!detail;
+  const graph = useMemo(
+    () =>
+      opened
+        ? buildAnnotationGraph(
+            all.map((a) => ({
+              id: a.id,
+              label: labelIn(a.title, locale) || undefined,
+              number: numbers?.get(a.id),
+              regionId: a.regionId,
+              resources: a.resources,
+            })),
+            manifest ? { id: manifest.id, label: labelIn(manifest.label, locale) || undefined } : undefined,
+            locale,
+          )
+        : undefined,
+    [opened, all, numbers, manifest, locale],
+  );
   const back = () => {
     if (!detail) return;
     // the list under the detail view is kept, so it is already scrolled to the annotation's row
@@ -338,7 +342,7 @@ export function CanvasAnnotationsPanelBody({ container, manifest }: PanelContext
 
   return (
     <div className="h-full min-h-0 flex flex-col relative">
-      {detail ? (
+      {detail && graph ? (
         <div className="absolute inset-0 z-10 overflow-auto bg-white dark:bg-gray-900 p-3" data-annotation-detail-pane>
           <ItemDetail
             annotation={detail}

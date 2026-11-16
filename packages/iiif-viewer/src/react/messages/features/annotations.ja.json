@@ -74,6 +74,7 @@
     "kind_image": "画像",
     "backToList": "← 一覧に戻る",
     "goToAnnotation": "この注釈へ",
+    "annotationOnRegion": "この領域に注釈 1 件",
     "annotationsOnRegion": "この領域に注釈 {count} 件",
     "close": "閉じる"
   }

@@ -74,6 +74,7 @@
     "kind_image": "Image",
     "backToList": "← Back to the list",
     "goToAnnotation": "Go to this annotation",
+    "annotationOnRegion": "1 annotation on this region",
     "annotationsOnRegion": "{count} annotations on this region",
     "close": "Close"
   }

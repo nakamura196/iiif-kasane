@@ -41,8 +41,8 @@ export function AnnotationCardFrame({
       ref={cardRef}
       data-annotation-id={annotationId}
       aria-current={selected || undefined}
-      // カードのどこを押しても選ぶ。ただしリンク（写真・参照など）を押したときは、
-      // そのリンクを開くだけにして選ばない
+      // A click anywhere on the card selects it, except on a link (a photo, a reference):
+      // that only opens the link
       onClick={
         plain
           ? undefined

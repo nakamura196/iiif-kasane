@@ -12,10 +12,10 @@ export function AnnotationCardBody({ annotation }: { annotation: Annotation }) {
   const others = otherBodies(annotation.bodies ?? []);
   return (
     <>
-      {/* コンテンツ部分。マニフェストに書かれた HTML なので、許可したタグ・属性だけにしてから出す */}
+      {/* The content. It is HTML from the manifest, so only allowed tags and attributes are kept */}
       <div dangerouslySetInnerHTML={{ __html: sanitizeAnnotationHtml(annotation.data.body.value) }} />
 
-      {/* 2 つ目以降の本文やリンク（Wikidata など）。見せ方は 2D の注釈一覧と同じ部品 */}
+      {/* The second and later bodies and links (Wikidata etc.): the same component as the 2D list */}
       {others.length > 0 && (
         <div className="mt-2 space-y-1">
           {others.map((b, i) => (
@@ -114,7 +114,7 @@ export default function AnnotationCard({
     >
       <AnnotationCardBody annotation={annotation} />
 
-      {/* 関連する資料（場所の写真・Wikidata・Wikipedia・文献）。2D の注釈一覧と同じ部品 */}
+      {/* Related resources (photos of the place, Wikidata, Wikipedia, references): the same component as the 2D list */}
       <div>
         <AnnotationResources resources={annotation.resources} />
       </div>

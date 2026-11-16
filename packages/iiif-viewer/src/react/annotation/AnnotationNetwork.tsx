@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import {
   GRAPH_VIEW,
   annotationNodeId,
@@ -63,39 +63,45 @@ const reducedMotion = () =>
  */
 function useGlide(nodes: PlacedNode[], origin: string | null): GraphPositions {
   const target = useMemo(() => new Map(nodes.map((n) => [n.id, { x: n.x, y: n.y }])), [nodes]);
-  const [drawn, setDrawn] = useState<GraphPositions>(target);
-  const drawnRef = useRef<GraphPositions>(target);
+  // `from`: where the glide starts; `drawn`: where the nodes are drawn now
+  const [glide, setGlide] = useState<{ target: GraphPositions; from: GraphPositions; drawn: GraphPositions }>(() => ({
+    target,
+    from: target,
+    drawn: target,
+  }));
+  // The layout changed: work out the start positions during render, so that the first frame drawn already shows the
+  // new nodes on the clicked node (never at their final place first).
+  if (glide.target !== target) {
+    const o = origin ? glide.drawn.get(origin) : undefined;
+    const from = new Map<string, { x: number; y: number }>();
+    for (const [id, p] of target) from.set(id, glide.drawn.get(id) ?? o ?? p);
+    // nothing moves (a change that kept every node in place), or reduced motion: no animation
+    const still = [...target].every(([id, p]) => from.get(id)!.x === p.x && from.get(id)!.y === p.y);
+    setGlide(still || reducedMotion() ? { target, from: target, drawn: target } : { target, from, drawn: from });
+  }
+  const { from } = glide;
   useEffect(() => {
-    const from = drawnRef.current;
-    const start = new Map<string, { x: number; y: number }>();
-    const o = origin ? from.get(origin) : undefined;
-    for (const [id, p] of target) start.set(id, from.get(id) ?? o ?? p);
-    const done = () => {
-      drawnRef.current = target;
-      setDrawn(target);
-    };
-    if (reducedMotion()) {
-      done();
-      return;
-    }
+    if (from === target) return;
     let frame = 0;
     const t0 = performance.now();
     const step = (now: number) => {
       const k = easeOut(Math.min(1, (now - t0) / TWEEN_MS));
-      if (k >= 1) return done();
+      if (k >= 1) {
+        setGlide({ target, from: target, drawn: target });
+        return;
+      }
       const at = new Map<string, { x: number; y: number }>();
       for (const [id, p] of target) {
-        const s = start.get(id)!;
+        const s = from.get(id)!;
         at.set(id, { x: s.x + (p.x - s.x) * k, y: s.y + (p.y - s.y) * k });
       }
-      drawnRef.current = at;
-      setDrawn(at);
+      setGlide({ target, from, drawn: at });
       frame = requestAnimationFrame(step);
     };
     frame = requestAnimationFrame(step);
     return () => cancelAnimationFrame(frame);
-  }, [target, origin]);
-  return drawn;
+  }, [from, target]);
+  return glide.target === target ? glide.drawn : target;
 }
 
 /**
@@ -144,16 +150,21 @@ export function AnnotationNetwork({
   const drawn = useGlide(placed.nodes, change.origin);
   const at = (n: { id: string; x: number; y: number }) => drawn.get(n.id) ?? n;
   const byId = useMemo(() => new Map(placed.nodes.map((n) => [n.id, n])), [placed]);
+  // a node hidden by collapsing the node it hangs from has no preview any more
   const focused = focusedId ? byId.get(focusedId) : undefined;
 
+  // The first click opens the node's preview and expands it; a second click (preview open) closes the preview and
+  // collapses it. So a node that is already open at the start (the root's region) is not closed by looking at it.
   const activate = (n: PlacedNode) => {
-    // a second click on the same node closes its preview
-    setFocusedId((prev) => (prev === n.id ? null : n.id));
+    const closing = focused?.id === n.id;
+    setFocusedId(closing ? null : n.id);
     if (n.id === rootId) return;
+    const open = expanded.has(n.id);
+    if (open !== closing) return;
     setChange({ origin: n.id, previous: new Map(placed.nodes.map((m) => [m.id, { x: m.x, y: m.y }])) });
     setExpanded((prev) => {
       const next = new Set(prev);
-      if (next.has(n.id)) next.delete(n.id);
+      if (closing) next.delete(n.id);
       else next.add(n.id);
       return next;
     });
@@ -248,7 +259,7 @@ export function AnnotationNetwork({
       </div>
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-gray-600 dark:text-gray-300 min-h-6">
         <span className="min-w-0 break-words">{t('hint')}</span>
-        {changedFromStart || focusedId ? (
+        {changedFromStart || focused ? (
           <button type="button" onClick={reset} className="shrink-0 text-[var(--ds-primary)] hover:underline">
             {t('reset')}
           </button>
@@ -298,7 +309,11 @@ function NodePopover({
       <div className="text-gray-500 dark:text-gray-400">{kind}</div>
       {/* a region's label is its id (an address); the count says more */}
       {node.kind === 'region' ? (
-        count > 0 ? <div className="text-gray-800 dark:text-gray-100">{t('annotationsOnRegion', { count })}</div> : null
+        count > 0 ? (
+          <div className="text-gray-800 dark:text-gray-100">
+            {count === 1 ? t('annotationOnRegion') : t('annotationsOnRegion', { count })}
+          </div>
+        ) : null
       ) : (
         <div className="break-words text-gray-800 dark:text-gray-100">{node.label}</div>
       )}

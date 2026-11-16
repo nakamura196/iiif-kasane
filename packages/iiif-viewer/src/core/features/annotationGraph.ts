@@ -69,8 +69,19 @@ const resourceLabel = (r: AnnotationResource, locale: string): string => {
   return r.kind;
 };
 
-// The same address is one node; a reference without an address is one node per kind and text.
-const resourceKey = (r: AnnotationResource, label: string): string => (r.url ? `x:${r.url}` : `x:${r.kind}|${label}`);
+// The same address is one node; a Wikidata item is one node whatever form its address takes (/wiki/Q1, /entity/Q1);
+// a reference without an address is one node per kind and text.
+const resourceKey = (r: AnnotationResource, label: string): string => {
+  const q = wikidataIdOf(r.url);
+  if (q) return `x:wd:${q}`;
+  return r.url ? `x:${r.url}` : `x:${r.kind}|${label}`;
+};
+
+const push = (map: Map<string, string[]>, key: string, value: string) => {
+  const list = map.get(key);
+  if (list) list.push(value);
+  else map.set(key, [value]);
+};
 
 export const buildAnnotationGraph = (
   items: GraphItem[],
@@ -86,8 +97,8 @@ export const buildAnnotationGraph = (
     if (a === b || seenEdges.has(key)) return;
     seenEdges.add(key);
     edges.push({ a, b });
-    adjacency.set(a, [...(adjacency.get(a) ?? []), b]);
-    adjacency.set(b, [...(adjacency.get(b) ?? []), a]);
+    push(adjacency, a, b);
+    push(adjacency, b, a);
   };
   if (object) nodes.set(OBJECT_NODE_ID, { id: OBJECT_NODE_ID, kind: 'object', label: object.label || object.id });
   for (const item of items) {
@@ -134,18 +145,32 @@ export interface VisibleGraph {
 }
 
 /**
- * The root and its neighbours, plus the neighbours of each expanded node that is itself visible.
- * Nodes and the edges among them, in a stable order (the root first, then the order they were reached).
+ * How many new nodes one node reveals at most. The whole item touches every annotation without a region (thousands
+ * of OCR lines on a page), and the layout grows with the square of the nodes shown.
  */
-export const visibleSubgraph = (graph: AnnotationGraph, rootId: string, expanded: ReadonlySet<string>): VisibleGraph => {
+export const EXPAND_LIMIT = 24;
+
+/**
+ * The root and its neighbours, plus the neighbours of each expanded node that is itself visible (at most `limit` new
+ * nodes per node). Nodes and the edges among them, in a stable order (the root first, then the order they were reached).
+ */
+export const visibleSubgraph = (
+  graph: AnnotationGraph,
+  rootId: string,
+  expanded: ReadonlySet<string>,
+  limit = EXPAND_LIMIT,
+): VisibleGraph => {
   if (!graph.nodes.has(rootId)) return { nodes: [], edges: [] };
   const visible: string[] = [rootId];
   const seen = new Set(visible);
   const reveal = (id: string) => {
+    let added = 0;
     for (const n of graph.adjacency.get(id) ?? []) {
+      if (added >= limit) break;
       if (!seen.has(n)) {
         seen.add(n);
         visible.push(n);
+        added++;
       }
     }
   };
@@ -183,8 +208,8 @@ export const layoutGraph = (shown: VisibleGraph, rootId: string, previous?: Grap
   const cy = GRAPH_VIEW.height / 2;
   const adj = new Map<string, string[]>();
   for (const e of shown.edges) {
-    adj.set(e.a, [...(adj.get(e.a) ?? []), e.b]);
-    adj.set(e.b, [...(adj.get(e.b) ?? []), e.a]);
+    push(adj, e.a, e.b);
+    push(adj, e.b, e.a);
   }
   const dist = new Map<string, number>([[rootId, 0]]);
   const queue = [rootId];

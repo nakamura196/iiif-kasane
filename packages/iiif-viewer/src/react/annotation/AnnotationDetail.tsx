@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useEffectEvent, useRef, type CSSProperties, type ReactNode } from 'react';
 import type { AnnotationGraph, AnnotationResource } from '../../core';
 import { useTranslations } from '../env';
 import { AnnotationCardFrame } from './AnnotationCardFrame';
@@ -45,21 +45,27 @@ export function AnnotationDetail({
 }) {
   const t = useTranslations('AnnotationConnections');
 
-  // Escape goes back, unless it was meant for something else: a typed field, or the diagram's open preview
+  const ref = useRef<HTMLDivElement>(null);
+  // Escape goes back, unless it was meant for something else: a key pressed while focus is elsewhere (another dialog,
+  // the image or the 3D viewer), a typed field, or the diagram's open preview.
+  // Focus on the page itself (nothing focused) counts as here: selecting an annotation leaves it there.
+  const onEscape = useEffectEvent((e: KeyboardEvent) => {
+    if (e.key !== 'Escape' || e.defaultPrevented) return;
+    const active = document.activeElement;
+    if (active && active !== document.body && !ref.current?.contains(active)) return;
+    const el = e.target instanceof Element ? e.target : null;
+    if (el?.closest('input, textarea, select, [contenteditable="true"]')) return;
+    if (ref.current?.querySelector('[data-network-popover]')) return;
+    onBack();
+  });
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || e.defaultPrevented) return;
-      const el = e.target as HTMLElement | null;
-      if (el?.closest('input, textarea, select, [contenteditable="true"]')) return;
-      if (document.querySelector('[data-network-popover]')) return;
-      onBack();
-    };
+    const onKey = (e: KeyboardEvent) => onEscape(e);
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onBack]);
+  }, []);
 
   return (
-    <div className="space-y-3" data-annotation-detail>
+    <div ref={ref} className="space-y-3" data-annotation-detail>
       <button type="button" onClick={onBack} className="text-sm text-[var(--ds-primary)] hover:underline">
         {t('backToList')}
       </button>

@@ -879,6 +879,7 @@ export [type] interface Detection {
 }
 export [type] type DisplayUnit = 'mm' | 'cm' | 'in';
 export [value] EMPTY_FILTER: AnnotationFilter
+export [value] EXPAND_LIMIT: 24
 export [value] FALLBACK_PALETTE: readonly string[]
 export [value] FIT_MARGIN: 1.2
 export [value] FOCUS_DISTANCE_FACTOR: 0.9
@@ -2181,7 +2182,7 @@ export [value] upgradeToV3: (json: unknown) => unknown
 export [value] upgradeUrl: (model: PaintedModel, choices: Record<string, number>) => null | string
 export [value] valuesIn: (map: unknown, locale: string) => string[]
 export [value] viewingOf: (manifest: unknown) => ViewingInfo
-export [value] visibleSubgraph: (graph: AnnotationGraph, rootId: string, expanded: ReadonlySet<string>) => VisibleGraph
+export [value] visibleSubgraph: (graph: AnnotationGraph, rootId: string, expanded: ReadonlySet<string>, limit?: number) => VisibleGraph
 export [value] warpAt: (w: AlignWarp, x: number, y: number) => [number, number]
 export [value] wikidataIdOf: (url: string | undefined) => string | undefined
 export [value] wikidataLabelUrl: (id: string, locale: string) => string
