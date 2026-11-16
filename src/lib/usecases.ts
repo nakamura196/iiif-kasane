@@ -171,6 +171,24 @@ export const USE_CASES: UseCase[] = [
     headline: { ja: '3D モデルに注釈を付ける', en: 'Annotate a 3D model' },
   },
   {
+    id: 'anthus-altar-connections',
+    added: '2026-11-15',
+    title: {
+      ja: 'アントゥスの大理石の墓碑（注釈のつながり）',
+      en: 'Marble funerary altar for Anthus (connections between annotations)',
+    },
+    note: {
+      ja: '3D の注釈エディタで、領域リソース（同じ場所を指す注釈の共有）と Wikidata を付けた墓碑の模型です。「犬と思われる動物のレリーフ」を選ぶと、つながりの図が出ます。「イヌ」の点をたどると、別の注釈「Dog」にたどり着きます。',
+      en: 'A model of a funerary altar annotated in a 3D annotation editor with region resources (annotations sharing a region) and Wikidata. Select the dog relief to see its connections, then follow the Dog (Wikidata) point to reach another annotation about the dog.',
+    },
+    open: {
+      page: 'viewer',
+      manifest: 'https://3-d-annotation-viewer.vercel.app/api/3/aHR0cHM6Ly9vZ2F3YS5hd3MubGRhcy5qcC9paWlmLzMvODcvbWFuaWZlc3Q/manifest',
+      tab: 'annotations',
+    },
+    features: ['3d', 'annotations'],
+  },
+  {
     id: 'globe-georef',
     added: '2026-10-14',
     title: {

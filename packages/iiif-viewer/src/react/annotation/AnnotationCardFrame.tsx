@@ -15,6 +15,7 @@ export function AnnotationCardFrame({
   annotationId,
   bodyStyle,
   bodyClassName = '',
+  plain,
   children,
 }: {
   /** The number shown in the round badge. No badge when absent. */
@@ -30,6 +31,8 @@ export function AnnotationCardFrame({
   annotationId?: string;
   bodyStyle?: CSSProperties;
   bodyClassName?: string;
+  /** Not a list item: no click to select, no hover effect (the detail view). */
+  plain?: boolean;
   children?: ReactNode;
 }) {
   const indent = number !== undefined ? 'pl-9' : '';
@@ -40,11 +43,15 @@ export function AnnotationCardFrame({
       aria-current={selected || undefined}
       // カードのどこを押しても選ぶ。ただしリンク（写真・参照など）を押したときは、
       // そのリンクを開くだけにして選ばない
-      onClick={(e) => {
-        if ((e.target as HTMLElement).closest('a')) return;
-        onSelect();
-      }}
-      className={`group rounded-lg shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer border overflow-hidden ${
+      onClick={
+        plain
+          ? undefined
+          : (e) => {
+              if ((e.target as HTMLElement).closest('a')) return;
+              onSelect();
+            }
+      }
+      className={`group rounded-lg shadow-sm ${plain ? '' : 'hover:shadow-md cursor-pointer'} transition-all duration-200 border overflow-hidden ${
         selected
           ? 'bg-blue-50 dark:bg-blue-900 border-blue-300 dark:border-blue-700'
           : playing

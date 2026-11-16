@@ -58,5 +58,23 @@
     "granularity": "単位",
     "tags": "タグ",
     "showMarks": "印を表示"
+  },
+  "AnnotationConnections": {
+    "title": "この注釈のつながり",
+    "reset": "最初に戻す",
+    "openResource": "開く",
+    "hint": "点を押すと、その先のつながりが出ます",
+    "kindAnnotation": "注釈",
+    "kindRegion": "領域リソース",
+    "kindObject": "資料全体",
+    "kind_wikidata": "Wikidata",
+    "kind_wikipedia": "Wikipedia",
+    "kind_web": "ウェブページ",
+    "kind_citation": "参考文献",
+    "kind_image": "画像",
+    "backToList": "← 一覧に戻る",
+    "goToAnnotation": "この注釈へ",
+    "annotationsOnRegion": "この領域に注釈 {count} 件",
+    "close": "閉じる"
   }
 }
