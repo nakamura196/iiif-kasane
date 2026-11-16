@@ -452,10 +452,12 @@ const separateLabels = (nodes: PlacedNode[], rootId: string, anchored?: Readonly
 };
 
 /**
- * Whether selecting this annotation opens its detail view (in place of the list): it has something to connect to,
+ * Whether selecting this annotation opens its detail view (in place of the list): it is on a region resource,
  * and it is not the hit of a Content Search (those keep the plain selection in the list).
+ * An annotation with related resources only (Wikidata, references) keeps the plain selection too:
+ * its resources are already shown on its card.
  */
-export const opensDetail = (item: GraphItem & { hitId?: string }): boolean => !item.hitId && hasConnections(item);
+export const opensDetail = (item: GraphItem & { hitId?: string }): boolean => !item.hitId && !!item.regionId;
 
 /** How many annotations touch a node (for a region: the annotations on it). */
 export const annotationsTouching = (graph: AnnotationGraph, nodeId: string): number =>

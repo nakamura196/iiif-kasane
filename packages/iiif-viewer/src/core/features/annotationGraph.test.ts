@@ -153,9 +153,11 @@ describe('layoutGraph', () => {
 });
 
 describe('detail view helpers', () => {
-  it('opens the detail view only for connected annotations that are not search hits', () => {
+  it('opens the detail view only for annotations on a region resource that are not search hits', () => {
     expect(opensDetail({ id: 'a', regionId: 'r' })).toBe(true);
-    expect(opensDetail({ id: 'a', resources: [book] })).toBe(true);
+    expect(opensDetail({ id: 'a', regionId: 'r', resources: [book] })).toBe(true);
+    // Related resources alone (Wikidata, references) keep the plain selection in the list
+    expect(opensDetail({ id: 'a', resources: [book] })).toBe(false);
     expect(opensDetail({ id: 'a' })).toBe(false);
     expect(opensDetail({ id: 'a', regionId: 'r', hitId: 'h' })).toBe(false);
   });
