@@ -76,6 +76,19 @@ describe('georeferencing on a Canvas (a georeferenced picture)', () => {
     expect(annos[0].position).toEqual({ x: 6690, y: 7517, z: 0 });
   });
 
+  it('reads the name from metadata.label (geo.ldas.jp older form) when properties.title is missing', () => {
+    // The older form geo.ldas.jp still supports: the name in metadata.label (e.g. Toyo Bunko's Da Ming map).
+    const legacy = { ...feature(3, [10, 20], [135.5, 34.7]), properties: { resourceCoords: [10, 20] }, metadata: { label: '會寧', tags: ['域外地名'] } };
+    const withTitle = { ...feature(4, [30, 40], [135.6, 34.8]), metadata: { label: 'old name' } };
+    const manifest = structuredClone(imageManifest);
+    manifest.items[0].annotations[0].items[0].body.features = [legacy, withTitle] as never;
+    const titles = parseManifestV4(convertToV4(manifest)).geoFeatures.map((f) => f.properties.title);
+    expect(titles).toEqual(['會寧', 'GCP 4']);
+    const empty = { ...feature(5, [50, 60], [135.7, 34.9]), properties: { resourceCoords: [50, 60], title: '' }, metadata: { label: { ja: ['長白山'] } } };
+    manifest.items[0].annotations[0].items[0].body.features = [empty] as never;
+    expect(parseManifestV4(convertToV4(manifest)).geoFeatures[0].properties.title).toBe('長白山');
+  });
+
   it('falls back to the GeoJSON id, then to the index', () => {
     const f = parsed.geoFeatures[0];
     expect(geoFeatureIdOf({ ...f, '@id': '' }, 0)).toBe('gcp-1');

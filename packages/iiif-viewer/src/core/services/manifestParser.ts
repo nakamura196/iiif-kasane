@@ -62,8 +62,8 @@ export interface GeoFeature {
     /** 画像上の範囲（Canvas 座標の "x,y,w,h"）。geo.ldas.jp は四角で描く。 */
     xywh?: string;
   };
-  /** geo.ldas.jp の古い形式。タグや範囲を properties ではなくここに書いていた。 */
-  metadata?: { tags?: string[]; xywh?: string };
+  /** geo.ldas.jp's older form: the name, tags and box were written here instead of in properties. */
+  metadata?: { label?: unknown; tags?: string[]; url?: string; xywh?: string };
   /** geo.ldas.jp のさらに古い形式（範囲を地物の直下に書く）。 */
   xywh?: string;
   names?: GeoFeatureName[];
@@ -210,11 +210,14 @@ const extractModel = (scene: SceneV4 | undefined): { url: string | null; body?: 
 };
 
 // A place name may be a IIIF language map instead of a string: pick the reader's language.
+// Without properties.title, the name comes from metadata.label (geo.ldas.jp's older form,
+// which its README still supports).
+// (geo.ldas.jp also fell back when the title was an empty string.)
 const withTitleIn = (feature: GeoFeature, locale: string): GeoFeature => {
-  const title: unknown = feature.properties?.title;
-  return title === undefined || typeof title === 'string'
-    ? feature
-    : { ...feature, properties: { ...feature.properties, title: labelIn(title, locale) } };
+  const own: unknown = feature.properties?.title;
+  const title: unknown = own === undefined || own === '' ? (feature.metadata?.label ?? own) : own;
+  if (title === own && (title === undefined || typeof title === 'string')) return feature;
+  return { ...feature, properties: { ...feature.properties, title: typeof title === 'string' ? title : labelIn(title, locale) } };
 };
 
 const extractGeoFeatures = (annos: AnnotationV4[], locale: string): GeoFeature[] => {
@@ -409,14 +412,15 @@ const httpUrl = (s: unknown): string | null => {
   }
 };
 
-// The links of a feature: links (Linked Places), or properties.url (geo.ldas.jp's older form) as 'detail'.
+// The links of a feature: links (Linked Places), or properties.url / metadata.url (geo.ldas.jp's
+// older forms) as 'detail'.
 export const geoFeatureLinksOf = (feature: GeoFeature): GeoFeatureLinkView[] => {
   const links = (Array.isArray(feature.links) ? feature.links : []).flatMap((link) => {
     const href = httpUrl(link?.identifier);
     return href ? [{ type: typeof link.type === 'string' && link.type ? link.type : 'detail', href }] : [];
   });
   if (links.length > 0) return links;
-  const url = httpUrl(feature.properties.url);
+  const url = httpUrl(feature.properties.url) ?? httpUrl(feature.metadata?.url);
   return url ? [{ type: 'detail', href: url }] : [];
 };
 
