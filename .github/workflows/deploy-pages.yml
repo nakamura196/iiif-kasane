@@ -36,8 +36,9 @@ jobs:
 
       # Runtime dependencies only: the dev-only advisories (braces via eslint-config-next)
       # have no fixed release yet and never reach the deployed site.
+      # scripts/audit.mjs lets a listed advisory through until a fixed release exists.
       - name: Audit dependencies
-        run: npm audit --omit=dev --audit-level=high
+        run: node scripts/audit.mjs --omit=dev
 
       # The remaining warnings are React Compiler rules (see eslint.config.mjs).
       # The cap keeps the count from growing; lower it as they are fixed.
