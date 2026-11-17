@@ -87,6 +87,13 @@ describe('georeferencing on a Canvas (a georeferenced picture)', () => {
     const empty = { ...feature(5, [50, 60], [135.7, 34.9]), properties: { resourceCoords: [50, 60], title: '' }, metadata: { label: { ja: ['長白山'] } } };
     manifest.items[0].annotations[0].items[0].body.features = [empty] as never;
     expect(parseManifestV4(convertToV4(manifest)).geoFeatures[0].properties.title).toBe('長白山');
+    // A title that gives no name (null, an empty language map) also falls back; a number label is kept.
+    const withNull = { ...empty, properties: { resourceCoords: [50, 60], title: null }, metadata: { label: '合闌' } };
+    const emptyMap = { ...empty, properties: { resourceCoords: [50, 60], title: { none: [] } }, metadata: { label: '秦寧' } };
+    const numbered = { ...empty, properties: { resourceCoords: [50, 60] }, metadata: { label: 12 } };
+    const none = { ...empty, properties: { resourceCoords: [50, 60] }, metadata: {} };
+    manifest.items[0].annotations[0].items[0].body.features = [withNull, emptyMap, numbered, none] as never;
+    expect(parseManifestV4(convertToV4(manifest)).geoFeatures.map((f) => f.properties.title)).toEqual(['合闌', '秦寧', '12', undefined]);
   });
 
   it('falls back to the GeoJSON id, then to the index', () => {

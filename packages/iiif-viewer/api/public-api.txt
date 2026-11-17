@@ -955,7 +955,7 @@ export [type] interface GeoFeature {
         xywh?: string;
     };
     metadata?: {
-        label?: unknown;
+        label?: string | Record<string, string[]>;
         tags?: string[];
         url?: string;
         xywh?: string;

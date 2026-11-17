@@ -48,23 +48,23 @@ export interface GeoFeatureDepiction {
 
 export interface GeoFeature {
   '@id': string;
-  /** GeoJSON の id（`@id` が無い地物で使う）。 */
+  /** The GeoJSON id (used when the feature has no `@id`). */
   id?: string;
   type: 'Feature';
   geometry: { coordinates: [number, number]; type: 'Point' };
-  /** resourceCoords: 3D の模型なら [x, y, z]、画像なら Canvas 座標の [x, y]。 */
+  /** resourceCoords: [x, y, z] on a 3D model, or [x, y] in Canvas coordinates on a picture. */
   properties: {
     title: string;
     resourceCoords: [number, number] | [number, number, number];
     tags?: string[];
-    /** geo.ldas.jp の古い形式。links が無いときの「詳細」のリンク。 */
+    /** geo.ldas.jp's older form: the 'detail' link used when there are no links. */
     url?: string;
-    /** 画像上の範囲（Canvas 座標の "x,y,w,h"）。geo.ldas.jp は四角で描く。 */
+    /** The area on the picture ("x,y,w,h" in Canvas coordinates). geo.ldas.jp draws it as a box. */
     xywh?: string;
   };
   /** geo.ldas.jp's older form: the name, tags and box were written here instead of in properties. */
-  metadata?: { label?: unknown; tags?: string[]; url?: string; xywh?: string };
-  /** geo.ldas.jp のさらに古い形式（範囲を地物の直下に書く）。 */
+  metadata?: { label?: string | Record<string, string[]>; tags?: string[]; url?: string; xywh?: string };
+  /** geo.ldas.jp's even older form (the area written directly on the feature). */
   xywh?: string;
   names?: GeoFeatureName[];
   links?: GeoFeatureLink[];
@@ -77,7 +77,7 @@ export interface ParsedManifest {
   modelBody?: unknown;
   annotations: Annotation[];
   geoFeatures: GeoFeature[];
-  /** 地点が画像（Canvas）に付いているとき、その Canvas の id。3D の Scene に付いているときは無い。 */
+  /** The id of the Canvas when the places are on a picture (Canvas); absent when they are on a 3D Scene. */
   geoCanvasId?: string;
 }
 
@@ -210,14 +210,15 @@ const extractModel = (scene: SceneV4 | undefined): { url: string | null; body?: 
 };
 
 // A place name may be a IIIF language map instead of a string: pick the reader's language.
-// Without properties.title, the name comes from metadata.label (geo.ldas.jp's older form,
-// which its README still supports).
-// (geo.ldas.jp also fell back when the title was an empty string.)
+// When properties.title gives no name (missing, null, '' or an empty map), the name comes from
+// metadata.label (geo.ldas.jp's older form, which its README still supports).
 const withTitleIn = (feature: GeoFeature, locale: string): GeoFeature => {
+  const nameOf = (v: unknown): string => (typeof v === 'number' ? String(v) : labelIn(v, locale));
   const own: unknown = feature.properties?.title;
-  const title: unknown = own === undefined || own === '' ? (feature.metadata?.label ?? own) : own;
-  if (title === own && (title === undefined || typeof title === 'string')) return feature;
-  return { ...feature, properties: { ...feature.properties, title: typeof title === 'string' ? title : labelIn(title, locale) } };
+  const name = nameOf(own) || nameOf(feature.metadata?.label);
+  // Unchanged when the title is already the name, or when there is no name anywhere.
+  if (name === own || (name === '' && own === undefined)) return feature;
+  return { ...feature, properties: { ...feature.properties, title: name } };
 };
 
 const extractGeoFeatures = (annos: AnnotationV4[], locale: string): GeoFeature[] => {
@@ -395,13 +396,13 @@ export const geoFeatureIdOf = (feature: GeoFeature, idx: number): string =>
 export const geoFeatureTagsOf = (feature: GeoFeature): string[] =>
   (feature.properties.tags ?? feature.metadata?.tags ?? []).filter((t): t is string => typeof t === 'string' && t !== '');
 
-/** 地点のリンク。type は Linked Places の関係（primaryTopicOf など）。properties.url から作ったものは 'detail'。 */
+/** A link of a place. type is the Linked Places relation (primaryTopicOf etc.); 'detail' for one made from properties.url or metadata.url. */
 export interface GeoFeatureLinkView {
   type: string;
   href: string;
 }
 
-// http(s) のリンクだけ通す（javascript: などをポップアップの href に入れない）
+// Lets only http(s) links through (keeps javascript: and the like out of the popup's href).
 const httpUrl = (s: unknown): string | null => {
   if (typeof s !== 'string') return null;
   try {
@@ -543,7 +544,7 @@ export const geoAnnotations = (features: GeoFeature[], annotations: Annotation[]
   return features.map((feature, idx) => {
     const id = plain[idx].id;
     const match = annotations.find((a) => describes(a, id));
-    // 説明の注釈にタグが無ければ、地物のタグを使う
+    // When the describing annotation has no tags, use the feature's tags.
     const base = match ? { ...match, id, tags: match.tags?.length ? match.tags : plain[idx].tags } : plain[idx];
     const depictions = (feature.depictions ?? []).filter((d) => typeof d['@id'] === 'string');
     return !base.images?.length && depictions.length > 0
