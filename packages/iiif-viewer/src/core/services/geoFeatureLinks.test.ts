@@ -27,6 +27,13 @@ describe('geoFeatureLinksOf', () => {
     expect(geoFeatureLinksOf(feature({}, 'https://example.org/a'))).toEqual([{ type: 'detail', href: 'https://example.org/a' }]);
   });
 
+  it('falls back to metadata.url (geo.ldas.jp older form) after properties.url', () => {
+    const legacy = feature({ metadata: { url: 'https://example.org/old' } });
+    expect(geoFeatureLinksOf(legacy)).toEqual([{ type: 'detail', href: 'https://example.org/old' }]);
+    const both = feature({ metadata: { url: 'https://example.org/old' } }, 'https://example.org/new');
+    expect(geoFeatureLinksOf(both)).toEqual([{ type: 'detail', href: 'https://example.org/new' }]);
+  });
+
   it('prefers links over properties.url', () => {
     const f = feature({ links: [{ type: 'seeAlso', identifier: 'https://example.org/b' }] }, 'https://example.org/a');
     expect(geoFeatureLinksOf(f)).toEqual([{ type: 'seeAlso', href: 'https://example.org/b' }]);
