@@ -76,6 +76,8 @@
     "noAnnotations": "アノテーションがありません",
     "fitAll": "全体を表示",
     "overlayImage": "画像を重ねる",
+    "mapMenu": "地図の設定",
+    "imageMenu": "画像の設定",
     "overlayOpacity": "画像の濃さ",
     "coordinates": "座標",
     "rotation": "回転",

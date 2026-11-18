@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
@@ -18,8 +18,10 @@ import {
 } from 'iiif-kasane/core';
 import { BASEMAPS, basemapOf, type BasemapId } from './basemaps';
 import { searchPlaces, type PlaceResult } from './placeSearch';
+import ControlMenu from './ControlMenu';
+import { useNarrowScreen } from '@/lib/useNarrowScreen';
 
-/** 地図に重ねる画像（絵図・古地図）。corners は左上・右上・右下・左下の経度・緯度。 */
+/** Image to overlay on the map (e-zu, old map). corners are the longitude and latitude of top-left, top-right, bottom-right, bottom-left. */
 export interface MapImageOverlay {
   url: string;
   corners: LngLat[];
@@ -30,18 +32,22 @@ interface MapViewProps {
   selectedId: string | null;
   onFeatureClick: (id: string) => void;
   overlay?: MapImageOverlay | null;
-  /** 開いたときの縮尺と中心（URL の mapZoom・mapLat・mapLng）。無ければすべての地点が収まる縮尺にする。 */
+  /** Zoom and center on load (mapZoom, mapLat, mapLng in the URL). If absent, use a zoom that fits all points. */
   initialView?: GeorefMapView;
-  /** 印を立てる地点（URL の lat・lng）。 */
+  /** Points to mark (lat, lng in the URL). */
   focus?: { lat: number; lng: number };
-  /** 開いたときに選んである地点。initialView があるときは、そこへは飛ばない。 */
+  /** Point selected on load. When initialView is given, do not fly to it. */
   initialSelectedId?: string | null;
-  /** 地図を動かし終えるたびに呼ぶ。 */
+  /** Called every time the map stops moving. */
   onViewChange?: (view: GeorefMapView) => void;
-  /** 近い地点を 1 つにまとめて件数を出すか（URL の clustering）。既定は出す。 */
+  /** Whether to merge nearby points into one and show the count (clustering in the URL). Default is to show. */
   clustering?: boolean;
-  /** これが変わったら、すべての地点が収まる縮尺に合わせ直す（地点の付いた Canvas を切り替えたとき）。 */
+  /** When this changes, refit to a zoom that fits all points (when switching between Canvases that have points). */
   fitKey?: string;
+  /** Controls placed at the top left, in the same row as the place search (they wrap together on a narrow map). Not shown on a phone. */
+  toolbar?: ReactNode;
+  /** Controls placed after the toolbar on a wider screen, and in the map's menu on a phone. */
+  menu?: ReactNode;
 }
 
 const OVERLAY_SOURCE = 'georef-overlay';
@@ -55,26 +61,26 @@ const SELECTED_LAYER = 'georef-selected';
 const POINT_LAYERS = [CLUSTERS_LAYER, CLUSTER_COUNT_LAYER, POINT_LAYER, SELECTED_LAYER];
 const POINT_COLOR = '#3b82f6';
 const SELECTED_COLOR = '#ef4444';
-// まとめる距離（画面の px）と、まとめるのをやめる縮尺。geo.ldas.jp は 50 と 14 だが、
-// 14 では近い建物どうしが重なって押し分けられないので、もっと寄るまでまとめる
+// Merge distance (screen px) and the zoom at which merging stops. geo.ldas.jp uses 50 and 14, but
+// at 14 nearby buildings overlap and cannot be told apart, so keep merging until zoomed in further
 const CLUSTER_RADIUS = 50;
 const CLUSTER_MAX_ZOOM = 19;
-// 同じ場所の地点の一覧に出す上限
+// Upper limit of entries in the list of points at the same place
 const CLUSTER_LIST_MAX = 100;
 
-// 「全体を表示」ボタン。手で拡大・移動したあと、すべてのピンが収まる縮尺に戻す。
-// 拡大・縮小のボタン（NavigationControl）と同じ見た目の枠に入れる
+// "Show all" button. After zooming or panning by hand, return to the zoom that fits all pins.
+// Put it in a frame that looks the same as the zoom buttons (NavigationControl)
 class FitAllControl implements maplibregl.IControl {
   private container?: HTMLDivElement;
   constructor(private readonly label: string, private readonly onFit: () => void) {}
   onAdd() {
     const container = document.createElement('div');
-    container.className = 'maplibregl-ctrl maplibregl-ctrl-group';
+    container.className = 'maplibregl-ctrl maplibregl-ctrl-group georef-fit-all';
     const button = document.createElement('button');
     button.type = 'button';
     button.title = this.label;
     button.setAttribute('aria-label', this.label);
-    // 四隅の括弧（全体に合わせる）の印
+    // Mark of four corner brackets (fit to all)
     button.innerHTML =
       '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
       'stroke-linecap="round" stroke-linejoin="round" style="margin:auto;display:block" aria-hidden="true">' +
@@ -103,10 +109,14 @@ export default function MapView({
   onViewChange,
   clustering = true,
   fitKey,
+  toolbar,
+  menu,
 }: MapViewProps) {
+  // On a phone only the place search and the current location stay on the map; the rest goes in a menu
+  const narrow = useNarrowScreen();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
-  // 地点の上を通ったときの名前と、同じ場所の地点の一覧
+  // Name shown when hovering over a point, and the list of points at the same place
   const activePopupRef = useRef<maplibregl.Popup | null>(null);
   const listPopupRef = useRef<maplibregl.Popup | null>(null);
   const { resolvedTheme } = useTheme();
@@ -117,7 +127,7 @@ export default function MapView({
   const selectedIdRef = useRef(selectedId);
   const onFeatureClickRef = useRef(onFeatureClick);
 
-  // Refsを最新の値で更新
+  // Update the refs with the latest values
   featuresRef.current = features;
   selectedIdRef.current = selectedId;
   onFeatureClickRef.current = onFeatureClick;
@@ -125,12 +135,12 @@ export default function MapView({
   const clusteringRef = useRef(clustering);
   clusteringRef.current = clustering;
 
-  // 今の縮尺と中心。地図を作り直したとき（テーマ・言語の切り替え）もここから始める
+  // Current zoom and center. Also used as the starting point when the map is rebuilt (theme or language switch)
   const viewRef = useRef<GeorefMapView | null>(initialView ?? null);
-  // 縮尺と中心が決まっているか（URL で与えられた、または人が動かした）。決まっていれば自動で全体に合わせない
+  // Whether zoom and center are fixed (given by the URL, or moved by the user). If so, do not fit to all automatically
   const keepViewRef = useRef(Boolean(initialView));
-  // URL で縮尺と中心が決まっているときは、開いたときの選択（URL の id）へは飛ばない。
-  // 地点は地図より後に読み込まれるので、最初に選ばれた地点で見分ける
+  // When the URL fixes the zoom and center, do not fly to the selection on load (id in the URL).
+  // Points are loaded after the map, so tell by the point that was selected first
   const initialSelectedIdRef = useRef(initialSelectedId);
   const firstSelectionRef = useRef(true);
   const hasInitialView = useRef(Boolean(initialView));
@@ -140,12 +150,12 @@ export default function MapView({
     initialSelectedIdRef.current = initialSelectedId;
   });
 
-  // 背景地図。切り替えたら地図を作り直す（縮尺と中心・地点・重ねた画像は引き継ぐ）
+  // Base map. Rebuild the map when it is switched (zoom and center, points and overlaid image are carried over)
   const [basemap, setBasemap] = useState<BasemapId>('standard');
   const basemapRef = useRef(basemap);
   basemapRef.current = basemap;
 
-  // 地名検索。選んだ場所には印を立てる（地図を作り直しても立て直す）
+  // Place name search. Mark the selected place (re-add it when the map is rebuilt)
   const [placeQuery, setPlaceQuery] = useState('');
   const [placeResults, setPlaceResults] = useState<PlaceResult[] | null>(null);
   const [placeSearching, setPlaceSearching] = useState(false);
@@ -153,7 +163,7 @@ export default function MapView({
   const placeAbortRef = useRef<AbortController | null>(null);
   const placeRef = useRef<PlaceResult | null>(null);
   const placeMarkerRef = useRef<maplibregl.Marker | null>(null);
-  // 現在地が取れなかったとき（許可されなかった・時間切れ）に出す
+  // Shown when the current location could not be obtained (not permitted, or timed out)
   const [geolocateError, setGeolocateError] = useState(false);
 
   const showPlace = () => {
@@ -201,7 +211,7 @@ export default function MapView({
     map.current?.flyTo({ center: [place.lng, place.lat], zoom: 15, duration: 1000 });
   };
 
-  // 重ねた画像の表示と濃さ。地図を作り直しても（テーマ・言語の切り替え）引き継ぐ
+  // Visibility and opacity of the overlaid image. Carried over even when the map is rebuilt (theme or language switch)
   const [overlayVisible, setOverlayVisible] = useState(true);
   const [overlayOpacity, setOverlayOpacity] = useState(0.7);
   const overlayRef = useRef(overlay);
@@ -209,8 +219,8 @@ export default function MapView({
   overlayRef.current = overlay;
   overlayStateRef.current = { visible: overlayVisible, opacity: overlayOpacity };
 
-  // 画像を地図に貼る。四隅を指定すると、地図ライブラリがその間を埋めて描く。
-  // 地点の層より下に入れ、地点は画像より常に手前に出す
+  // Put the image on the map. Given the four corners, the map library fills in and draws between them.
+  // Insert it below the points layer, so that points are always drawn in front of the image
   const syncOverlay = () => {
     const m = map.current;
     if (!m || !mapReadyRef.current) return;
@@ -233,7 +243,7 @@ export default function MapView({
     }, m.getLayer(CLUSTERS_LAYER) ? CLUSTERS_LAYER : undefined);
   };
 
-  // 言語コードをOpenMapTiles形式に変換
+  // Convert the language code to OpenMapTiles format
   const getMapLanguage = (loc: string) => {
     switch (loc) {
       case 'ja': return 'ja';
@@ -242,15 +252,15 @@ export default function MapView({
     }
   };
 
-  // 地点を地図の層として描く（HTML の印を 1 つずつ置くと、数千件で動かすたびに重くなる）。
-  // 近い地点は 1 つの円にまとめて件数を出す（clustering）。まとめは地図ライブラリが別スレッドで数える。
-  // 選んだ地点は、まとまりに隠れないよう、別の層で一番上に赤く描く
+  // Draw points as map layers (placing HTML marks one by one gets slower on every move with thousands of points).
+  // Merge nearby points into one circle and show the count (clustering). The map library counts the merge in a separate thread.
+  // The selected point is drawn in red on top in a separate layer, so that it is not hidden in a cluster
   const pointsData = (): GeoJSON.FeatureCollection<GeoJSON.Point> => {
     const all = featuresRef.current;
     return {
       type: 'FeatureCollection',
       features: all.flatMap((feature, idx) => {
-        // Web Mercator投影で表示できない座標（緯度±85度超）をスキップ
+        // Skip coordinates that cannot be shown in the Web Mercator projection (latitude beyond ±85 degrees)
         const [, lat] = feature.geometry.coordinates;
         if (lat > 85 || lat < -85) return [];
         return [{
@@ -287,7 +297,7 @@ export default function MapView({
       paint: {
         'circle-color': POINT_COLOR,
         'circle-opacity': 0.9,
-        // 件数が多いほど大きく
+        // Larger as the count grows
         'circle-radius': ['step', ['get', 'point_count'], 14, 10, 17, 100, 21, 1000, 25],
         'circle-stroke-width': 3,
         'circle-stroke-color': '#ffffff',
@@ -300,7 +310,7 @@ export default function MapView({
       filter: ['has', 'point_count'],
       layout: {
         'text-field': ['get', 'point_count_abbreviated'],
-        // 背景地図のスタイルが配っている字体（れきちずは LINE Seed JP しか無い）
+        // Fonts served by the base map style (Rekichizu only has LINE Seed JP)
         'text-font': basemapOf(basemapRef.current).labelFont,
         'text-size': 12,
         'text-allow-overlap': true,
@@ -330,11 +340,11 @@ export default function MapView({
         'circle-stroke-width': 3,
         'circle-stroke-color': '#ffffff',
       },
-    });    // 地点の層を描いたことの目印（計測と試験で、描き終えたかを見分けるため。地点は要素を持たない）
+    });    // Marker that the points layer has been drawn (so that measurement and tests can tell it is finished. Points have no elements)
     mapContainer.current?.setAttribute('data-georef-map-points', '');
   };
 
-  // 地点が変わったら描き直し、全体が見える縮尺に合わせる
+  // When points change, redraw and fit to a zoom that shows everything
   const updatePoints = () => {
     const m = map.current;
     if (!m || !mapReadyRef.current) return;
@@ -348,13 +358,13 @@ export default function MapView({
     fitAll(0, true);
   };
 
-  // リンクの種類の名前。知らない種類はそのまま出す（geo.ldas.jp と同じ）
+  // Names of link types. Unknown types are shown as they are (same as geo.ldas.jp)
   const linkLabel = (type: string): string => {
     const key = `linkType.${type}`;
     return t.has(key) ? t(key) : type;
   };
 
-  // 地点の上に出す名前・画像・タグ・リンク
+  // Name, image, tags and links shown above a point
   const popupHtml = (feature: GeoFeature) => {
     const isDark = resolvedTheme === 'dark';
     const title = feature.properties.title;
@@ -405,7 +415,7 @@ export default function MapView({
     activePopupRef.current?.remove();
     activePopupRef.current = null;
   };
-  // 印から外れても少し待つ。その間にポップアップへ乗れば閉じない（中のリンクを押せるように）
+  // Wait a little even after leaving the mark. If the pointer moves onto the popup in that time, it does not close (so the links inside can be clicked)
   const closePopupSoon = () => {
     cancelClose();
     closeTimerRef.current = setTimeout(closePopup, 300);
@@ -416,7 +426,7 @@ export default function MapView({
     listPopupRef.current = null;
   };
 
-  // 同じ場所の地点のまとまり。一番寄っても分かれないので、名前の一覧を出して選ばせる
+  // A group of points at the same place. They do not separate even at maximum zoom, so show a list of names to choose from
   const showClusterList = (lngLat: maplibregl.LngLatLike, fids: string[]) => {
     const m = map.current;
     if (!m) return;
@@ -443,7 +453,7 @@ export default function MapView({
     listPopupRef.current = popup;
   };
 
-  // 地点・まとまりを押したとき、上を通ったとき。層ごとに受けると重なった層で 2 回届くので、一番上の 1 つだけを見る
+  // When a point or cluster is clicked or hovered. Listening per layer would fire twice for overlapping layers, so look only at the topmost one
   const handleMapClick = async (e: maplibregl.MapMouseEvent) => {
     const m = map.current;
     if (!m || !m.getLayer(POINT_LAYER)) return;
@@ -453,7 +463,7 @@ export default function MapView({
     if (hit.layer.id !== CLUSTERS_LAYER) {
       const fid = String(hit.properties.fid);
       closeList();
-      // 押した地点のポップアップは、閉じるボタンか地図の別の所を押すまで残す（タッチの画面でもリンクを押せるように）
+      // Keep the popup of a clicked point until the close button or another place on the map is pressed (so links can be clicked on touch screens too)
       const feature = featureById(fid);
       if (feature) openFeaturePopup(feature, true);
       onFeatureClickRef.current(fid);
@@ -464,7 +474,7 @@ export default function MapView({
     const clusterId = Number(hit.properties.cluster_id);
     const center = (hit.geometry as GeoJSON.Point).coordinates as [number, number];
     const zoom = await source.getClusterExpansionZoom(clusterId);
-    // まとめる上限の縮尺を超えないと分かれない（同じ場所の地点）なら、一覧を出す
+    // If it does not separate until the merge-limit zoom is exceeded (points at the same place), show the list
     if (zoom > CLUSTER_MAX_ZOOM) {
       const leaves = await source.getClusterLeaves(clusterId, CLUSTER_LIST_MAX, 0);
       showClusterList(center, leaves.map((l) => String(l.properties?.fid)));
@@ -491,7 +501,7 @@ export default function MapView({
     openFeaturePopup(feature, false);
   };
 
-  // 地点の名前・タグ・リンクのポップアップ。pinned は押して開いたもの（閉じるボタンを付け、印から外れても消さない）
+  // Popup with point name, tags and links. pinned means opened by a click (has a close button and is not removed when leaving the mark)
   const openFeaturePopup = (feature: GeoFeature, pinned: boolean) => {
     const m = map.current;
     if (!m) return;
@@ -527,20 +537,20 @@ export default function MapView({
   const handleMapHoverRef = useRef(handleMapHover);
   handleMapHoverRef.current = handleMapHover;
 
-  // すべてのピンが収まるように合わせる（地球儀なら大陸の規模、街なら通りの規模になる）。
-  // ピンが 1 つ・ごく近いときに寄りすぎないよう、上限は建物が見える程度。
-  // 開いたときと、「全体を表示」ボタンを押したときに使う
-  // 自動で合わせるとき（auto）は、縮尺と中心が決まっていれば何もしない。
-  // 地点を選んであれば、全体の縮尺のまま、その地点を中心にする
+  // Fit so that all pins are visible (at globe scale it is continent scale, for a town it is street scale).
+  // The upper limit is about where buildings are visible, so it does not zoom in too much when there is one pin or they are very close.
+  // Used on load and when the "Show all" button is pressed
+  // When fitting automatically (auto), do nothing if the zoom and center are fixed.
+  // If a point is selected, keep the overall zoom and center on that point
   const fitAll = (duration = 600, auto = false) => {
     const currentFeatures = featuresRef.current;
     if (!map.current || currentFeatures.length === 0) return;
     if (auto && keepViewRef.current) return;
-    // 「全体を表示」を押したら、以後は自動で合わせない
+    // Once "Show all" is pressed, do not fit automatically afterwards
     if (!auto) keepViewRef.current = true;
     const bounds = new maplibregl.LngLatBounds();
     currentFeatures.forEach(f => bounds.extend(f.geometry.coordinates));
-    // 画像を重ねているときは、画像の全体も収める
+    // When an image is overlaid, also fit the whole image
     overlayRef.current?.corners.forEach(c => bounds.extend(c));
     map.current.fitBounds(bounds, { padding: 50, maxZoom: 17, duration });
     const selected = auto
@@ -558,13 +568,13 @@ export default function MapView({
 
     const lang = getMapLanguage(locale);
 
-    // 既存のマップを削除
+    // Remove the existing map
     if (map.current) {
       map.current.remove();
       map.current = null;
     }
 
-    // 標準は OpenFreeMap のベクタータイル（多言語対応）。ほかは basemaps.ts
+    // The default is OpenFreeMap vector tiles (multilingual). Others are in basemaps.ts
     const base = basemapOf(basemap);
     const styleUrl = base.style(resolvedTheme === 'dark');
 
@@ -577,9 +587,9 @@ export default function MapView({
       attributionControl: { compact: base.collapseAttribution || undefined },
     });
 
-    // 動かし終えたら、縮尺と中心を覚えて知らせる（URL に書く）。
-    // 人が動かしたら（操作の元になったイベントがあれば）、以後は自動で合わせない。
-    // 地図が枠の大きさに合わせて自分で動いたとき（狭い画面で開いたときなど）は数えない
+    // When movement ends, remember the zoom and center and report them (written to the URL).
+    // If the user moved the map (an event that originated the operation exists), do not fit automatically afterwards.
+    // Do not count moves the map made itself to fit the frame size (e.g. when opened on a narrow screen)
     const reportView = () => {
       const m = map.current;
       if (!m) return;
@@ -589,7 +599,7 @@ export default function MapView({
     };
     map.current.on('click', (e) => void handleMapClickRef.current(e));
     map.current.on('mousemove', (e) => handleMapHoverRef.current(e));
-    // 地図の外へ出たとき。ポップアップの上へ移ったときもここに来るので、すぐには閉じない
+    // When the pointer leaves the map. Moving onto the popup also comes here, so do not close right away
     map.current.on('mouseout', () => {
       hoveredRef.current = null;
       if (!pinnedRef.current) closePopupSoon();
@@ -599,7 +609,7 @@ export default function MapView({
       reportView();
     });
 
-    // URL の lat・lng の地点に印を立て、座標を出しておく
+    // Mark the point given by lat and lng in the URL and show its coordinates
     const focus = focusRef.current;
     if (focus) {
       new maplibregl.Marker({ color: '#f97316' })
@@ -611,7 +621,7 @@ export default function MapView({
 
     map.current.addControl(new maplibregl.NavigationControl());
     map.current.addControl(new FitAllControl(t('fitAll'), () => fitAllRef.current()));
-    // 現在地。押すと、いる場所に青い点を出して寄る（地図ライブラリの部品）
+    // Current location. When pressed, show a blue dot at the place and move there (a map library component)
     const geolocate = new maplibregl.GeolocateControl({
       positionOptions: { enableHighAccuracy: true, timeout: 10000 },
       fitBoundsOptions: { maxZoom: 15 },
@@ -624,19 +634,19 @@ export default function MapView({
     map.current.addControl(geolocate);
     showPlace();
 
-    // スタイル読み込み後に言語を設定してマーカーを追加
+    // After the style loads, set the language and add markers
     map.current.on('load', () => {
       if (!map.current) return;
 
       const style = map.current.getStyle();
       if (!style || !style.layers) return;
 
-      // テキストラベルのレイヤーを探して言語を変更
+      // Find the text label layers and change the language
       if (base.localizeLabels) style.layers.forEach((layer) => {
         if (layer.type === 'symbol' && layer.layout && 'text-field' in layer.layout) {
           const textField = layer.layout['text-field'];
           if (textField && typeof textField === 'object') {
-            // name:ja, name:en などの形式で言語を指定
+            // Specify the language in a form such as name:ja or name:en
             map.current!.setLayoutProperty(
               layer.id,
               'text-field',
@@ -646,16 +656,18 @@ export default function MapView({
         }
       });
 
-      // 出典の長い地図（れきちず）は、出典を「i」のボタンに畳む（下の「画像を重ねる」に重なるため）
-      if (base.collapseAttribution) {
-        mapContainer.current?.querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show');
+      // Fold the credits into the "i" button when they are shown compact (always for a basemap with
+      // long credits such as rekichizu, and on a narrow map), so they do not cover "Overlay image" below.
+      const attrib = mapContainer.current?.querySelector('.maplibregl-ctrl-attrib');
+      if (base.collapseAttribution || attrib?.classList.contains('maplibregl-compact')) {
+        attrib?.classList.remove('maplibregl-compact-show');
       }
 
       mapReadyRef.current = true;
-      // 開いたときの縮尺と中心も URL に書く（動かさなければ moveend が来ないため）
+      // Also write the zoom and center on load to the URL (moveend does not fire if the map is not moved)
       reportView();
 
-      // マップ準備完了後に地点と画像を追加
+      // After the map is ready, add points and the image
       addPointLayers();
       syncOverlay();
       fitAll(0, true);
@@ -668,13 +680,13 @@ export default function MapView({
     };
   }, [locale, resolvedTheme, basemap]);
 
-  // 地点が変わったら描き直す
+  // When points change, redraw
   useEffect(() => {
     updatePoints();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [features]);
 
-  // まとめる・まとめないを切り替える
+  // Switch between merging and not merging
   useEffect(() => {
     const source = map.current?.getSource<maplibregl.GeoJSONSource>(POINTS_SOURCE);
     if (!source || !mapReadyRef.current) return;
@@ -683,14 +695,14 @@ export default function MapView({
     void source.setClusterOptions({ cluster: clustering, clusterRadius: CLUSTER_RADIUS, clusterMaxZoom: CLUSTER_MAX_ZOOM });
   }, [clustering]);
 
-  // 重ねる画像が変わったら貼り直し、全体が見える縮尺に戻す
+  // When the overlaid image changes, re-add it and return to a zoom that shows everything
   useEffect(() => {
     syncOverlay();
     fitAll(0, true);
   }, [overlay?.url, overlay?.corners]);
 
-  // 別の Canvas に切り替えたら、手で動かした後でも、その地点が収まる縮尺に合わせ直す。
-  // 読み込みで最初の Canvas が決まったとき（未定 → id）は切り替えではないので、URL の縮尺と中心を残す
+  // When switching to another Canvas, refit to a zoom that fits its points, even after a manual move.
+  // When the first Canvas is decided by loading (undetermined to id) it is not a switch, so keep the zoom and center from the URL
   const fitKeyRef = useRef(fitKey);
   useEffect(() => {
     if (fitKeyRef.current === fitKey) return;
@@ -708,7 +720,7 @@ export default function MapView({
     m.setPaintProperty(OVERLAY_LAYER, 'raster-opacity', overlayOpacity);
   }, [overlayVisible, overlayOpacity]);
 
-  // 選んだ地点を赤く描く
+  // Draw the selected point in red
   useEffect(() => {
     if (mapReadyRef.current) map.current?.getSource<maplibregl.GeoJSONSource>(SELECTED_SOURCE)?.setData(selectedData());
 
@@ -722,7 +734,7 @@ export default function MapView({
       const feature = features.find((f, idx) => geoFeatureIdOf(f, idx) === selectedId);
       if (feature && map.current) {
         keepViewRef.current = true;
-        // 選んだピンへ移る。今より引かない（全体に合わせた拡大のまま、中心だけ動かす）
+        // Move to the selected pin. Do not zoom out from the current level (keep the overall-fit zoom and only move the center)
         map.current.flyTo({
           center: feature.geometry.coordinates,
           zoom: Math.max(map.current.getZoom(), 4),
@@ -732,12 +744,60 @@ export default function MapView({
     }
   }, [selectedId, features]);
 
+  const basemapSelect = (className: string) => (
+    <select
+      value={basemap}
+      onChange={(e) => setBasemap(e.target.value as BasemapId)}
+      aria-label={t('basemap')}
+      title={t('basemap')}
+      className={`${className} text-gray-900 dark:text-gray-100`}
+    >
+      {BASEMAPS.map((b) => (
+        <option key={b.id} value={b.id}>
+          {t(b.labelKey)}
+        </option>
+      ))}
+    </select>
+  );
+
+  // Show or hide the overlaid image, and its opacity (at the bottom left, or in the menu on a phone)
+  const overlayControls = (
+    <>
+      <label className="flex items-center gap-1.5 cursor-pointer">
+        <input type="checkbox" checked={overlayVisible} onChange={(e) => setOverlayVisible(e.target.checked)} />
+        {t('overlayImage')}
+      </label>
+      <input
+        type="range"
+        min={0}
+        max={1}
+        step={0.05}
+        value={overlayOpacity}
+        disabled={!overlayVisible}
+        onChange={(e) => setOverlayOpacity(Number(e.target.value))}
+        aria-label={t('overlayOpacity')}
+        title={t('overlayOpacity')}
+        className="w-24 disabled:opacity-40"
+      />
+    </>
+  );
+
   return (
-    <div className="relative w-full h-full">
+    // On a phone, hide the zoom and compass buttons (pinch and rotate with two fingers instead)
+    // and "Show all" (it is in the menu)
+    <div data-menu-bounds className="relative w-full h-full max-sm:[&_.maplibregl-ctrl-group:has(.maplibregl-ctrl-zoom-in)]:hidden max-sm:[&_.georef-fit-all]:hidden">
       <div ref={mapContainer} className="w-full h-full" />
-      {/* 地名検索と背景地図。右上の拡大・縮小のボタンの左に置く（左上の「地図」の札は避ける） */}
-      <div className="absolute top-2.5 right-12 left-20 z-10 flex flex-wrap items-start justify-end gap-2 pointer-events-none text-sm">
-        <div className="relative w-56 max-w-full pointer-events-auto">
+      {/* The toolbar on the left, then the place search and the basemap to the left of the zoom buttons.
+          One wrapping row: on a narrow map the search moves to the next line instead of covering the toolbar. */}
+      <div className="absolute top-4 right-12 left-4 z-10 flex flex-wrap items-start gap-2 pointer-events-none text-sm">
+        {!narrow && (toolbar || menu) && (
+          <div className="flex flex-wrap items-center gap-2 pointer-events-auto">
+            {toolbar}
+            {menu}
+          </div>
+        )}
+        <div className="ml-auto flex min-w-0 flex-[1_1_20rem] items-start justify-end gap-2">
+        <div className="relative min-w-40 max-w-56 max-sm:max-w-none flex-1 pointer-events-auto">
           <form
             role="search"
             onSubmit={(e) => {
@@ -801,19 +861,26 @@ export default function MapView({
             </div>
           )}
         </div>
-        <select
-          value={basemap}
-          onChange={(e) => setBasemap(e.target.value as BasemapId)}
-          aria-label={t('basemap')}
-          title={t('basemap')}
-          className="pointer-events-auto rounded-md bg-white/95 dark:bg-gray-800/95 px-2 py-1.5 shadow text-gray-900 dark:text-gray-100"
-        >
-          {BASEMAPS.map((b) => (
-            <option key={b.id} value={b.id}>
-              {t(b.labelKey)}
-            </option>
-          ))}
-        </select>
+        {narrow ? (
+          <ControlMenu label={t('mapMenu')}>
+            {menu}
+            <label className="flex flex-col gap-1">
+              <span>{t('basemap')}</span>
+              {basemapSelect('w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1.5')}
+            </label>
+            {overlay && <div className="flex items-center gap-2">{overlayControls}</div>}
+            <button
+              type="button"
+              onClick={() => fitAllRef.current()}
+              className="self-start rounded border border-gray-300 dark:border-gray-600 px-2 py-1 hover:bg-gray-50 dark:hover:bg-gray-700"
+            >
+              {t('fitAll')}
+            </button>
+          </ControlMenu>
+        ) : (
+          basemapSelect('pointer-events-auto shrink-0 rounded-md bg-white/95 dark:bg-gray-800/95 px-2 py-1.5 shadow')
+        )}
+        </div>
       </div>
       {geolocateError && (
         <div role="alert" className="absolute bottom-8 right-2 z-10 flex items-center gap-2 rounded-md bg-white/95 dark:bg-gray-800/95 px-3 py-2 shadow text-sm text-red-600 dark:text-red-400">
@@ -823,28 +890,9 @@ export default function MapView({
           </button>
         </div>
       )}
-      {overlay && (
+      {overlay && !narrow && (
         <div className="absolute bottom-8 left-2 z-10 flex items-center gap-2 rounded-md bg-white/90 dark:bg-gray-800/90 px-3 py-2 shadow text-sm text-gray-700 dark:text-gray-200">
-          <label className="flex items-center gap-1.5 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={overlayVisible}
-              onChange={(e) => setOverlayVisible(e.target.checked)}
-            />
-            {t('overlayImage')}
-          </label>
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.05}
-            value={overlayOpacity}
-            disabled={!overlayVisible}
-            onChange={(e) => setOverlayOpacity(Number(e.target.value))}
-            aria-label={t('overlayOpacity')}
-            title={t('overlayOpacity')}
-            className="w-24 disabled:opacity-40"
-          />
+          {overlayControls}
         </div>
       )}
     </div>
