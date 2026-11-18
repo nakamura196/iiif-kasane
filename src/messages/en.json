@@ -76,6 +76,8 @@
     "noAnnotations": "No annotations",
     "fitAll": "Show all",
     "overlayImage": "Overlay image",
+    "mapMenu": "Map settings",
+    "imageMenu": "Image settings",
     "overlayOpacity": "Image opacity",
     "coordinates": "Coordinates",
     "rotation": "Rotation",

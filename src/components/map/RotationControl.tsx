@@ -3,20 +3,23 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 
-// 地図と画像の画面で、画像の回転を変える。ボタンを押すと、スライダー・数値・「北を上に」「元に戻す」が開く。
-// 角度は反時計回りが正（geo.ldas.jp の回転の画面と同じ向き・範囲）。
-// 「選んだ地点の近くで北を上に」は geo.ldas.jp の autoRotateOnSelect。向こうには画面のスイッチが無く、URL でしか入れられなかった。
+// Changes the rotation of the image on the map-and-image page. The button opens a slider, a number,
+// "North up" and "Reset". Counterclockwise is positive (the same direction and range as geo.ldas.jp).
+// "North up near the selected point" is geo.ldas.jp's autoRotateOnSelect; there it had no switch on screen
+// and could only be set in the URL.
 
 interface Props {
   rotation: number;
   onChange: (degrees: number) => void;
-  /** 北が上になる角度。地点が足りず求まらないときは null（「北を上に」を押せなくする）。 */
+  /** The angle that puts north up. null when there are too few points to work it out ("North up" is disabled). */
   northUp: number | null;
   autoRotateOnSelect: boolean;
   onAutoRotateOnSelectChange: (on: boolean) => void;
+  /** Open the panel below the button in the page flow instead of floating over the image (inside a menu). */
+  inline?: boolean;
 }
 
-export default function RotationControl({ rotation, onChange, northUp, autoRotateOnSelect, onAutoRotateOnSelectChange }: Props) {
+export default function RotationControl({ rotation, onChange, northUp, autoRotateOnSelect, onAutoRotateOnSelectChange, inline = false }: Props) {
   const t = useTranslations('GeoRef');
   const [open, setOpen] = useState(false);
   const label = `${Number(rotation.toFixed(1))}°`;
@@ -27,12 +30,16 @@ export default function RotationControl({ rotation, onChange, northUp, autoRotat
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="bg-white dark:bg-gray-800 px-3 py-1 rounded-full shadow text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+        className={
+          inline
+            ? 'text-left text-sm text-gray-700 dark:text-gray-300 hover:underline'
+            : 'bg-white dark:bg-gray-800 px-3 py-1 rounded-full shadow text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+        }
       >
         {t('rotation')}: {label}
       </button>
       {open && (
-        <div className="absolute left-0 mt-2 w-64 whitespace-normal rounded-lg shadow-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-3 space-y-3 text-sm text-gray-700 dark:text-gray-300">
+        <div className={`${inline ? 'mt-2 border-t pt-3' : 'absolute left-0 mt-2 w-64 rounded-lg shadow-lg bg-white dark:bg-gray-800 border p-3'} whitespace-normal border-gray-200 dark:border-gray-700 space-y-3 text-sm text-gray-700 dark:text-gray-300`}>
           <label className="block">
             <span className="sr-only">{t('rotation')}</span>
             <input

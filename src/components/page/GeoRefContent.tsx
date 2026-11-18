@@ -12,6 +12,8 @@ import { CanvasComponent } from 'iiif-kasane/scene';
 import ManifestInput from '@/components/Input';
 import ManifestParamWatcher from '@/components/ManifestParamWatcher';
 import RotationControl from '@/components/map/RotationControl';
+import ControlMenu from '@/components/map/ControlMenu';
+import { useNarrowScreen } from '@/lib/useNarrowScreen';
 import Header from '@/components/Header';
 import { Link } from '@/i18n/routing';
 import { SITE_URL } from '@/lib/site';
@@ -365,6 +367,39 @@ const GeoRefContent: NextPage = () => {
     }
   }, [selectedAnnotationId]);
 
+
+  // On a phone, the controls over the map and the image go into a menu (see MapView)
+  const narrow = useNarrowScreen();
+  const pill = 'bg-white dark:bg-gray-800 px-3 py-1 rounded-full shadow text-sm text-gray-700 dark:text-gray-300';
+  // Controls over the image: pills in a row, or plain items in the menu on a phone
+  const imageControls = (inMenu: boolean) => (
+    <>
+      {/* back to the ordinary viewer, at the Canvas shown here */}
+      <Link
+        href={manifestUrl ? `/viewer?${contentParam(manifestUrl)}${geoCanvasId ? `&canvas=${encodeURIComponent(geoCanvasId)}` : ''}` : '/viewer'}
+        className={`${inMenu ? '' : pill} text-blue-600 dark:text-blue-400 hover:underline`}
+      >
+        {t('openInViewer')}
+      </Link>
+      {geoCanvas && (
+        <label className={`flex items-center gap-1.5 cursor-pointer ${inMenu ? '' : pill}`}>
+          <input type="checkbox" checked={showImageMarks} onChange={(e) => changeShowImageMarks(e.target.checked)} />
+          {t('showImageMarks')}
+        </label>
+      )}
+      {geoCanvas && (
+        <RotationControl
+          rotation={rotation}
+          onChange={changeRotation}
+          northUp={autoRotation}
+          autoRotateOnSelect={autoRotateOnSelect}
+          onAutoRotateOnSelectChange={changeAutoRotateOnSelect}
+          inline={inMenu}
+        />
+      )}
+    </>
+  );
+
   return (
     <div className="flex flex-col h-dvh">
       <Suspense fallback={null}>
@@ -379,16 +414,16 @@ const GeoRefContent: NextPage = () => {
             <div className="flex-1 min-h-0 lg:h-full lg:flex-[2] relative border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-gray-700">
               <MapView
                 toolbar={
-                  <>
-                    <div className="whitespace-nowrap bg-white dark:bg-gray-800 px-3 py-1 rounded-full shadow text-sm font-medium text-gray-700 dark:text-gray-300">
-                      {t('map')}
-                    </div>
-                    {/* applies to both the map and the image */}
-                    <label className="flex items-center gap-1.5 whitespace-nowrap cursor-pointer bg-white dark:bg-gray-800 px-3 py-1 rounded-full shadow text-sm text-gray-700 dark:text-gray-300">
-                      <input type="checkbox" checked={clustering} onChange={(e) => changeClustering(e.target.checked)} />
-                      {t('clustering')}
-                    </label>
-                  </>
+                  <div className="whitespace-nowrap bg-white dark:bg-gray-800 px-3 py-1 rounded-full shadow text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {t('map')}
+                  </div>
+                }
+                menu={
+                  // applies to both the map and the image
+                  <label className={`flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${narrow ? '' : pill}`}>
+                    <input type="checkbox" checked={clustering} onChange={(e) => changeClustering(e.target.checked)} />
+                    {t('clustering')}
+                  </label>
                 }
                 features={geoFeatures}
                 selectedId={selectedAnnotationId}
@@ -403,35 +438,19 @@ const GeoRefContent: NextPage = () => {
               />
             </div>
             {/* 3D Viewer, or the georeferenced picture */}
-            <div className="flex-1 min-h-0 lg:h-full lg:flex-[2] relative bg-gray-100 dark:bg-gray-900 border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-gray-700">
-              {/* Wraps onto a second row on a narrow pane; each pill keeps its text on one line */}
-              <div className="absolute top-4 left-4 right-4 z-10 flex flex-wrap items-center gap-2 pointer-events-none whitespace-nowrap [&>*]:pointer-events-auto">
-                <div className="bg-white dark:bg-gray-800 px-3 py-1 rounded-full shadow text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {geoCanvasId ? t('image') : t('viewer3d')}
+            <div data-menu-bounds className="flex-1 min-h-0 lg:h-full lg:flex-[2] relative bg-gray-100 dark:bg-gray-900 border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-gray-700">
+              {narrow ? (
+                // On a phone, one menu button at the top right instead of a row of buttons
+                <div className="absolute top-4 right-4 z-10">
+                  <ControlMenu label={t('imageMenu')}>{imageControls(true)}</ControlMenu>
                 </div>
-                {/* back to the ordinary viewer, at the Canvas shown here */}
-                <Link
-                  href={`/viewer?${contentParam(manifestUrl)}${geoCanvasId ? `&canvas=${encodeURIComponent(geoCanvasId)}` : ''}`}
-                  className="bg-white dark:bg-gray-800 px-3 py-1 rounded-full shadow text-sm text-blue-600 dark:text-blue-400 hover:underline"
-                >
-                  {t('openInViewer')}
-                </Link>
-                {geoCanvas && (
-                  <label className="flex items-center gap-1.5 cursor-pointer bg-white dark:bg-gray-800 px-3 py-1 rounded-full shadow text-sm text-gray-700 dark:text-gray-300">
-                    <input type="checkbox" checked={showImageMarks} onChange={(e) => changeShowImageMarks(e.target.checked)} />
-                    {t('showImageMarks')}
-                  </label>
-                )}
-                {geoCanvas && (
-                  <RotationControl
-                    rotation={rotation}
-                    onChange={changeRotation}
-                    northUp={autoRotation}
-                    autoRotateOnSelect={autoRotateOnSelect}
-                    onAutoRotateOnSelectChange={changeAutoRotateOnSelect}
-                  />
-                )}
-              </div>
+              ) : (
+                // Wraps onto a second row on a narrow pane; each pill keeps its text on one line
+                <div className="absolute top-4 left-4 right-4 z-10 flex flex-wrap items-center gap-2 pointer-events-none whitespace-nowrap [&>*]:pointer-events-auto">
+                  <div className={`${pill} font-medium`}>{geoCanvasId ? t('image') : t('viewer3d')}</div>
+                  {imageControls(false)}
+                </div>
+              )}
               {geoCanvas && (
                 <GeoImageView
                   key={geoCanvasId}

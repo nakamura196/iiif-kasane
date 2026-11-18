@@ -18,6 +18,8 @@ import {
 } from 'iiif-kasane/core';
 import { BASEMAPS, basemapOf, type BasemapId } from './basemaps';
 import { searchPlaces, type PlaceResult } from './placeSearch';
+import ControlMenu from './ControlMenu';
+import { useNarrowScreen } from '@/lib/useNarrowScreen';
 
 /** Image to overlay on the map (e-zu, old map). corners are the longitude and latitude of top-left, top-right, bottom-right, bottom-left. */
 export interface MapImageOverlay {
@@ -42,8 +44,10 @@ interface MapViewProps {
   clustering?: boolean;
   /** When this changes, refit to a zoom that fits all points (when switching between Canvases that have points). */
   fitKey?: string;
-  /** Controls placed at the top left, in the same row as the place search (they wrap together on a narrow map). */
+  /** Controls placed at the top left, in the same row as the place search (they wrap together on a narrow map). Not shown on a phone. */
   toolbar?: ReactNode;
+  /** Controls placed after the toolbar on a wider screen, and in the map's menu on a phone. */
+  menu?: ReactNode;
 }
 
 const OVERLAY_SOURCE = 'georef-overlay';
@@ -71,7 +75,7 @@ class FitAllControl implements maplibregl.IControl {
   constructor(private readonly label: string, private readonly onFit: () => void) {}
   onAdd() {
     const container = document.createElement('div');
-    container.className = 'maplibregl-ctrl maplibregl-ctrl-group';
+    container.className = 'maplibregl-ctrl maplibregl-ctrl-group georef-fit-all';
     const button = document.createElement('button');
     button.type = 'button';
     button.title = this.label;
@@ -106,7 +110,10 @@ export default function MapView({
   clustering = true,
   fitKey,
   toolbar,
+  menu,
 }: MapViewProps) {
+  // On a phone only the place search and the current location stay on the map; the rest goes in a menu
+  const narrow = useNarrowScreen();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   // Name shown when hovering over a point, and the list of points at the same place
@@ -737,15 +744,60 @@ export default function MapView({
     }
   }, [selectedId, features]);
 
+  const basemapSelect = (className: string) => (
+    <select
+      value={basemap}
+      onChange={(e) => setBasemap(e.target.value as BasemapId)}
+      aria-label={t('basemap')}
+      title={t('basemap')}
+      className={`${className} text-gray-900 dark:text-gray-100`}
+    >
+      {BASEMAPS.map((b) => (
+        <option key={b.id} value={b.id}>
+          {t(b.labelKey)}
+        </option>
+      ))}
+    </select>
+  );
+
+  // Show or hide the overlaid image, and its opacity (at the bottom left, or in the menu on a phone)
+  const overlayControls = (
+    <>
+      <label className="flex items-center gap-1.5 cursor-pointer">
+        <input type="checkbox" checked={overlayVisible} onChange={(e) => setOverlayVisible(e.target.checked)} />
+        {t('overlayImage')}
+      </label>
+      <input
+        type="range"
+        min={0}
+        max={1}
+        step={0.05}
+        value={overlayOpacity}
+        disabled={!overlayVisible}
+        onChange={(e) => setOverlayOpacity(Number(e.target.value))}
+        aria-label={t('overlayOpacity')}
+        title={t('overlayOpacity')}
+        className="w-24 disabled:opacity-40"
+      />
+    </>
+  );
+
   return (
-    <div className="relative w-full h-full">
+    // On a phone, hide the zoom and compass buttons (pinch and rotate with two fingers instead)
+    // and "Show all" (it is in the menu)
+    <div data-menu-bounds className="relative w-full h-full max-sm:[&_.maplibregl-ctrl-group:has(.maplibregl-ctrl-zoom-in)]:hidden max-sm:[&_.georef-fit-all]:hidden">
       <div ref={mapContainer} className="w-full h-full" />
       {/* The toolbar on the left, then the place search and the basemap to the left of the zoom buttons.
           One wrapping row: on a narrow map the search moves to the next line instead of covering the toolbar. */}
       <div className="absolute top-4 right-12 left-4 z-10 flex flex-wrap items-start gap-2 pointer-events-none text-sm">
-        {toolbar && <div className="flex flex-wrap items-center gap-2 pointer-events-auto">{toolbar}</div>}
+        {!narrow && (toolbar || menu) && (
+          <div className="flex flex-wrap items-center gap-2 pointer-events-auto">
+            {toolbar}
+            {menu}
+          </div>
+        )}
         <div className="ml-auto flex min-w-0 flex-[1_1_20rem] items-start justify-end gap-2">
-        <div className="relative min-w-40 max-w-56 flex-1 pointer-events-auto">
+        <div className="relative min-w-40 max-w-56 max-sm:max-w-none flex-1 pointer-events-auto">
           <form
             role="search"
             onSubmit={(e) => {
@@ -809,19 +861,25 @@ export default function MapView({
             </div>
           )}
         </div>
-        <select
-          value={basemap}
-          onChange={(e) => setBasemap(e.target.value as BasemapId)}
-          aria-label={t('basemap')}
-          title={t('basemap')}
-          className="pointer-events-auto shrink-0 rounded-md bg-white/95 dark:bg-gray-800/95 px-2 py-1.5 shadow text-gray-900 dark:text-gray-100"
-        >
-          {BASEMAPS.map((b) => (
-            <option key={b.id} value={b.id}>
-              {t(b.labelKey)}
-            </option>
-          ))}
-        </select>
+        {narrow ? (
+          <ControlMenu label={t('mapMenu')}>
+            {menu}
+            <label className="flex flex-col gap-1">
+              <span>{t('basemap')}</span>
+              {basemapSelect('w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1.5')}
+            </label>
+            {overlay && <div className="flex items-center gap-2">{overlayControls}</div>}
+            <button
+              type="button"
+              onClick={() => fitAllRef.current()}
+              className="self-start rounded border border-gray-300 dark:border-gray-600 px-2 py-1 hover:bg-gray-50 dark:hover:bg-gray-700"
+            >
+              {t('fitAll')}
+            </button>
+          </ControlMenu>
+        ) : (
+          basemapSelect('pointer-events-auto shrink-0 rounded-md bg-white/95 dark:bg-gray-800/95 px-2 py-1.5 shadow')
+        )}
         </div>
       </div>
       {geolocateError && (
@@ -832,28 +890,9 @@ export default function MapView({
           </button>
         </div>
       )}
-      {overlay && (
+      {overlay && !narrow && (
         <div className="absolute bottom-8 left-2 z-10 flex items-center gap-2 rounded-md bg-white/90 dark:bg-gray-800/90 px-3 py-2 shadow text-sm text-gray-700 dark:text-gray-200">
-          <label className="flex items-center gap-1.5 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={overlayVisible}
-              onChange={(e) => setOverlayVisible(e.target.checked)}
-            />
-            {t('overlayImage')}
-          </label>
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.05}
-            value={overlayOpacity}
-            disabled={!overlayVisible}
-            onChange={(e) => setOverlayOpacity(Number(e.target.value))}
-            aria-label={t('overlayOpacity')}
-            title={t('overlayOpacity')}
-            className="w-24 disabled:opacity-40"
-          />
+          {overlayControls}
         </div>
       )}
     </div>
