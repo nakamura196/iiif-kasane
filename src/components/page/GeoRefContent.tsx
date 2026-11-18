@@ -58,7 +58,7 @@ import {
   type GeorefUrlState,
 } from 'iiif-kasane/core';
 
-// マニフェストからattributionを取得するヘルパー関数
+// Helper that gets the attribution from the manifest
 const getAttribution = (manifest: Record<string, unknown>, locale: string): string | undefined => {
   const requiredStatement = manifest.requiredStatement as {
     value?: Record<string, string[]>;
@@ -68,8 +68,8 @@ const getAttribution = (manifest: Record<string, unknown>, locale: string): stri
   return value[locale]?.[0] || value['en']?.[0] || value['none']?.[0] || Object.values(value)[0]?.[0];
 };
 
-// 地図に重ねる画像の URL。Image API があれば、地図に貼るのに足りる大きさ（長辺 4096 px まで）で取る。
-// 元の画像は数万 px になることがあり、そのままでは重く、ブラウザの上限も超える
+// URL of the image to overlay on the map. If an Image API is available, request a size large enough for the map (up to 4096 px on the long side).
+// The original image can be tens of thousands of px, which is too heavy and exceeds browser limits
 const OVERLAY_MAX = 4096;
 const overlayUrlOf = (layer: ImageLayer): string => {
   if (!layer.service) return layer.url;
@@ -78,16 +78,16 @@ const overlayUrlOf = (layer: ImageLayer): string => {
   return `${layer.service.id}/full/!${size},${size}/0/${quality}.jpg`;
 };
 
-// 表示の状態を URL に書き戻す間隔。地図や画像を動かしている間に、何度も書き換えないようにする
+// Interval for writing the view state back to the URL. Avoids rewriting it many times while the map or image is being moved
 const URL_WRITE_DELAY = 500;
 
-// URL の id は geo.ldas.jp では地物の id。Kasane の地点の名前（@id が先）と違うときがあるので、両方で引く
+// The id in the URL is the feature id in geo.ldas.jp. It can differ from the Kasane point name (@id comes first), so look up by both
 const featureIdFromParam = (features: GeoFeature[], id: string): string | undefined => {
   const idx = features.findIndex((f, i) => f.id === id || geoFeatureIdOf(f, i) === id);
   return idx < 0 ? undefined : geoFeatureIdOf(features[idx], idx);
 };
 
-// 画像と地図の組（画像の地点 x, y と地図の経度・緯度）
+// Pair of an image point and a map point (image point x, y and map longitude, latitude)
 const pairsOf = (features: GeoFeature[]) =>
   features.map((f) => ({
     x: f.properties.resourceCoords[0],
@@ -96,7 +96,7 @@ const pairsOf = (features: GeoFeature[]) =>
     lat: f.geometry.coordinates[1],
   }));
 
-// 入口に並べる例: 地図と画像の画面で開くユースケースと、geo.ldas.jp から移したタグ付きの Canvas
+// Examples listed on the entry screen: use cases that open the map and image view, and tagged Canvases moved from geo.ldas.jp
 const GEOREF_USE_CASES = USE_CASES.filter((u) => u.open.page === 'georef');
 const TAGGED_CANVAS_HREF = hrefOf({ page: 'georef', manifest: `${SITE_URL}/manifests/geo-hongo-canvas-tags.json` });
 
@@ -112,7 +112,7 @@ const GeoRefContent: NextPage = () => {
   const probes = useMemo(() => [modelBody ? probeServiceOf(modelBody, locale) : undefined], [modelBody, locale]);
   const [authState] = useAuthStates(probes, locale);
   const glbUrl = modelUrl ? authorizedUrl(modelUrl, authState) : null;
-  // 地点が画像（絵図・古地図）に付いているときは、その Canvas を 3D の代わりに出す
+  // When the points are attached to an image (e-zu, old map), show that Canvas instead of 3D
   const [geoCanvasId, setGeoCanvasId] = useState<string | undefined>(undefined);
   const geoCanvas = useCanvasImages(geoCanvasId ? manifestUrl : null, geoCanvasId);
   const [attribution, setAttribution] = useState<string | undefined>(undefined);
@@ -120,27 +120,27 @@ const GeoRefContent: NextPage = () => {
   const [selectedAnnotationId, setSelectedAnnotationId] = useAtom(selectedAnnotationIdAtom);
   const [geoFeatures, setGeoFeatures] = useState<GeoFeature[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  // 一覧で選んでいるタグ（どれかを持つ地点を残す）
+  // Tags selected in the list (keep points that have any of them)
   const [tagFilter, setTagFilter] = useState<string[]>([]);
-  // 地点の付いた Canvas すべて（geo.ldas.jp と同じく、1 つずつ切り替えて見る）
+  // All Canvases that have points (as in geo.ldas.jp, view them one at a time)
   const [geoCanvases, setGeoCanvases] = useState<GeoCanvas[]>([]);
-  // URL の画像の拡大率・中心は、開いたときの Canvas にだけ使う
+  // The image zoom and center in the URL are used only for the Canvas that is open on load
   const [useUrlImageView, setUseUrlImageView] = useState(true);
   const annotationRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-  // 開いたときの URL から読んだ表示の状態（geo.ldas.jp と同じ名前の引数）
+  // View state read from the URL on load (parameters have the same names as in geo.ldas.jp)
   const [urlState, setUrlState] = useState<GeorefUrlState | null>(null);
-  // 画像の回転（度、反時計回りが正）。URL の rotation と同じ値
+  // Image rotation (degrees, counterclockwise is positive). Same value as rotation in the URL
   const [rotation, setRotation] = useState(0);
-  // 地図か一覧で地点を選んだら、その近くで北が上になるよう回すか。URL の autoRotateOnSelect と同じ
+  // Whether to rotate so north is up near a point when it is selected on the map or list. Same as autoRotateOnSelect in the URL
   const [autoRotateOnSelect, setAutoRotateOnSelect] = useState(false);
-  // 近い地点を 1 つにまとめて件数を出すか（地図と画像の両方）。URL の clustering と同じ。既定はまとめる
+  // Whether to merge nearby points into one and show the count (both map and image). Same as clustering in the URL. Default is to merge
   const [clustering, setClustering] = useState(true);
-  // 画像に地点の印を出すか。URL の annotations と同じ。切っても地図の印と一覧はそのまま
+  // Whether to show point marks on the image. Same as annotations in the URL. Turning it off leaves the map marks and the list unchanged
   const [showImageMarks, setShowImageMarks] = useState(true);
-  // 右の欄で出すもの（地点の一覧か権利）。URL の search・license と同じ
+  // What to show in the right panel (point list or license). Same as search and license in the URL
   const [sideTab, setSideTab] = useState<GeorefSideTab>('list');
 
-  // 開いたとき、また入口のリンクで URL の資料が変わったときに読む
+  // Read on load, and when the document in the URL changes via an entry link
   const readUrl = useCallback(() => {
     const params = new URLSearchParams(window.location.search);
     const state = readGeorefParams(params, manifestFromParams(params));
@@ -154,7 +154,7 @@ const GeoRefContent: NextPage = () => {
     setManifestUrl(state.manifest);
   }, [setManifestUrl]);
 
-  // 表示の状態を URL に書き戻す（履歴は増やさない）。まとめて、動きが止まってから書く
+  // Write the view state back to the URL (without adding history entries). Batched, and written after movement stops
   const pendingPatch = useRef<GeorefParamPatch>({});
   const writeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const writeParams = useCallback((patch: GeorefParamPatch) => {
@@ -211,7 +211,7 @@ const GeoRefContent: NextPage = () => {
     [writeParams]
   );
 
-  // 権利のタブは、マニフェストに出典表記かライセンスがあるときだけ出す（ビューアの権利のタブと同じ）
+  // Show the license tab only when the manifest has an attribution or a license (same as the viewer's license tab)
   const hasRights = useMemo(() => !!manifest && rightsPanel.available({ manifest }), [manifest]);
   const shownSideTab: GeorefSideTab = sideTab === 'rights' && hasRights ? 'rights' : 'list';
 
@@ -224,9 +224,9 @@ const GeoRefContent: NextPage = () => {
       const parsed = parseManifestV4(manifest, undefined, locale);
       const { modelUrl, modelBody, annotations } = parsed;
       let { geoFeatures, geoCanvasId } = parsed;
-      // 地点の付いた Canvas が 2 つ以上あれば、URL の canvas のものを開く
+      // If there are two or more Canvases with points, open the one given by canvas in the URL
       const canvases = geoCanvasId ? geoCanvasesOf(manifest, locale) : [];
-      // ビューアと同じく、番号（1 から。マニフェストの何枚目か）でも id でもよい
+      // As in the viewer, either a number (from 1, the position in the manifest) or an id is accepted
       const want = urlState?.canvas;
       const wantId = want && /^\d+$/.test(want) ? manifest.items?.[Number(want) - 1]?.id : want;
       const fromUrl = canvases.find((c) => c.id === wantId);
@@ -245,7 +245,7 @@ const GeoRefContent: NextPage = () => {
       // the map names a place as the list does (in the page language)
       setGeoFeatures(geoFeaturesNamedBy(geoFeatures, listed));
       geoFeatures = geoFeaturesNamedBy(geoFeatures, listed);
-      // URL の id の地点を選んでおく
+      // Select the point given by id in the URL
       const id = urlState?.id;
       const selected = id ? featureIdFromParam(geoFeatures, id) : undefined;
       if (selected) setSelectedAnnotationId(selected);
@@ -254,25 +254,25 @@ const GeoRefContent: NextPage = () => {
 
   const handleManifestSubmit = async (manifestUrl: string) => {
     setManifestUrl(manifestUrl);
-    // 入力欄から開いたときも、URL を共有すれば同じものが開くようにする
+    // Make sure that sharing the URL opens the same thing even when it was opened from the input field
     const params = new URLSearchParams(window.location.search);
     params.set('iiif-content', manifestUrl);
     window.history.replaceState(window.history.state, '', `${window.location.pathname}?${params.toString()}`);
   };
 
-  // 選んでいる地点を URL の id に書く。geo.ldas.jp のリンクと揃えるため、地物に id があればそれを使う
+  // Write the selected point to id in the URL. To match geo.ldas.jp links, use the feature id when it has one
   useEffect(() => {
     if (geoFeatures.length === 0) return;
     const idx = geoFeatures.findIndex((f, i) => geoFeatureIdOf(f, i) === selectedAnnotationId);
     writeParams({ id: idx < 0 ? null : (geoFeatures[idx].id ?? geoFeatureIdOf(geoFeatures[idx], idx)) });
   }, [selectedAnnotationId, geoFeatures, writeParams]);
 
-  // 画像の地点と地図の地点の組
+  // Pairs of image points and map points
   const georefPairs = useMemo(() => pairsOf(geoFeatures), [geoFeatures]);
-  // 北が上になる回転。地点が 2 つ以上あるときだけ求まる
+  // Rotation that puts north up. Only available when there are two or more points
   const autoRotation = useMemo(() => northUpRotation(georefPairs), [georefPairs]);
 
-  // 開いたとき、URL に rotation が無ければ北が上になるよう回す（geo.ldas.jp と同じ）。1 つの資料につき 1 回だけ
+  // On load, if the URL has no rotation, rotate so north is up (same as geo.ldas.jp). Only once per document
   const autoRotatedFor = useRef<string | null>(null);
   useEffect(() => {
     if (!urlState || urlState.rotation !== undefined || autoRotation === null || !manifestUrl) return;
@@ -296,8 +296,8 @@ const GeoRefContent: NextPage = () => {
     [geoFeatures]
   );
 
-  // 画像を地図に重ねる。対応点から四隅の位置を求める（1 次の多項式、対応点が 3 つ以上のとき）。
-  // Canvas に画像が 1 枚だけ全面に貼られている場合に限る（一部に貼った画像や回転は扱わない）
+  // Overlay the image on the map. Compute the four corners from the control points (first-order polynomial, when there are three or more control points).
+  // Only when the Canvas has a single image covering the whole of it (partial images and rotation are not handled)
   const mapOverlay = useMemo((): MapImageOverlay | null => {
     const paintings = geoCanvas?.paintings ?? [];
     const layer = paintings.length === 1 ? paintings[0].options[0]?.layer : undefined;
@@ -315,7 +315,7 @@ const GeoRefContent: NextPage = () => {
     return corners ? { url: overlayUrlOf(layer), corners } : null;
   }, [geoCanvas, geoFeatures]);
 
-  // 別の Canvas に切り替える。地点・一覧・画像の向きをその Canvas のものにし、URL の canvas に書く
+  // Switch to another Canvas. Use that Canvas's points, list and image orientation, and write it to canvas in the URL
   const geoCanvasIndex = geoCanvases.findIndex((c) => c.id === geoCanvasId);
   const showGeoCanvas = (index: number) => {
     const c = geoCanvases[index];
@@ -326,12 +326,12 @@ const GeoRefContent: NextPage = () => {
     setSelectedAnnotationId(null);
     setTagFilter([]);
     setUseUrlImageView(false);
-    // 開いたときと同じく、北が上になるよう回す（地点が 2 つ未満なら回さない）
+    // As on load, rotate so north is up (do not rotate when there are fewer than two points)
     changeRotation(northUpRotation(pairsOf(c.features)) ?? 0);
     writeParams({ canvas: index === 0 ? null : c.id, zoom: null, centerX: null, centerY: null });
   };
 
-  // 一覧の絞り込み。番号と注記は絞り込む前の並びで引く
+  // Filtering of the list. Numbers and notes are looked up in the order before filtering
   const tagFacets = useMemo(() => georefTagFacets(annotations), [annotations]);
   const visibleIndices = useMemo(
     () => filterGeorefFeatures(geoFeatures, annotations, { query: searchQuery, tags: tagFilter }),
@@ -341,12 +341,12 @@ const GeoRefContent: NextPage = () => {
   const toggleTag = (tag: string) =>
     setTagFilter((cur) => (cur.includes(tag) ? cur.filter((t) => t !== tag) : [...cur, tag]));
 
-  // 画像の印から選んだとき。画像は回さない（見ている向きのまま印を押したので）
+  // When selected from a mark on the image. Do not rotate the image (the mark was clicked in the current orientation)
   const handleFeatureClick = (id: string) => {
     setSelectedAnnotationId(id);
   };
 
-  // 地図か一覧から選んだとき。スイッチが入っていれば、その地点の近くで北が上になるよう回す（geo.ldas.jp と同じ）
+  // When selected from the map or list. If the switch is on, rotate so north is up near that point (same as geo.ldas.jp)
   const handleFeatureSelect = (id: string) => {
     setSelectedAnnotationId(id);
     if (!autoRotateOnSelect) return;
@@ -355,7 +355,7 @@ const GeoRefContent: NextPage = () => {
     if (r !== null) changeRotation(r);
   };
 
-  // 選択されたアノテーションにスクロール
+  // Scroll to the selected annotation
   useEffect(() => {
     if (selectedAnnotationId) {
       const element = annotationRefs.current.get(selectedAnnotationId);
@@ -372,22 +372,24 @@ const GeoRefContent: NextPage = () => {
       </Suspense>
       <Header />
       <main className="flex-1 flex overflow-hidden">
-        {/* URL を読み終えてから地図と画像を作る（開いたときの縮尺・中心を渡すため） */}
+        {/* Create the map and image only after the URL has been read (to pass the zoom and center on load) */}
         {manifestUrl && urlState ? (
           <div className="flex flex-col lg:flex-row w-full h-full">
             {/* Map */}
             <div className="flex-1 min-h-0 lg:h-full lg:flex-[2] relative border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-gray-700">
-              <div className="absolute top-4 left-4 z-10 flex items-center gap-2">
-                <div className="bg-white dark:bg-gray-800 px-3 py-1 rounded-full shadow text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {t('map')}
-                </div>
-                {/* 地図と画像の両方に効く */}
-                <label className="flex items-center gap-1.5 cursor-pointer bg-white dark:bg-gray-800 px-3 py-1 rounded-full shadow text-sm text-gray-700 dark:text-gray-300">
-                  <input type="checkbox" checked={clustering} onChange={(e) => changeClustering(e.target.checked)} />
-                  {t('clustering')}
-                </label>
-              </div>
               <MapView
+                toolbar={
+                  <>
+                    <div className="whitespace-nowrap bg-white dark:bg-gray-800 px-3 py-1 rounded-full shadow text-sm font-medium text-gray-700 dark:text-gray-300">
+                      {t('map')}
+                    </div>
+                    {/* applies to both the map and the image */}
+                    <label className="flex items-center gap-1.5 whitespace-nowrap cursor-pointer bg-white dark:bg-gray-800 px-3 py-1 rounded-full shadow text-sm text-gray-700 dark:text-gray-300">
+                      <input type="checkbox" checked={clustering} onChange={(e) => changeClustering(e.target.checked)} />
+                      {t('clustering')}
+                    </label>
+                  </>
+                }
                 features={geoFeatures}
                 selectedId={selectedAnnotationId}
                 onFeatureClick={handleFeatureSelect}
@@ -402,7 +404,8 @@ const GeoRefContent: NextPage = () => {
             </div>
             {/* 3D Viewer, or the georeferenced picture */}
             <div className="flex-1 min-h-0 lg:h-full lg:flex-[2] relative bg-gray-100 dark:bg-gray-900 border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-gray-700">
-              <div className="absolute top-4 left-4 z-10 flex items-center gap-2">
+              {/* Wraps onto a second row on a narrow pane; each pill keeps its text on one line */}
+              <div className="absolute top-4 left-4 right-4 z-10 flex flex-wrap items-center gap-2 pointer-events-none whitespace-nowrap [&>*]:pointer-events-auto">
                 <div className="bg-white dark:bg-gray-800 px-3 py-1 rounded-full shadow text-sm font-medium text-gray-700 dark:text-gray-300">
                   {geoCanvasId ? t('image') : t('viewer3d')}
                 </div>
@@ -443,7 +446,7 @@ const GeoRefContent: NextPage = () => {
                   showMarkers={showImageMarks}
                 />
               )}
-              {/* 地点の付いた Canvas が 2 つ以上あるとき、前後に切り替える */}
+              {/* When there are two or more Canvases with points, switch between previous and next */}
               {geoCanvases.length > 1 && geoCanvasIndex >= 0 && (
                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 bg-white dark:bg-gray-800 rounded-full shadow px-1 py-1 text-sm text-gray-700 dark:text-gray-300">
                   <button
@@ -488,7 +491,7 @@ const GeoRefContent: NextPage = () => {
               {modelUrl && <AuthPrompt />}
             </div>
             {/* Annotations */}
-            {/* geo.ldas.jp の search=1・license=1 のリンクは、欄を畳んでいても開いて出す */}
+            {/* The search=1 and license=1 links of geo.ldas.jp open the panel and show it even if it is collapsed */}
             <SidePanel breakpoint="lg" className="bg-white dark:bg-gray-800 flex flex-col" openOnStart={!!urlState.sideTab}>
               {hasRights && (
                 <div role="tablist" className="flex gap-1 px-4 pr-10 pt-2 border-b border-gray-200 dark:border-gray-700">
@@ -547,7 +550,7 @@ const GeoRefContent: NextPage = () => {
                       </button>
                     )}
                   </div>
-                  {/* タグで絞り込む（件数の多い順。押すたびに入れる・外す） */}
+                  {/* Filter by tag (most frequent first; each click adds or removes it) */}
                   {tagFacets.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1.5 max-h-24 overflow-y-auto" role="group" aria-label={t('filterByTag')}>
                       {tagFacets.map(({ value, count }) => {
@@ -575,12 +578,12 @@ const GeoRefContent: NextPage = () => {
                   {visibleIndices
                     .map((index) => ({ feature: geoFeatures[index], index }))
                     .map(({ feature, index }) => {
-                      // 中身（説明・画像・タグ・参照）は 3D の画面の一覧と同じカードで出す
+                      // The content (description, image, tags, references) is shown with the same card as the list in the 3D view
                       const annotation = annotations[index];
                       if (!annotation) return null;
                       const wikipediaLink = feature.links?.find(link => link.type === 'primaryTopicOf')?.identifier;
                       const altNames = feature.names?.filter(name => name.toponym !== feature.properties.title);
-                      // geo.ldas.jp の一覧の ID の列（ID でも探せる）
+                      // ID column of the geo.ldas.jp list (points can be searched by ID too)
                       const featureId = feature.id ?? feature['@id'];
                       return (
                         <AnnotationCard
@@ -598,7 +601,7 @@ const GeoRefContent: NextPage = () => {
                               ID: {featureId}
                             </div>
                           )}
-                          {/* 地名の別名と Wikipedia は、georef の地物（Linked Places 形式）だけが持つ */}
+                          {/* Place name aliases and Wikipedia are only in georef features (Linked Places format) */}
                           {altNames && altNames.length > 0 && (
                             <div className="mt-2 pl-9 text-xs text-gray-500 dark:text-gray-400">
                               {altNames.map(n => n.toponym).join(', ')}
@@ -637,7 +640,7 @@ const GeoRefContent: NextPage = () => {
           </div>
         ) : (
           <div className="w-full h-full overflow-y-auto flex px-4 py-8">
-            {/* 入口の画面。中身が画面より高いときは上から並べてスクロールさせ（真ん中寄せだと上が切れる）、幅はトップに近い 768px まで */}
+            {/* Entry screen. When the content is taller than the screen, lay it out from the top and scroll (centering would cut off the top). The width goes up to 768px, close to the top page */}
             <div className="m-auto w-full max-w-3xl">
               <ManifestInput
                 onSubmit={handleManifestSubmit}
@@ -645,7 +648,7 @@ const GeoRefContent: NextPage = () => {
                 description={t('entryDescription')}
                 useCases={GEOREF_USE_CASES}
               >
-                {/* geo.ldas.jp から転送されて来た人が、何の画面かと使い方を分かるように */}
+                {/* So that people forwarded from geo.ldas.jp can tell what this screen is and how to use it */}
                 <div className="text-left text-sm text-[var(--ds-fg)] space-y-6">
                   <section>
                     <h3 className="font-medium mb-2">{t('entryHowTo')}</h3>

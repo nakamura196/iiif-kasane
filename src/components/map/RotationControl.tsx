@@ -32,7 +32,7 @@ export default function RotationControl({ rotation, onChange, northUp, autoRotat
         {t('rotation')}: {label}
       </button>
       {open && (
-        <div className="absolute left-0 mt-2 w-64 rounded-lg shadow-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-3 space-y-3 text-sm text-gray-700 dark:text-gray-300">
+        <div className="absolute left-0 mt-2 w-64 whitespace-normal rounded-lg shadow-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-3 space-y-3 text-sm text-gray-700 dark:text-gray-300">
           <label className="block">
             <span className="sr-only">{t('rotation')}</span>
             <input
