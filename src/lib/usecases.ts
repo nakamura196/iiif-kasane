@@ -663,6 +663,7 @@ export const USE_CASES: UseCase[] = [
       tab: 'layers',
     },
     features: ['image', 'video', 'layers'],
+    video: { ja: '8TKnhL9FOm4', en: 'aSfn6OeybyM' },
     site: 'https://github.com/nakamura196/hyakki-video-layers',
   },
 ];
