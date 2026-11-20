@@ -26,8 +26,8 @@ export type UseCaseOpen =
       tab?: ViewerTab;
       // キュレーションの何番目の項目を開くか（1 始まり）
       pos?: number;
-      // 何コマ目を開くか（1 始まり）
-      canvas?: number;
+      // The Canvas to open: a 1-based frame number, or a Canvas URI (with #xywh= it opens that region)
+      canvas?: number | string;
       // 文字の検索（tab: 'contentSearch'）で、開いたときに探しておく語
       query?: string;
     }
@@ -124,7 +124,7 @@ export function hrefOf(open: UseCaseOpen): string {
     case 'viewer':
       if (open.tab) q.push(`tab=${open.tab}`);
       if (open.pos) q.push(`pos=${open.pos}`);
-      if (open.canvas) q.push(`canvas=${open.canvas}`);
+      if (open.canvas) q.push(`canvas=${encodeURIComponent(String(open.canvas))}`);
       if (open.query) q.push(`q=${encodeURIComponent(open.query)}`);
       break;
     case 'compare':
@@ -644,6 +644,26 @@ export const USE_CASES: UseCase[] = [
     features: ['browse', 'curation'],
     video: { ja: 'rF0KxUX2dl4', en: 'aHHVXY2dF-c' },
     site: 'https://nakamura196.github.io/ndl-face-finder/',
+  },
+  {
+    id: 'hyakki-video-layers',
+    added: '2026-11-19',
+    title: {
+      ja: '『百鬼夜行図』の妖怪が動く（画像に動画をレイヤーとして重ねる）',
+      en: 'The Hyakki Yagyō scroll comes to life (videos as layers on an image)',
+    },
+    note: {
+      ja: '東京大学総合図書館が所蔵する『百鬼夜行図』に、AI で作った 19 本の短い動画を、切り出した元の場所へ重ねたマニフェストです。IIIF Cookbook の 0036（複数の画像を #xywh で 1 枚に組む例）の画像を、動画に置き換えた形をしています。拡大・移動すると、動画も絵に付いてきます。右の「レイヤー」タブで、動画ごとに表示・不透明度・重ね順を変えられ、「いちばん奥だけ表示」で元の絵だけに戻せます。動画は画面に入ったものだけを読み込みます。',
+      en: 'The Hyakki Yagyō scroll, held by the General Library, the University of Tokyo, with 19 short AI-generated clips placed back on the regions they were made from. The manifest has the shape of IIIF Cookbook recipe 0036 (several images composed onto one Canvas with #xywh), with videos in place of the images. The clips follow the picture as you zoom and pan. In the Layers tab on the right you can show or hide each clip, change its opacity and order, and go back to the original picture with “Show only the bottom layer”. Only the clips in view are loaded.',
+    },
+    open: {
+      page: 'viewer',
+      manifest: 'https://nakamura196.github.io/hyakki-video-layers/manifest.json',
+      canvas: 'https://example.org/hyakki/canvas/1#xywh=38500,0,6500,3082',
+      tab: 'layers',
+    },
+    features: ['image', 'video', 'layers'],
+    site: 'https://github.com/nakamura196/hyakki-video-layers',
   },
 ];
 
