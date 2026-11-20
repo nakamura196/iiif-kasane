@@ -79,6 +79,16 @@ export const moveLayer = (ids: string[], id: string, to: number): string[] => {
 export const imageLayerCount = (painting: PaintingContent[]): number =>
   painting.reduce((n, p) => n + p.options.filter((o) => o.kind === 'Image').length, 0);
 
+/**
+ * How many layers a Canvas has: its images, and the videos painted with them (recipe 0036 with a clip in place of
+ * an image). Decides whether the Layers tab is offered. A video in a Choice, or on a Canvas without an image, is not one.
+ */
+export const layerCountOf = (painting: PaintingContent[]): number => {
+  const images = imageLayerCount(painting);
+  if (images === 0) return 0;
+  return images + painting.filter((p) => p.options.length === 1 && p.options[0].kind === 'Video').length;
+};
+
 // 再生: 重ねた画像を段ごとに見せる。2 つの向きがある。
 // - 組み立て（build）: いちばん奥から始め、段ごとに手前の画像を足していく（起こし絵図を起こしていく見せ方）
 // - 取り外し（peel）: すべてを重ねた状態から始め、手前の段から隠していく

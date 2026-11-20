@@ -9,6 +9,7 @@ import {
   mediaTimeAt,
   rawCanvasOf,
   rawContainerOf,
+  isPictureWithVideo,
   sanitizeTemporalHtml,
   timelineImageUrl,
   timelineOf,
@@ -21,6 +22,7 @@ import { useTranslations } from '../env';
 import { usePlayback } from '../playback';
 import ChoiceBar from './ChoiceBar';
 import { flatDisplay } from './FlatDisplay';
+import { DISPLAYS } from './registry';
 import { MediaCover } from './ImageExtras';
 import { FIRST_FRAME } from './MediaView';
 import { useRawManifest } from './rawManifest';
@@ -279,6 +281,11 @@ function CompositeDisplayView(props: DisplayProps) {
     () => timelineOf(rawContainerOf(manifest, container.id), manifest),
     [manifest, container.id]
   );
+  // images and videos with no time (recipe 0036 with a clip in place of an image): the zoomable image, with the
+  // videos as its layers. Looked up when drawn (the registry imports this file)
+  const picture = useMemo(() => isPictureWithVideo(rawCanvasOf(raw ?? manifest, container.id)), [raw, manifest, container.id]);
+  const ImageCanvas = picture ? DISPLAYS.find((d) => d.id === 'image-canvas')?.Component : undefined;
+  if (ImageCanvas) return <ImageCanvas {...props} />;
   // when the timing cannot be read, show it the usual way
   if (!timeline || !isComposite(timeline)) return <flatDisplay.Component {...props} />;
   const hasVideo = timeline.items.some((m) => m.kind === 'Video');

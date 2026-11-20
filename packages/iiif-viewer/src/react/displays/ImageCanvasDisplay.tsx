@@ -7,13 +7,14 @@ import {
   choiceSidesOf,
   detailWidthOf,
   imageChoiceOf,
-  paintsImage,
   physdimOf,
   rawCanvasOf,
   type CanvasImages,
   type CanvasPainting,
   type ImageAnnotation,
   isLayerVisible,
+  isVideoLayer,
+  layerPaintingsOf,
   labelIn,
   layerItemsOf,
   layerOpacity,
@@ -41,6 +42,7 @@ import AuthPrompt from '../auth/AuthPrompt';
 import { useAuthPanels } from '../auth/authStore';
 import { AnnotationBoxes, MediaCover } from './ImageExtras';
 import ImageLayerView from './ImageTiles';
+import VideoLayerView from './VideoLayerView';
 import { LoadingChip, LoadingOverlay } from '../layout/Loading';
 import ImageView from './ImageView';
 import PhysicalRuler from './PhysicalRuler';
@@ -234,7 +236,16 @@ function ImageBody({
             }
           >
             {(stage) =>
-              drawn.map((it) => (
+              drawn.map((it) => isVideoLayer(it.layer) ? (
+                <VideoLayerView
+                  key={it.id}
+                  layer={it.layer}
+                  canvasWidth={width}
+                  canvasHeight={height}
+                  stage={stage}
+                  opacity={layerOpacity(it, settings)}
+                />
+              ) : (
                 <ImageLayerView
                   key={it.id}
                   layer={it.layer}
@@ -379,7 +390,8 @@ function ImageCanvasDisplay(props: DisplayProps) {
   const source = useMemo(() => rawCanvasOf(raw ?? props.manifest, container.id), [raw, props.manifest, container.id]);
   const images = useMemo(() => canvasImagesOf(source), [source]);
   const physdim = useMemo(() => physdimOf(source), [source]);
-  const imagePaintings = useMemo(() => images.paintings.filter(paintsImage), [images]);
+  // the images, and the videos placed with them (recipe 0036 with a clip): all drawn as layers
+  const imagePaintings = useMemo(() => layerPaintingsOf(images.paintings), [images]);
 
   if (waiting) {
     return (

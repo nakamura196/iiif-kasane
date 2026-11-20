@@ -1115,6 +1115,9 @@ export [type] interface ImageLayer {
     mirror: boolean;
     annotations: ImageAnnotation[];
     auth?: AuthProbeRef;
+    media?: 'Video';
+    format?: string;
+    summary?: unknown;
 }
 export [type] interface ImageRegion {
     x: number;
@@ -1945,6 +1948,7 @@ export [value] isGeoreferencing: (anno: Json) => boolean
 export [value] isImageBody: (b: AnnotationBodyItem) => boolean
 export [value] isImageInfoJson: (json: unknown) => boolean
 export [value] isLayerVisible: (item: LayerItem, settings: Record<string, LayerSetting>) => boolean
+export [value] isPictureWithVideo: (container: unknown) => boolean
 export [value] isPresentation2: (json: unknown) => boolean
 export [value] isPuzzleSolved: (b: PuzzleBoard) => boolean
 export [value] isResourceBody: (b: AnnotationBodyItem) => boolean
@@ -1953,6 +1957,7 @@ export [value] isSearchHit: (a: { motivations?: readonly string[] | undefined; }
 export [value] isTagBody: (b: AnnotationBodyItem) => boolean
 export [value] isTocNodeActive: (node: TocNode, canvasId: string | undefined, time?: number) => boolean
 export [value] isUnresolvableEditorId: (url: string | undefined) => boolean
+export [value] isVideoLayer: (layer: ImageLayer) => boolean
 export [value] isVtt: (s: SupplementingContent) => boolean
 export [value] kindFacets: (kinds: readonly string[]) => Facet[]
 export [value] kotenDetTensor: (square: Uint8ClampedArray<ArrayBufferLike>, side: number) => Float32Array<ArrayBufferLike>
@@ -1961,8 +1966,10 @@ export [value] labelIn: (label: unknown, locale: string) => string
 export [value] labelStrings: (label: unknown) => string[]
 export [value] languageMapOf: (label: unknown) => LanguageMap | undefined
 export [value] largestPart: (mask: ArrayLike<number>, w: number, h: number) => null | { mask: Uint8Array<ArrayBufferLike>; size: number; }
+export [value] layerCountOf: (painting: PaintingContent[]) => number
 export [value] layerItemsOf: (paintings: CanvasPainting[]) => LayerItem[]
 export [value] layerOpacity: (item: LayerItem, settings: Record<string, LayerSetting>) => number
+export [value] layerPaintingsOf: (paintings: CanvasPainting[]) => CanvasPainting[]
 export [value] layerThumbnailUrl: (layer: ImageLayer, height?: number) => string
 export [value] layoutGraph: (shown: VisibleGraph, rootId: string, previous?: GraphPositions | undefined) => PlacedNode[]
 export [value] level0BaseTiles: (service: ImageServiceRef, info: ImageInfo, region: ImageRegion, limit?: number) => Tile[] | null
@@ -2082,9 +2089,11 @@ export [value] readingOrder: <T extends LineDetection>(lines: T[]) => ReadingOrd
 export [value] readingTime: (step: StoryStep, locale: string) => number
 export [value] recentManifests: (start: Json, fetchJson: FetchJson, props?: { maxItems?: number | undefined; maxPages?: number | undefined; }) => Promise<ManifestRef[]>
 export [value] regionBoxPercent: (region: AnnotationRegion, canvasW: number, canvasH: number) => PercentBox | null
+export [value] regionInView: (region: ImageRegion, view: { x: number; y: number; w: number; h: number; }) => boolean
 export [value] regionNodeId: (regionId: string) => string
 export [value] regionOf: (id: string) => Region | undefined
 export [value] regionToCanvasOf: (region: ImageRegion, target: ImageRegion, imageWidth: number, imageHeight: number, outWidth: number, outHeight: number) => ImageToCanvas
+export [value] regionVolume: (region: ImageRegion, view: { x: number; y: number; w: number; h: number; }) => number
 export [value] regionXywh: (region: AnnotationRegion, pad?: number) => Xywh | undefined
 export [value] remoteGroupsOf: (targets: (CanvasTarget & { manifestUrl?: string | undefined; })[], containers: ContainerInfo[]) => { manifestUrl: string; targets: CanvasTarget[]; }[]
 export [value] renderingTranscriptOf: (container: unknown) => RenderingTranscript | undefined

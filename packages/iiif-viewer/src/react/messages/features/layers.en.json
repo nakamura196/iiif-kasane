@@ -6,6 +6,7 @@
     "loading": "Loading images...",
     "hint": "Upper layers are drawn in front. Drag or use ▲▼ to change the order.",
     "showAll": "Show all",
+    "bottomOnly": "Show only the bottom layer",
     "reset": "Reset",
     "layerN": "Image {n}",
     "choiceOption": "One of a choice",
@@ -24,6 +25,10 @@
     "interval": "Every",
     "seconds": "s",
     "loop": "Repeat",
-    "playStep": "{n} / {total}"
+    "playStep": "{n} / {total}",
+    "video": "Video",
+    "videoPlay": "Play the videos",
+    "videoPause": "Stop the videos",
+    "videoSound": "Sound (loudest at the middle of the view)"
   }
 }
