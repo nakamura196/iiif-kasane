@@ -6,6 +6,7 @@
     "loading": "画像を読み込み中...",
     "hint": "上ほど手前に描かれます。ドラッグか ▲▼ で重ね順を変えられます。",
     "showAll": "すべて表示",
+    "bottomOnly": "いちばん奥だけ表示",
     "reset": "初めの状態に戻す",
     "layerN": "画像 {n}",
     "choiceOption": "選択肢の 1 つ",
@@ -24,6 +25,10 @@
     "interval": "間隔",
     "seconds": "秒",
     "loop": "繰り返し",
-    "playStep": "{n} / {total}"
+    "playStep": "{n} / {total}",
+    "video": "動画",
+    "videoPlay": "動画を再生",
+    "videoPause": "動画を停止",
+    "videoSound": "音を出す（画面の中央に近い動画ほど大きく）"
   }
 }

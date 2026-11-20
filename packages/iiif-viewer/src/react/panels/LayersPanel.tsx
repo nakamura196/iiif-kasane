@@ -3,13 +3,16 @@
 import { useState } from 'react';
 import { useAtom, useAtomValue } from 'jotai';
 import {
-  imageLayerCount,
   isLayerVisible,
+  isPictureWithVideo,
+  isVideoLayer,
+  layerCountOf,
   labelIn,
   layerOpacity,
   layerThumbnailUrl,
   moveLayer,
   orderLayers,
+  rawCanvasOf,
   playbackGroups,
   playbackSettings,
   playbackStepCount,
@@ -23,6 +26,7 @@ import {
   layerPlaybackOptionsAtom,
   layerSettingsAtom,
 } from '../atoms';
+import { videoLayersPlayingAtom, videoLayersSoundAtom } from '../displays/videoLayerState';
 import { useLocale, useTranslations } from '../env';
 import type { Panel, PanelContext } from './types';
 
@@ -56,6 +60,24 @@ function PlayIcon({ playing }: { playing: boolean }) {
 // 再生の間隔（秒）
 const INTERVALS = [0.5, 1, 1.5, 2, 3, 5];
 
+// The thumbnail of a video row: the same place cut from the base image (the clip was made from it), so opening
+// the tab does not fetch every clip. Undefined when the base image has no Image API service or is not whole.
+const videoThumbnailOf = (
+  video: LayerItem['layer'],
+  base: LayerItem['layer'] | undefined,
+  canvasWidth: number | undefined,
+  canvasHeight: number | undefined,
+): string | undefined => {
+  const r = video.target;
+  if (!r || !base?.service || base.target || base.regionSpec || !base.width || !base.height) return undefined;
+  if (!canvasWidth || !canvasHeight) return undefined;
+  const sx = base.width / canvasWidth;
+  const sy = base.height / canvasHeight;
+  const region = [r.x * sx, r.y * sy, r.w * sx, r.h * sy].map(Math.round).join(',');
+  const q = base.service.version === 1 ? 'native' : 'default';
+  return `${base.service.id}/${region}/,96/0/${q}.jpg`;
+};
+
 function LayersTab({ container }: PanelContext) {
   const t = useTranslations('Layers');
   const locale = useLocale();
@@ -67,6 +89,8 @@ function LayersTab({ container }: PanelContext) {
   const [playback, setPlayback] = useAtom(layerPlaybackAtom);
   const [{ seconds, loop, direction }, setOptions] = useAtom(layerPlaybackOptionsAtom);
   const playing = playback && playback.canvasId === container?.id ? playback : null;
+  const [videosPlaying, setVideosPlaying] = useAtom(videoLayersPlayingAtom);
+  const [videoSound, setVideoSound] = useAtom(videoLayersSoundAtom);
 
   if (!container || !current || current.canvasId !== container.id) {
     return <div className="p-4 text-sm text-[var(--ds-fg)]">{t('loading')}</div>;
@@ -77,6 +101,9 @@ function LayersTab({ container }: PanelContext) {
   const ids = bottomFirst.map((it) => it.id);
   const topFirst = bottomFirst.slice().reverse();
   const number = new Map(items.map((it, i) => [it.id, i + 1]));
+  const baseImage = bottomFirst.find((it) => !isVideoLayer(it.layer))?.layer;
+  const videoThumb = (layer: LayerItem['layer']) =>
+    videoThumbnailOf(layer, baseImage, container.width, container.height);
   const nameOf = (it: LayerItem) => labelIn(it.label, locale) || t('layerN', { n: number.get(it.id) ?? 0 });
 
   const patch = (id: string, change: { visible?: boolean; opacity?: number }) =>
@@ -90,6 +117,15 @@ function LayersTab({ container }: PanelContext) {
   const showAll = () => {
     setPlayback(null);
     setSettings((s) => ({ ...s, ...Object.fromEntries(items.map((it) => [it.id, { ...s[it.id], visible: true }])) }));
+  };
+  // Keep only the bottom layer (in the current order) and hide the others
+  const bottomOnly = () => {
+    setPlayback(null);
+    const bottom = bottomFirst[0]?.id;
+    setSettings((s) => ({
+      ...s,
+      ...Object.fromEntries(items.map((it) => [it.id, { ...s[it.id], visible: it.id === bottom }])),
+    }));
   };
   const togglePlay = () => {
     if (playing) {
@@ -111,6 +147,9 @@ function LayersTab({ container }: PanelContext) {
         <p className="flex-1 min-w-0 text-xs text-gray-500 dark:text-gray-400">{t('hint')}</p>
         <button type="button" onClick={showAll} className="text-xs underline">
           {t('showAll')}
+        </button>
+        <button type="button" onClick={bottomOnly} className="text-xs underline">
+          {t('bottomOnly')}
         </button>
         <button type="button" onClick={reset} className="text-xs underline">
           {t('reset')}
@@ -167,6 +206,23 @@ function LayersTab({ container }: PanelContext) {
           </span>
         )}
       </div>
+      {items.some((it) => isVideoLayer(it.layer)) && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-2 rounded border border-[var(--ds-border)] p-2">
+          <button
+            type="button"
+            onClick={() => setVideosPlaying(!videosPlaying)}
+            aria-pressed={videosPlaying}
+            className="inline-flex items-center gap-1 rounded border border-[var(--ds-border)] px-2 py-1 text-xs hover:bg-gray-100 dark:hover:bg-gray-800"
+          >
+            <PlayIcon playing={videosPlaying} />
+            {t(videosPlaying ? 'videoPause' : 'videoPlay')}
+          </button>
+          <label className="inline-flex items-center gap-1 text-xs">
+            <input type="checkbox" checked={videoSound} onChange={(e) => setVideoSound(e.target.checked)} />
+            {t('videoSound')}
+          </label>
+        </div>
+      )}
       <ol className="space-y-2">
         {topFirst.map((it) => {
           const visible = isLayerVisible(it, settings);
@@ -205,18 +261,45 @@ function LayersTab({ container }: PanelContext) {
                 <span className="cursor-grab select-none text-gray-400" title={t('drag')} aria-hidden="true">
                   ⠿
                 </span>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={layerThumbnailUrl(it.layer, 96)}
-                  alt=""
-                  draggable={false}
-                  className={`w-12 h-12 object-contain shrink-0 bg-gray-100 dark:bg-gray-800 ${visible ? '' : 'opacity-40'}`}
-                />
+                {isVideoLayer(it.layer) ? (
+                  videoThumb(it.layer) ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={videoThumb(it.layer)}
+                      alt=""
+                      draggable={false}
+                      className={`w-12 h-12 object-contain shrink-0 bg-gray-100 dark:bg-gray-800 ${visible ? '' : 'opacity-40'}`}
+                    />
+                  ) : (
+                    // no image to cut from: an empty box (preload="none", so the clip is not fetched)
+                    <video
+                      src={`${it.layer.url.split('#')[0]}#t=0.1`}
+                      muted
+                      playsInline
+                      preload="none"
+                      aria-hidden
+                      className={`w-12 h-12 object-contain shrink-0 bg-gray-100 dark:bg-gray-800 pointer-events-none ${visible ? '' : 'opacity-40'}`}
+                    />
+                  )
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={layerThumbnailUrl(it.layer, 96)}
+                    alt=""
+                    draggable={false}
+                    className={`w-12 h-12 object-contain shrink-0 bg-gray-100 dark:bg-gray-800 ${visible ? '' : 'opacity-40'}`}
+                  />
+                )}
                 <div className="flex-1 min-w-0">
                   <div className="truncate" title={name}>
                     {name}
                   </div>
                   {it.choice && <div className="text-xs text-gray-500 dark:text-gray-400">{t('choiceOption')}</div>}
+                  {isVideoLayer(it.layer) && (
+                    <div className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2" title={labelIn(it.layer.summary, locale) || undefined}>
+                      {labelIn(it.layer.summary, locale) || t('video')}
+                    </div>
+                  )}
                 </div>
                 <button
                   type="button"
@@ -290,6 +373,12 @@ export const layersPanel: Panel = {
   id: 'layers',
 
   order: 40,
-  available: ({ container }) => imageLayerCount(container?.painting ?? []) > 1,
+  // videos count only where the image display draws them (a picture with video); a timed Canvas goes to the stage
+  available: ({ container, manifest, shown }) =>
+    !!container &&
+    layerCountOf(
+      container.painting,
+      isPictureWithVideo(rawCanvasOf(shown?.raw ?? manifest, container.id) ?? rawCanvasOf(manifest, container.id)),
+    ) > 1,
   Component: LayersTab,
 };

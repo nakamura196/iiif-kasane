@@ -7,13 +7,14 @@ import {
   choiceSidesOf,
   detailWidthOf,
   imageChoiceOf,
-  paintsImage,
   physdimOf,
   rawCanvasOf,
   type CanvasImages,
   type CanvasPainting,
   type ImageAnnotation,
   isLayerVisible,
+  isVideoLayer,
+  layerPaintingsOf,
   labelIn,
   layerItemsOf,
   layerOpacity,
@@ -41,6 +42,7 @@ import AuthPrompt from '../auth/AuthPrompt';
 import { useAuthPanels } from '../auth/authStore';
 import { AnnotationBoxes, MediaCover } from './ImageExtras';
 import ImageLayerView from './ImageTiles';
+import VideoLayerView from './VideoLayerView';
 import { LoadingChip, LoadingOverlay } from '../layout/Loading';
 import ImageView from './ImageView';
 import PhysicalRuler from './PhysicalRuler';
@@ -95,7 +97,7 @@ function ImageBody({
   const setCanvasLayers = useSetAtom(canvasLayersAtom);
 
   // every image (each option of a Choice too) is a layer; the Layers tab changes how they are drawn
-  const items = useMemo(() => layerItemsOf(paintings), [paintings]);
+  const items = useMemo(() => layerItemsOf(paintings, { videos: true }), [paintings]);
   useEffect(() => {
     setCanvasLayers({ canvasId: container.id, items });
   }, [container.id, items, setCanvasLayers]);
@@ -156,7 +158,8 @@ function ImageBody({
   const { width, height } = images;
   // the same for every visibility and order, so switching layers keeps the zoom
   const key = items.map((it) => it.layer.url).join('|');
-  const base = items[0]?.id;
+  // the base is the first image (a video may come first in the manifest)
+  const base = items.find((it) => !isVideoLayer(it.layer))?.id;
   const baseLayer = drawn.find((it) => it.id === base)?.layer;
   const baseShown = !!baseLayer && shownBase === baseLayer.url;
   // only for an image that is drawn, has a size and is not waiting for a login
@@ -234,7 +237,16 @@ function ImageBody({
             }
           >
             {(stage) =>
-              drawn.map((it) => (
+              drawn.map((it) => isVideoLayer(it.layer) ? (
+                <VideoLayerView
+                  key={it.id}
+                  layer={it.layer}
+                  canvasWidth={width}
+                  canvasHeight={height}
+                  stage={stage}
+                  opacity={layerOpacity(it, settings)}
+                />
+              ) : (
                 <ImageLayerView
                   key={it.id}
                   layer={it.layer}
@@ -260,7 +272,10 @@ function ImageBody({
           </ImageView>
         ) : (
           // neither the Canvas nor the image says how big it is: the plain image
-          drawn[0] && <ImageView key={drawn[0].layer.url} src={drawn[0].layer.url} container={container} />
+          (() => {
+            const first = drawn.find((it) => !isVideoLayer(it.layer));
+            return first && <ImageView key={first.layer.url} src={first.layer.url} container={container} />;
+          })()
         )}
         <AuthPrompt />
         {failedBase && items.length === 1 && !authPending && <FailedHint />}
@@ -379,7 +394,8 @@ function ImageCanvasDisplay(props: DisplayProps) {
   const source = useMemo(() => rawCanvasOf(raw ?? props.manifest, container.id), [raw, props.manifest, container.id]);
   const images = useMemo(() => canvasImagesOf(source), [source]);
   const physdim = useMemo(() => physdimOf(source), [source]);
-  const imagePaintings = useMemo(() => images.paintings.filter(paintsImage), [images]);
+  // the images, and the videos placed with them (recipe 0036 with a clip): all drawn as layers
+  const imagePaintings = useMemo(() => layerPaintingsOf(images.paintings), [images]);
 
   if (waiting) {
     return (

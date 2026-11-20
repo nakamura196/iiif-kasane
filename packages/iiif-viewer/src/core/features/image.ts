@@ -49,6 +49,15 @@ export interface ImageLayer {
   annotations: ImageAnnotation[];
   /** The AuthProbeService2 of the image (IIIF Authorization Flow 2.0), when the manifest declares one. */
   auth?: AuthProbeRef;
+  /**
+   * 'Video': a video painted with the images (recipe 0036 with a clip in place of an image), drawn and
+   * stacked like the image layers. Absent: an image.
+   */
+  media?: 'Video';
+  /** MIME type of the resource, as the manifest says. */
+  format?: string;
+  /** The resource's `summary` (a description, such as how a clip was made). */
+  summary?: unknown;
 }
 
 /** An annotation drawn as a box on the image. Image bodies and text are what the box shows. */
@@ -366,6 +375,21 @@ const parseSelectorSize = (selector: Json | undefined): { w: number; h: number }
   return m ? { w: Number(m[1]), h: Number(m[2]) } : undefined;
 };
 
+/** A video as a layer: where it goes on the Canvas and how big it is (it is drawn only over an image). */
+const videoLayerOf = (resource: Json, url: string, annotation: Json, canvas: { width?: number; height?: number }): ImageLayer => {
+  const layer: ImageLayer = { url, rotation: 0, mirror: false, annotations: [], media: 'Video' };
+  const target = targetOf(annotation.target, canvas);
+  if (target.region) layer.target = target.region;
+  const w = num(resource.width);
+  const h = num(resource.height);
+  if (w !== undefined) layer.width = w;
+  if (h !== undefined) layer.height = h;
+  const format = str(resource.format);
+  if (format) layer.format = format;
+  if (resource.summary !== undefined) layer.summary = resource.summary;
+  return layer;
+};
+
 const optionOf = (
   body: Json,
   annotation: Json,
@@ -381,6 +405,8 @@ const optionOf = (
     const layer = layerOf(body, annotation, canvas);
     if (!layer) return null;
     option.layer = layer;
+  } else if (kind === 'Video') {
+    option.layer = videoLayerOf(inner, url, annotation, canvas);
   }
   return option;
 };
@@ -472,6 +498,20 @@ const companionOf = (raw: unknown): CompanionImage | undefined => {
 /** One of the candidates of the painting is an image. */
 export const paintsImage = (p: CanvasPainting): boolean => p.options.some((o) => o.kind === 'Image');
 
+/** The layer is a video (drawn with the images, recipe 0036 with a clip). */
+export const isVideoLayer = (layer: ImageLayer): boolean => layer.media === 'Video';
+
+/**
+ * The paintings drawn as layers of an image Canvas: the images, and, when there is an image, the videos placed
+ * with them (not in a Choice). A Canvas of only video is not one: it is played as a video.
+ */
+export const layerPaintingsOf = (paintings: CanvasPainting[]): CanvasPainting[] => {
+  if (!paintings.some(paintsImage)) return [];
+  return paintings.filter(
+    (p) => paintsImage(p) || (p.options.length === 1 && p.options[0].kind === 'Video' && !!p.options[0].layer),
+  );
+};
+
 /** The image painting a comparison uses (and the viewer links to): the first one with two or more candidates. */
 export const imageChoiceOf = (images: CanvasImages | undefined): CanvasPainting | undefined =>
   images?.paintings.find((p) => paintsImage(p) && p.options.length > 1);
@@ -484,7 +524,7 @@ export const chosenLayersOf = (paintings: CanvasPainting[], indexOf: (p: CanvasP
 
 /** Width of the sharpest source image; it decides how far one can zoom in. */
 export const detailWidthOf = (layers: ImageLayer[]): number | undefined =>
-  Math.max(0, ...layers.map((l) => l.width ?? 0)) || undefined;
+  Math.max(0, ...layers.filter((l) => !isVideoLayer(l)).map((l) => l.width ?? 0)) || undefined;
 
 /** What a Canvas (as in the source manifest) paints and shows around its painting. */
 export const canvasImagesOf = (canvas: unknown): CanvasImages => {
