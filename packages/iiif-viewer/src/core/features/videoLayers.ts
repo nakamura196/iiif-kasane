@@ -11,7 +11,7 @@ import { timelineOf } from './temporal';
 
 /**
  * A picture made of images and videos with no time: the Canvas has no `duration`, no target has "#t=", it paints
- * only images and videos (no sound, no text), at least one of each. It is shown as a zoomable image with its
+ * only images and videos (no sound, no text), at least one of each, and no video is inside a Choice. It is shown as a zoomable image with its
  * videos as layers, not on the timed stage (recipe 0489 and the like, which have a duration).
  */
 export const isPictureWithVideo = (container: unknown): boolean => {
@@ -20,6 +20,8 @@ export const isPictureWithVideo = (container: unknown): boolean => {
   const timeline = timelineOf(c);
   if (!timeline || timeline.items.length === 0) return false;
   if (timeline.items.some((m) => m.timed || (m.kind !== 'Image' && m.kind !== 'Video'))) return false;
+  // a video offered as a Choice is not a layer (layerPaintingsOf keeps single videos only); leave it to the stage
+  if (timeline.items.some((m) => m.kind === 'Video' && m.choiceId != null)) return false;
   return timeline.items.some((m) => m.kind === 'Image') && timeline.items.some((m) => m.kind === 'Video');
 };
 

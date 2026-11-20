@@ -46,9 +46,16 @@ export default function VideoLayerView({
   // within one view's size around the view
   const near = regionInView(region, visibleBoxOf(stage, canvasWidth, canvasHeight, 2));
   const big = region.w * pixelsPerUnit(stage, canvasWidth) >= MIN_SCREEN_WIDTH;
-  const shown = near && big;
+  // before the view has measured itself every clip would look near and big: show none until then
+  const measured = !!stage && stage.stageW > 0 && stage.boxW > 0;
+  const shown = measured && near && big;
   const onScreen = shown && regionInView(region, view);
   const volume = sound ? regionVolume(region, view) : undefined;
+  // read by the play() fallback, which runs later: retry only if the clip should still play
+  const wanted = useRef(false);
+  useEffect(() => {
+    wanted.current = playing && onScreen;
+  }, [playing, onScreen]);
 
   useEffect(() => {
     const el = ref.current;
@@ -61,9 +68,10 @@ export default function VideoLayerView({
     const el = ref.current;
     if (!el) return;
     if (playing && onScreen) {
-      el.play().catch(() => {
-        // sound may be refused before a click on the page: play muted instead
-        if (!el.muted) {
+      el.play().catch((err: unknown) => {
+        // sound may be refused before a click on the page: play muted instead. A pause() during play() also
+        // rejects it (AbortError); that is not a refusal, so the clip stays paused
+        if ((err as { name?: string } | null)?.name === 'NotAllowedError' && wanted.current && !el.muted) {
           el.muted = true;
           el.play().catch(() => {});
         }

@@ -23,12 +23,15 @@ export interface LayerSetting {
   opacity?: number;
 }
 
-/** The image layers of a Canvas, bottom first (painting order: later paintings are drawn on top). */
-export const layerItemsOf = (paintings: CanvasPainting[]): LayerItem[] =>
+/**
+ * The image layers of a Canvas, bottom first (painting order: later paintings are drawn on top).
+ * Videos painted with the images are left out unless `videos` is set (only the image display draws them).
+ */
+export const layerItemsOf = (paintings: CanvasPainting[], { videos = false }: { videos?: boolean } = {}): LayerItem[] =>
   paintings.flatMap((p) => {
     const choice = p.options.length > 1;
     return p.options.flatMap((o, j) =>
-      o.layer
+      o.layer && (videos || o.layer.media !== 'Video')
         ? [
             {
               id: choice ? `${p.id}::${j}` : p.id,
@@ -83,9 +86,9 @@ export const imageLayerCount = (painting: PaintingContent[]): number =>
  * How many layers a Canvas has: its images, and the videos painted with them (recipe 0036 with a clip in place of
  * an image). Decides whether the Layers tab is offered. A video in a Choice, or on a Canvas without an image, is not one.
  */
-export const layerCountOf = (painting: PaintingContent[]): number => {
+export const layerCountOf = (painting: PaintingContent[], withVideos = true): number => {
   const images = imageLayerCount(painting);
-  if (images === 0) return 0;
+  if (images === 0 || !withVideos) return images;
   return images + painting.filter((p) => p.options.length === 1 && p.options[0].kind === 'Video').length;
 };
 

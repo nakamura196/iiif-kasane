@@ -65,7 +65,7 @@ describe('a video painted with an image is a layer (0036 with a clip)', () => {
   const images = canvasImagesOf(canvas);
 
   it('reads the video as a layer placed on its target', () => {
-    const items = layerItemsOf(layerPaintingsOf(images.paintings));
+    const items = layerItemsOf(layerPaintingsOf(images.paintings), { videos: true });
     expect(items.map((it) => [isVideoLayer(it.layer), it.layer.target])).toEqual([
       [false, undefined],
       [true, { x: 38601, y: 181, w: 2440, h: 2690 }],
@@ -79,6 +79,10 @@ describe('a video painted with an image is a layer (0036 with a clip)', () => {
   it('counts the videos as layers, so the Layers tab is offered', () => {
     const [info] = containersOf(manifestOf(canvas) as never);
     expect(layerCountOf(info.painting)).toBe(3);
+  });
+
+  it('leaves the videos out of the image layers unless asked (the Download tab and other image users)', () => {
+    expect(layerItemsOf(images.paintings).map((it) => it.id)).toEqual([image.id]);
   });
 
   it('is a picture, not a timeline', () => {
@@ -103,6 +107,14 @@ describe('what is not a picture with video', () => {
   it('a Canvas that also paints sound', () => {
     const sound = { ...image, id: 'x', body: { id: 'https://example.org/a.mp3', type: 'Sound' } };
     expect(isPictureWithVideo(canvasWith([image, sound, video(1, `${CANVAS}#xywh=1,2,3,4`)]))).toBe(false);
+  });
+
+  it('videos offered as a Choice (left to the stage, which shows them)', () => {
+    const choice = {
+      ...video(1, `${CANVAS}#xywh=1,2,3,4`),
+      body: { type: 'Choice', items: [video(1, CANVAS).body, video(2, CANVAS).body] },
+    };
+    expect(isPictureWithVideo(canvasWith([image, choice]))).toBe(false);
   });
 
   it('images only (recipe 0036 itself)', () => {

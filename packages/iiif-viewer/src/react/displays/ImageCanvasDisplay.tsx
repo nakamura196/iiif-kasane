@@ -97,7 +97,7 @@ function ImageBody({
   const setCanvasLayers = useSetAtom(canvasLayersAtom);
 
   // every image (each option of a Choice too) is a layer; the Layers tab changes how they are drawn
-  const items = useMemo(() => layerItemsOf(paintings), [paintings]);
+  const items = useMemo(() => layerItemsOf(paintings, { videos: true }), [paintings]);
   useEffect(() => {
     setCanvasLayers({ canvasId: container.id, items });
   }, [container.id, items, setCanvasLayers]);
@@ -158,7 +158,8 @@ function ImageBody({
   const { width, height } = images;
   // the same for every visibility and order, so switching layers keeps the zoom
   const key = items.map((it) => it.layer.url).join('|');
-  const base = items[0]?.id;
+  // the base is the first image (a video may come first in the manifest)
+  const base = items.find((it) => !isVideoLayer(it.layer))?.id;
   const baseLayer = drawn.find((it) => it.id === base)?.layer;
   const baseShown = !!baseLayer && shownBase === baseLayer.url;
   // only for an image that is drawn, has a size and is not waiting for a login
@@ -271,7 +272,10 @@ function ImageBody({
           </ImageView>
         ) : (
           // neither the Canvas nor the image says how big it is: the plain image
-          drawn[0] && <ImageView key={drawn[0].layer.url} src={drawn[0].layer.url} container={container} />
+          (() => {
+            const first = drawn.find((it) => !isVideoLayer(it.layer));
+            return first && <ImageView key={first.layer.url} src={first.layer.url} container={container} />;
+          })()
         )}
         <AuthPrompt />
         {failedBase && items.length === 1 && !authPending && <FailedHint />}
