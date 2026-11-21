@@ -64,6 +64,8 @@ export class IiifViewerElement extends HTMLElement {
   private tab: InfoTab | undefined;
   // Content language: starts from the attribute, then follows the reader's choice (an attribute change takes over again).
   private contentLanguage: string | undefined;
+  // true once the reader has chosen (also "Automatic", which leaves contentLanguage undefined): a reconnect keeps it
+  private contentLanguageByReader = false;
 
   connectedCallback() {
     if (!this.container) {
@@ -72,7 +74,7 @@ export class IiifViewerElement extends HTMLElement {
       this.appendChild(this.container);
     }
     this.tab ??= parseOptions(this.getAttribute('options')).tab;
-    this.contentLanguage ??= this.getAttribute('content-language')?.trim() || undefined;
+    if (!this.contentLanguageByReader) this.contentLanguage = this.getAttribute('content-language')?.trim() || undefined;
     // After a reconnect the old root is gone; create a new one.
     this.root ??= createRoot(this.container);
     this.render();
@@ -84,7 +86,11 @@ export class IiifViewerElement extends HTMLElement {
   }
 
   attributeChangedCallback(name: string) {
-    if (name === 'content-language') this.contentLanguage = this.getAttribute('content-language')?.trim() || undefined;
+    if (name === 'content-language') {
+      // the page set the attribute: it takes over again from the reader's choice
+      this.contentLanguageByReader = false;
+      this.contentLanguage = this.getAttribute('content-language')?.trim() || undefined;
+    }
     if (name === 'options') this.tab = parseOptions(this.getAttribute('options')).tab;
     if (this.root) this.render();
   }
@@ -121,6 +127,7 @@ export class IiifViewerElement extends HTMLElement {
         // the reader's choice is kept here and told to the embedding page (it may write it into its own URL)
         onContentLanguageChange: (language) => {
           this.contentLanguage = language;
+          this.contentLanguageByReader = true;
           this.dispatchEvent(
             new CustomEvent('kasane-content-language', { detail: { language }, bubbles: true, composed: true }),
           );

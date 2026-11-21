@@ -9,7 +9,7 @@ import {
   timedTextsOf,
   transcriptOf,
   type CaptionFile,
-  primaryLanguage,
+  languageRank,
 } from '../../core';
 import TranscriptPanel, { CueList } from '../displays/TranscriptPanel';
 import { useContentLocale, useTranslations } from '../env';
@@ -33,15 +33,16 @@ const sources = (ctx: PanelContext) => {
   };
 };
 
-const sameLang = (a: string | undefined, locale: string) =>
-  !!a && a.split('-')[0].toLowerCase() === primaryLanguage(locale).split('-')[0].toLowerCase();
+// the caption file that fits the preference list best (chosen content language, then the UI language); none fits: the first
+const bestFile = (files: CaptionFile[], locale: string) =>
+  files.reduce((best, f) => (languageRank(f.language, locale) < languageRank(best.language, locale) ? f : best), files[0]);
 
 function CaptionFiles({ files }: { files: CaptionFile[] }) {
   const t = useTranslations('Transcript');
   const locale = useContentLocale();
   const { currentTime, seek } = usePlayback();
   const [picked, setPicked] = useState<string | null>(null);
-  const url = picked && files.some((f) => f.url === picked) ? picked : (files.find((f) => sameLang(f.language, locale)) ?? files[0]).url;
+  const url = picked && files.some((f) => f.url === picked) ? picked : bestFile(files, locale).url;
   const file = files.find((f) => f.url === url)!;
   return (
     <div className="h-full flex flex-col">

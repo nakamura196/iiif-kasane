@@ -10,7 +10,7 @@
 
 import type { SceneV4 } from '../types/iiif';
 import { transformMatrixOf } from './modelTransform';
-import { preferredLanguages } from './contentLanguage';
+import { keysInOrder } from './contentLanguage';
 
 export interface ModelOption {
   url: string;
@@ -112,7 +112,7 @@ export const labelIn = (label: unknown, locale: string): string => {
   if (typeof label === 'string') return label;
   if (!label || typeof label !== 'object') return '';
   const map = label as Record<string, unknown>;
-  for (const lang of [...preferredLanguages(locale), 'none', 'en', ...Object.keys(map)]) {
+  for (const lang of keysInOrder(map, locale)) {
     const v = map[lang];
     if (Array.isArray(v) && v.length > 0) return v.map(String).join(' ');
     if (typeof v === 'string') return v;

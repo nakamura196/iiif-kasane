@@ -20,12 +20,16 @@ const CanvasComponent = lazy(() => import('../three/Canvas'));
 
 const EMPTY: PreparedShow['paintedModels'] = [];
 
-/** What the display of a Scene puts in the store: its Scene id, painted models and notes (a new Scene or locale clears the selection). */
+/** What the display of a Scene puts in the store: its Scene id, painted models and notes (a new Scene clears the selection; a new locale keeps it while the note still exists). */
 export function writeSceneState(store: ReturnType<typeof createStore>, sceneId: string, read: PreparedShow | null): void {
+  const sameScene = store.get(sceneIdAtom) === sceneId;
+  const annotations = read?.annotations ?? [];
   store.set(sceneIdAtom, sceneId);
   store.set(paintedModelsAtom, read?.paintedModels ?? []);
-  store.set(annotationsAtom, read?.annotations ?? []);
-  store.set(selectedAnnotationIdAtom, null);
+  store.set(annotationsAtom, annotations);
+  // the same Scene read again (a new content language): the selected note stays while it still exists
+  const selected = store.get(selectedAnnotationIdAtom);
+  if (!(sameScene && selected !== null && annotations.some((a) => a.id === selected))) store.set(selectedAnnotationIdAtom, null);
 }
 
 function SceneDisplay({ container, manifest, iiifContent, shownUrl, renderActions, selectedIndex }: DisplayProps) {

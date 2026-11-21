@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { ManifestV4 } from '../types/iiif';
 import { aboutOf } from '../features/about';
 import { pickBodies } from '../features/annotationBody';
-import { contentLocale, languagesOf, primaryLanguage, uiLanguage } from './contentLanguage';
+import { pickWikidataLabel, wikidataLabelUrl } from '../features/wikidataLabel';
+import { contentLanguageOfInput, contentLocale, languageRank, languagesOf, primaryLanguage, uiLanguage } from './contentLanguage';
 import { labelIn } from './paintedModels';
 
 const multi = {
@@ -75,5 +76,66 @@ describe('content language', () => {
       expect(languagesOf({ type: 'Manifest', label: { en: ['Only'] }, summary: { none: ['x'] } })).toEqual(['en']);
       expect(languagesOf({ type: 'Manifest', label: { none: ['Only'] } })).toEqual([]);
     });
+  });
+});
+
+describe('review fixes', () => {
+  it('counts the language of annotation text bodies, not of links or painting bodies', () => {
+    const m = {
+      type: 'Manifest',
+      label: { en: ['T'], ja: ['題'] },
+      homepage: [{ id: 'h', type: 'Text', label: { en: ['Home'] }, language: ['de'] }],
+      items: [
+        {
+          type: 'Canvas',
+          items: [{ type: 'AnnotationPage', items: [{ type: 'Annotation', motivation: 'painting', body: { id: 'x.mp3', type: 'Sound', language: 'fr' } }] }],
+        },
+      ],
+    };
+    expect(languagesOf(m)).toEqual(['en', 'ja']);
+  });
+
+  it('reads the label map of a link', () => {
+    expect(languagesOf({ type: 'Manifest', homepage: [{ id: 'h', type: 'Text', label: { en: ['Home'], ko: ['홈'] } }] })).toEqual(['en', 'ko']);
+  });
+
+  it('normalises tags: case, and a body tag merged into the one map key of the same language', () => {
+    expect(languagesOf({ type: 'Manifest', label: { en: ['a'], 'zh-Hans': ['b'] }, summary: { EN: ['c'] } })).toEqual(['en', 'zh-Hans']);
+    const withBody = { type: 'Manifest', label: { en: ['a'], zh: ['b'] }, annotations: [{ items: [{ body: { value: 'x', language: 'ZH-hant' } }] }] };
+    expect(languagesOf(withBody)).toEqual(['en', 'zh']);
+    // two keys of the same language: a body tag is kept as its own entry
+    expect(languagesOf({ type: 'Manifest', label: { 'zh-hans': ['a'], 'zh-hant': ['b'] }, annotations: [{ items: [{ body: { value: 'x', language: 'zh-tw' } }] }] })).toEqual(['zh-hans', 'zh-hant', 'zh-tw']);
+  });
+
+  it('finds the key of a chosen language without regard to case or script', () => {
+    expect(labelIn({ en: ['E'], 'zh-Hans': ['简'] }, contentLocale('ja', 'zh'))).toBe('简');
+    expect(labelIn({ en: ['E'], 'zh-Hans': ['简'] }, contentLocale('ja', 'ZH-HANS'))).toBe('简');
+    // a plain UI locale is matched exactly as before
+    expect(labelIn({ en: ['E'], 'ja-JP': ['日'] }, 'ja')).toBe('E');
+  });
+
+  it('ranks languages by the preference list (chosen, then UI)', () => {
+    const l = contentLocale('ja', 'zh');
+    expect(languageRank('zh-Hans', l)).toBe(0);
+    expect(languageRank('ja', l)).toBe(1);
+    expect(languageRank('en', l)).toBeGreaterThan(1);
+    expect(languageRank(undefined, l)).toBeGreaterThan(1);
+  });
+
+  it('asks Wikidata for every preferred language and picks by that order', () => {
+    const l = contentLocale('ja', 'zh');
+    expect(wikidataLabelUrl('Q1', l)).toContain('languages=zh|ja|en&');
+    expect(wikidataLabelUrl('Q1', 'ja')).toContain('languages=ja|en&');
+    const json = { entities: { Q1: { labels: { en: { value: 'Tokyo' }, ja: { value: '東京' } } } } };
+    // no zh label: the UI language comes before en
+    expect(pickWikidataLabel(json, 'Q1', l)).toBe('東京');
+    expect(pickWikidataLabel(json, 'Q1', 'en')).toBe('Tokyo');
+  });
+
+  it('reads a content language from outside: not given leaves the choice, empty or a list gives automatic', () => {
+    expect(contentLanguageOfInput(undefined)).toBeUndefined();
+    expect(contentLanguageOfInput('')).toBeNull();
+    expect(contentLanguageOfInput(' fr ')).toBe('fr');
+    expect(contentLanguageOfInput('fr,ja')).toBeNull();
   });
 });

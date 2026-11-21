@@ -28,10 +28,11 @@ export default function ContentLanguageSelect({ resource }: { resource: unknown 
   // a language given from outside that this resource lacks is still shown, so the select does not lie
   const options = chosen && !languages.includes(chosen) ? [...languages, chosen] : languages;
   return (
-    <label className="ml-auto shrink-0 flex items-center gap-1 px-3 text-xs text-gray-500 dark:text-gray-300">
-      <span>{t('label')}</span>
+    <label className="shrink-0 flex items-center gap-1 px-2 text-xs text-gray-500 dark:text-gray-300">
+      <span className="hidden sm:inline">{t('label')}</span>
       <select
         className="rounded border border-gray-300 dark:border-gray-600 bg-transparent px-1 py-0.5 text-gray-700 dark:text-gray-200"
+        aria-label={t('label')}
         value={chosen ?? ''}
         onChange={(e) => {
           const next = e.target.value || null;

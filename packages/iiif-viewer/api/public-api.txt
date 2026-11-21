@@ -1281,6 +1281,7 @@ export [value] NDL_REC: readonly [{ readonly chars: 30; readonly width: 256; }, 
 export [value] NDL_REC_H: 16
 export [value] NDL_REC_RETRY: readonly [25, 45]
 export [value] NDL_REC_SPLIT: 98
+export [value] NOT_PREFERRED: 1000
 export [type] interface NdlLine {
     x: number;
     y: number;
@@ -1860,6 +1861,7 @@ export [value] compareDetailWidthOf: (a: CompareSide, b: CompareSide) => number 
 export [value] compareIndexesOf: (matched: { index: number; }[]) => number[]
 export [value] computeFocusCamera: (input: FocusInput) => FocusResult
 export [value] containersOf: (manifest: ManifestV4 | null | undefined) => ContainerInfo[]
+export [value] contentLanguageOfInput: (value: null | string | undefined) => null | string | undefined
 export [value] contentLocale: (uiLocale: string, chosen?: null | string | undefined) => string
 export [value] contentParam: (manifestUrl: string) => string
 export [value] contentSearchAnnotationPage: (canvasId: string, matches: ContentSearchMatch[]) => Record<string, unknown>
@@ -1966,12 +1968,14 @@ export [value] isTocNodeActive: (node: TocNode, canvasId: string | undefined, ti
 export [value] isUnresolvableEditorId: (url: string | undefined) => boolean
 export [value] isVideoLayer: (layer: ImageLayer) => boolean
 export [value] isVtt: (s: SupplementingContent) => boolean
+export [value] keysInOrder: (map: Record<string, unknown>, locale: string) => string[]
 export [value] kindFacets: (kinds: readonly string[]) => Facet[]
 export [value] kotenDetTensor: (square: Uint8ClampedArray<ArrayBufferLike>, side: number) => Float32Array<ArrayBufferLike>
 export [value] kotenLines: (boxes: ArrayLike<number>, scores: ArrayLike<number>, W: number, H: number) => KotenLine[]
 export [value] labelIn: (label: unknown, locale: string) => string
 export [value] labelStrings: (label: unknown) => string[]
 export [value] languageMapOf: (label: unknown) => LanguageMap | undefined
+export [value] languageRank: (tag: string | undefined, locale: string) => number
 export [value] languagesOf: (resource: unknown) => string[]
 export [value] largestPart: (mask: ArrayLike<number>, w: number, h: number) => null | { mask: Uint8Array<ArrayBufferLike>; size: number; }
 export [value] layerCountOf: (painting: PaintingContent[], withVideos?: boolean) => number

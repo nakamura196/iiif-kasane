@@ -156,4 +156,18 @@ describe('SceneDisplay with SpecificResource-wrapped models', () => {
     expect(store.get(annotationsAtom).map((a) => a.title)).toEqual(['note 2']);
     expect(store.get(selectedAnnotationIdAtom)).toBeNull();
   });
+
+  it('keeps the selected note when the same Scene is read again (a new content language) and the note still exists', () => {
+    const manifest = wrapped('https://example.org/wr4/m.json');
+    const id = `${manifest.id}/scene/2`;
+    const store = createStore();
+    writeSceneState(store, id, tryPrepareShow(manifest, 'en', id));
+    const note = store.get(annotationsAtom)[0].id;
+    store.set(selectedAnnotationIdAtom, note);
+    writeSceneState(store, id, tryPrepareShow(manifest, 'fr,en', id));
+    expect(store.get(selectedAnnotationIdAtom)).toBe(note);
+    store.set(selectedAnnotationIdAtom, 'gone');
+    writeSceneState(store, id, tryPrepareShow(manifest, 'en', id));
+    expect(store.get(selectedAnnotationIdAtom)).toBeNull();
+  });
 });

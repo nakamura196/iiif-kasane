@@ -17,6 +17,7 @@ import { containersOf, convertToV4, fetchManifest, manifestFromParams } from 'ii
 import { HIDDEN_VIEWER_TABS, OTHER_VIEWS_TAB, viewerTabOf } from '@/lib/viewerTabs';
 import { puzzleFromParams } from '@/lib/puzzleLink';
 import { PushedLocations, locationKey } from '@/lib/pushedLocations';
+import { contentLangForViewer, shownLocationSearch, withContentLang } from '@/lib/contentLang';
 import { otherViewsPanel, type CompareTarget } from '@/components/OtherViewsPanel';
 import { LocalImageError, filesFromDataTransfer, isLocalManifestUrl, openLocalImages } from '@/lib/localImage';
 
@@ -114,6 +115,27 @@ const ViewerContent: NextPage = () => {
   );
   const collection = collections.of === manifestUrl ? collections.urls : undefined;
 
+  // ?content-lang=zh: the language of the resource's own text, apart from the page's language (the reader's choice is written back)
+  const urlLang = searchParams?.get('content-lang')?.trim() || undefined;
+  // Kept in the page: an address without the parameter (an entry of a Collection, the browser's Back) must not lose
+  // the reader's choice. '' is "Automatic", chosen on purpose. The address wins when it has a value.
+  const [chosenLang, setChosenLang] = useState<string | undefined>(urlLang);
+  if (urlLang !== undefined && urlLang !== chosenLang) setChosenLang(urlLang);
+  const contentLang = contentLangForViewer(urlLang, chosenLang);
+  const handleContentLanguageChange = useCallback(
+    (language: string | undefined) => {
+      setChosenLang(language ?? '');
+      // replace: a choice of language is not a place to go back to
+      router.replace(`?${withContentLang(new URLSearchParams(window.location.search), language).toString()}`);
+    },
+    [router],
+  );
+  // arrived at an address without the parameter (Back, a link to an entry) while a language is chosen: write it again
+  useEffect(() => {
+    if (!manifestUrl || !chosenLang || urlLang !== undefined) return;
+    router.replace(`?${withContentLang(new URLSearchParams(window.location.search), chosenLang).toString()}`);
+  }, [manifestUrl, chosenLang, urlLang, router]);
+
   // The reader opened an entry of a Collection, or went back: write where that is into the address bar, so that
   // the link opens it (and the browser's Back returns to the place before). The arguments of the item left
   // (canvas, pos, puzzle, ...) are dropped; only the tab stays. The viewer takes the new URL over without reading again.
@@ -129,15 +151,12 @@ const ViewerContent: NextPage = () => {
   const handleShownChange = useCallback(
     (shown: ViewerShown) => {
       if (shown.origin === 'content') return;
-      const params = new URLSearchParams();
-      params.set('iiif-content', shown.url);
-      for (const c of shown.collections) params.append('collection', c);
       const tab = new URLSearchParams(window.location.search).get('tab');
-      if (tab) params.set('tab', tab);
-      // the content language stays across the entries of a Collection
-      const contentLang = new URLSearchParams(window.location.search).get('content-lang');
-      if (contentLang) params.set('content-lang', contentLang);
-      const next = `?${params.toString()}`;
+      // the content language stays across the entries of a Collection (the reader's choice, not only what the address has)
+      const next = shownLocationSearch(
+        { url: shown.url, collections: shown.collections, tab },
+        contentLang,
+      );
       const here = window.location.search;
       if (locationKey(next) === locationKey(here)) return;
       if (shown.origin === 'back') {
@@ -154,7 +173,7 @@ const ViewerContent: NextPage = () => {
       pushed.current.push(here);
       router.push(next);
     },
-    [router],
+    [router, contentLang],
   );
 
   // the Canvas ids of the item in the URL, read only for a puzzle link (?puzzle=)
@@ -197,19 +216,6 @@ const ViewerContent: NextPage = () => {
           ]
         : [],
     [manifestUrl, isLocal, compare, puzzle, closePuzzleLink, otherViewsLabel],
-  );
-
-  // ?content-lang=zh: the language of the resource's own text, apart from the page's language (the reader's choice is written back)
-  const contentLang = searchParams?.get('content-lang')?.trim() || undefined;
-  const handleContentLanguageChange = useCallback(
-    (language: string | undefined) => {
-      const params = new URLSearchParams(window.location.search);
-      if (language) params.set('content-lang', language);
-      else params.delete('content-lang');
-      // replace: a choice of language is not a place to go back to
-      router.replace(`?${params.toString()}`);
-    },
-    [router],
   );
 
   const tabParam = searchParams?.get('tab');

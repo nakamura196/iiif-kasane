@@ -69,12 +69,15 @@ const Info = ({ tab, onTabChange, container, manifest, extraPanels, hiddenPanels
   return (
     <div className="h-full min-w-0 flex flex-col">
       {/* tab headers */}
-      <div className="flex overflow-x-auto border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-        {available.map((p) => (
-          <button key={p.id} onClick={() => handleTabChange(p.id)} className={TAB_CLASS(active?.id === p.id)}>
-            {p.label ?? t(p.id)}
-          </button>
-        ))}
+      <div className="flex border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        {/* the tabs scroll; the content language menu stays outside the scrolling row, always in view */}
+        <div className="flex flex-1 min-w-0 overflow-x-auto">
+          {available.map((p) => (
+            <button key={p.id} onClick={() => handleTabChange(p.id)} className={TAB_CLASS(active?.id === p.id)}>
+              {p.label ?? t(p.id)}
+            </button>
+          ))}
+        </div>
         <ContentLanguageSelect resource={manifest} />
       </div>
 

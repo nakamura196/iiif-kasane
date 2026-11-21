@@ -14,7 +14,7 @@ import {
   youTubeStartOf,
   type ContainerInfo,
   type MediaOption,
-  primaryLanguage,
+  languageRank,
 } from '../../core';
 import { manifestAtom } from '../atoms';
 import { useContentLocale } from '../env';
@@ -72,8 +72,7 @@ export default function MediaPainting({
   useEffect(() => () => annotated.forEach((t) => URL.revokeObjectURL(t.url)), [annotated]);
   tracks.push(...annotated);
   // 端末の言語に合う字幕を最初に出す（default は先頭の 1 つ）
-  const lang = primaryLanguage(locale).split('-')[0];
-  tracks.sort((a, b) => Number(b.language?.split('-')[0] === lang) - Number(a.language?.split('-')[0] === lang));
+  tracks.sort((a, b) => languageRank(a.language, locale) - languageRank(b.language, locale));
 
   const youTubeId = option.kind === 'Video' ? youTubeIdOf(option.url) : null;
   if (youTubeId) {

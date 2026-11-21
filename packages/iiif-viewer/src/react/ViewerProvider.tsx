@@ -12,7 +12,7 @@ import {
   type ReactNode,
 } from 'react';
 import { Provider, createStore, useAtom, useAtomValue, useSetAtom } from 'jotai';
-import { containersOf, type ContainerInfo, type ManifestV4 } from '../core';
+import { containersOf, contentLanguageOfInput, type ContainerInfo, type ManifestV4 } from '../core';
 import { manifestAtom, manifestUrlAtom, modelChoicesAtom, shownManifestAtom } from './atoms';
 import { backFailedAtom, contentLanguageAtom, contentLanguageChangeAtom, pickedIndex, pickedPageAtom, quietSeqAtom } from './internalState';
 import { navRequestAtom, nextSeq, trailAtom } from './displays/structureState';
@@ -50,7 +50,7 @@ export interface ViewerProviderProps {
    * It is separate from `locale`, which is the language of the viewer's own text. Where a value has no text in this
    * language, the viewer falls back to `locale` and then to its usual order. Without it the text follows `locale`.
    * When the resource has two or more languages the viewer lets the reader choose; `onContentLanguageChange`
-   * reports the choice.
+   * reports the choice. Without this prop the reader's choice is kept; an empty string sets it back to automatic.
    */
   contentLanguage?: string;
   /** Called when the reader chooses a content language (undefined: back to automatic). */
@@ -144,11 +144,14 @@ export function ViewerProvider({
   const [store] = useState(() => {
     const s = createStore();
     // set before the first render, so a given language does not flash the UI language's text first
-    s.set(contentLanguageAtom, contentLanguage?.trim() || null);
+    s.set(contentLanguageAtom, contentLanguageOfInput(contentLanguage) ?? null);
     return s;
   });
   useEffect(() => {
-    store.set(contentLanguageAtom, contentLanguage?.trim() || null);
+    // not given: the reader's choice stays (a host that does not pass the prop, or one that cannot repeat it
+    // for every address). "" gives it back to automatic.
+    const given = contentLanguageOfInput(contentLanguage);
+    if (given !== undefined) store.set(contentLanguageAtom, given);
   }, [store, contentLanguage]);
   useEffect(() => {
     store.set(contentLanguageChangeAtom, onContentLanguageChange ? { call: onContentLanguageChange } : null);
