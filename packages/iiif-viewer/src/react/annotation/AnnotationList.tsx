@@ -7,7 +7,7 @@ import {
 } from '../atoms';
 import { useAtom } from 'jotai';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { useLocale, useTranslations } from '../env';
+import { useContentLocale, useTranslations } from '../env';
 import AnnotationCard, { AnnotationCardDetail } from '../annotation/AnnotationCard';
 import { RegionGroupFrame } from '../annotation/AnnotationCardFrame';
 import { buildAnnotationGraph, groupByRegion, labelIn, opensDetail } from '../../core';
@@ -31,7 +31,7 @@ export default function AnnotationList() {
   const [filter, setFilter] = useAtom(annotationFilterAtom);
   const [selectedAnnotationId, setSelectedAnnotationId] = useAtom(selectedAnnotationIdAtom);
   const [manifest] = useAtom(manifestAtom);
-  const locale = useLocale();
+  const locale = useContentLocale();
   const selectedRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

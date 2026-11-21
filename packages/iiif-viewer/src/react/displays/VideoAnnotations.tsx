@@ -11,7 +11,7 @@ import {
   type ContainerInfo,
 } from '../../core';
 import { manifestAtom } from '../atoms';
-import { useLocale } from '../env';
+import { useContentLocale } from '../env';
 import { selectedCanvasAnnotationAtom } from '../overlays/canvasAnnotationState';
 import { useCanvasAnnotations } from '../overlays/useCanvasAnnotations';
 import { usePlayback } from '../playback';
@@ -25,7 +25,7 @@ const SELECTED = '#f97316';
 // 枠は、その時間のあいだだけ出る。位置は Canvas 座標の割合で置く（動画と同じ大きさの箱の中）。
 // 枠そのものは押せない（動画の操作の邪魔をしない）。左上の名札を押すと、右パネルの一覧でその注釈が選ばれる。
 export default function VideoAnnotations({ container }: { container: ContainerInfo }) {
-  const locale = useLocale();
+  const locale = useContentLocale();
   const manifest = useAtomValue(manifestAtom);
   const { annotations, styleOf } = useCanvasAnnotations(manifest, container);
   const [selected, setSelected] = useAtom(selectedCanvasAnnotationAtom);

@@ -2,6 +2,7 @@
 // React に依存しない。この機能の担当だけがこのファイルを書く。
 import type { ManifestV4 } from '../types/iiif';
 import { labelIn } from '../services/paintedModels';
+import { preferredLanguages, uiLanguage } from '../services/contentLanguage';
 
 type Json = Record<string, unknown>;
 
@@ -199,7 +200,7 @@ export const valuesIn = (map: unknown, locale: string): string[] => {
   if (Array.isArray(map)) return v2Values(map);
   if (!isObj(map)) return [];
   if ('@value' in map) return v2Values(map);
-  const lang = [locale, 'none', 'en', ...Object.keys(map)].find((k) => {
+  const lang = [...preferredLanguages(locale), 'none', 'en', ...Object.keys(map)].find((k) => {
     const v = map[k];
     return Array.isArray(v) ? v.some((e) => typeof e === 'string' && e) : typeof v === 'string' && !!v;
   });
@@ -326,7 +327,7 @@ const dateText = (iso: string, locale: string): string => {
   const d = new Date(t);
   const midnight = d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0;
   try {
-    return new Intl.DateTimeFormat(locale, {
+    return new Intl.DateTimeFormat(uiLanguage(locale), {
       timeZone: 'UTC',
       year: 'numeric',
       month: 'long',

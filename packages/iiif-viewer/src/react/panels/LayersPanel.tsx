@@ -27,7 +27,7 @@ import {
   layerSettingsAtom,
 } from '../atoms';
 import { videoLayersPlayingAtom, videoLayersSoundAtom } from '../displays/videoLayerState';
-import { useLocale, useTranslations } from '../env';
+import { useContentLocale, useTranslations } from '../env';
 import type { Panel, PanelContext } from './types';
 
 // 重なった画像（合成の画像・Choice の候補）を 1 枚ずつ、表示・非表示、不透明度、重ね順で操作する。
@@ -80,7 +80,7 @@ const videoThumbnailOf = (
 
 function LayersTab({ container }: PanelContext) {
   const t = useTranslations('Layers');
-  const locale = useLocale();
+  const locale = useContentLocale();
   const current = useAtomValue(canvasLayersAtom);
   const [settings, setSettings] = useAtom(layerSettingsAtom);
   const [orders, setOrders] = useAtom(layerOrderAtom);

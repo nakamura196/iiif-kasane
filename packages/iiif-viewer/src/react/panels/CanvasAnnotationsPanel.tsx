@@ -27,7 +27,7 @@ import {
   type CanvasAnnotation,
   type StyleDeclarations,
 } from '../../core';
-import { useLocale, useTranslations } from '../env';
+import { useContentLocale, useTranslations } from '../env';
 import {
   canvasAnnotationFocusOnSelectAtom,
   canvasAnnotationGranularityAtom,
@@ -57,7 +57,7 @@ const TAG_LIMIT = 20;
 // The small notes on the right of a card's heading (kind, unit, layer, time)
 function useItemMeta(annotation: CanvasAnnotation) {
   const t = useTranslations('Info');
-  const locale = useLocale();
+  const locale = useContentLocale();
   const kindLabel = useKindLabel();
   const granularityLabel = useGranularityLabel();
   const motivation = annotation.painted ? 'painting' : annotation.motivations[0];
@@ -81,7 +81,7 @@ function useItemMeta(annotation: CanvasAnnotation) {
 
 // What a card says (its bodies, without the related resources). Also shown in the annotation's detail view.
 function ItemBodies({ annotation, canvasLabels }: { annotation: CanvasAnnotation; canvasLabels: Map<string, string> }) {
-  const locale = useLocale();
+  const locale = useContentLocale();
   const bodies = pickBodies(annotation.bodies, locale).filter((b) => !isResourceBody(b));
   return (
     <>
@@ -111,7 +111,7 @@ function Item({
   onSelect: () => void;
   canvasLabels: Map<string, string>;
 }) {
-  const locale = useLocale();
+  const locale = useContentLocale();
   const meta = useItemMeta(annotation);
   return (
     <AnnotationCardFrame
@@ -149,7 +149,7 @@ function ItemDetail({
   onBack: () => void;
   onSelectAnnotation: (id: string) => void;
 }) {
-  const locale = useLocale();
+  const locale = useContentLocale();
   const meta = useItemMeta(annotation);
   return (
     <AnnotationDetail
@@ -180,7 +180,7 @@ const LIST_TOP = 8;
 export function CanvasAnnotationsPanelBody({ container, manifest }: PanelContext) {
   const t = useTranslations('Info');
   const tf = useTranslations('AnnotationFilter');
-  const locale = useLocale();
+  const locale = useContentLocale();
   const { annotations: all, loading, failed, styleOf } = useCanvasAnnotations(manifest, container);
   // the same numbers as the marks on the image (none when there are very many)
   const numbers = useMemo(() => annotationNumbers(all), [all]);
@@ -470,7 +470,7 @@ export function CanvasAnnotationsPanelBody({ container, manifest }: PanelContext
 }
 
 function LabelOf({ label, fallback }: { label: unknown; fallback: string }) {
-  const locale = useLocale();
+  const locale = useContentLocale();
   return <>{labelIn(label, locale) || fallback}</>;
 }
 

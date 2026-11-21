@@ -16,6 +16,7 @@ export {
   ViewerEnv,
   useSceneEnvironment,
   useLocale,
+  useContentLocale,
   useTranslations,
   useTheme,
   type ViewerLocale,
@@ -35,6 +36,7 @@ export type { Panel, PanelContext } from './panels/types';
 export { rightsPanel } from './panels/AboutPanel';
 // パズルの始める欄（タブを隠して、使う側のタブに置くとき）
 export { Puzzle, canPlayPuzzle, PUZZLE_SIZES, DEFAULT_PUZZLE_SIZE, type PuzzleProps } from './panels/PuzzlePanel';
+export { default as ContentLanguageSelect } from './layout/ContentLanguageSelect';
 export { default as AnnotationList } from './annotation/AnnotationList';
 export { default as AnnotationCard } from './annotation/AnnotationCard';
 export { default as Metadata } from './metadata/Metadata';

@@ -3,6 +3,7 @@
 // navDate は xsd:dateTime。紀元前（"-0500-01-01T00:00:00Z"）や 5 桁以上の年は Date.parse が
 // 読めないので、並べる鍵は先頭の年から自分で作る。
 import type { CollectionEntry } from './structure';
+import { uiLanguage } from '../services/contentLanguage';
 
 export interface DatedEntry {
   entry: CollectionEntry;
@@ -67,7 +68,7 @@ export function chronologyOf(entries: CollectionEntry[]): Chronology {
 export function yearText(year: number, locale: string): string {
   if (year > 0) return String(year);
   const bce = 1 - year; // 天文年 0 = 紀元前 1 年
-  return locale.startsWith('ja') ? `紀元前 ${bce}` : `${bce} BCE`;
+  return uiLanguage(locale).startsWith('ja') ? `紀元前 ${bce}` : `${bce} BCE`;
 }
 
 /** 日付の表示。時刻が 0 時なら日付だけ。紀元前など Intl が扱えない値は年だけ。 */
@@ -83,7 +84,7 @@ export function navDateText(iso: string, locale: string): string {
     return yearText(k.year, locale);
   }
   try {
-    return new Intl.DateTimeFormat(locale, { timeZone: 'UTC', year: 'numeric', month: 'short', day: 'numeric' }).format(d);
+    return new Intl.DateTimeFormat(uiLanguage(locale), { timeZone: 'UTC', year: 'numeric', month: 'short', day: 'numeric' }).format(d);
   } catch {
     return iso;
   }

@@ -1,6 +1,9 @@
 'use client';
 
 import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react';
+import { useAtomValue } from 'jotai';
+import { contentLocale } from '../core/services/contentLanguage';
+import { contentLanguageAtom } from './internalState';
 import { messages as bundled, type ViewerMessages } from './messages';
 
 export type ViewerLocale = 'ja' | 'en';
@@ -71,6 +74,17 @@ export function useTranslations(namespace: string): Translator {
 
 export function useLocale(): string {
   return useContext(EnvContext).locale;
+}
+
+/**
+ * The locale string for reading a resource's own text (labels, metadata, annotation bodies): the language the
+ * reader chose for the content, then the UI locale. Without a choice it is the UI locale itself. Use `useLocale()`
+ * for the UI (dates, the viewer's own messages).
+ */
+export function useContentLocale(): string {
+  const locale = useLocale();
+  const chosen = useAtomValue(contentLanguageAtom);
+  return contentLocale(locale, chosen);
 }
 
 /** Same shape as next-themes' useTheme, reduced to what the viewer reads. */

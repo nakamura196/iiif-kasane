@@ -34,7 +34,7 @@ import { BUTTON } from '../common/buttonClasses';
 import { CopyButton } from '../common/CopyButton';
 import { useAuth } from '../auth/authStore';
 import { useImageInfo } from '../displays/ImageTiles';
-import { useLocale, useTranslations, type Translator } from '../env';
+import { useContentLocale, useTranslations, type Translator } from '../env';
 import { viewReaderAtom } from '../inference/viewState';
 import { MetadataList } from './SafeHtml';
 import type { Panel, PanelContext } from './types';
@@ -164,7 +164,7 @@ function ImageDownload({
 
   // The same resolution the display makes (ImageTiles): the probe is the manifest's, else the one the info.json declares;
   // once allowed, the probe's `location` replaces the image; until then its `substitute` (a degraded copy) stands in.
-  const locale = useLocale();
+  const locale = useContentLocale();
   const [infoProbe, setInfoProbe] = useState<AuthProbeRef | undefined>();
   const probe = given.auth ?? infoProbe;
   const auth = useAuth(probe, locale);
@@ -299,7 +299,7 @@ const MEDIA_LABEL: Record<MediaKind, string> = { Image: 'imageFile', Video: 'vid
 
 function DownloadTab({ container, manifest, shown }: PanelContext) {
   const t = useTranslations('Download');
-  const locale = useLocale();
+  const locale = useContentLocale();
   const fromAtom = useAtomValue(manifestAtom);
   const m = manifest ?? fromAtom;
   const settings = useAtomValue(layerSettingsAtom);

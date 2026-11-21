@@ -28,7 +28,7 @@ import {
   shownManifestAtom,
   type ShownOrigin,
 } from './atoms';
-import { useLocale } from './env';
+import { useContentLocale } from './env';
 import { backFailedAtom, pickedPageAtom, quietSeqAtom, resetViewState, sceneDisplayAtom, shownSeqAtom } from './internalState';
 import { useStableList } from './stableList';
 
@@ -487,7 +487,7 @@ export function cancelContentLoad(store: Store): void {
 
 /** The locale, read when called (not a dependency of effects). */
 export function useLocaleRef(): { readonly current: string } {
-  const locale = useLocale();
+  const locale = useContentLocale();
   const ref = useRef(locale);
   useEffect(() => {
     ref.current = locale;
@@ -529,7 +529,7 @@ export function useManifest(iiifContent: string | null, collection?: string[]): 
   useEffect(() => () => cancelContentLoad(store), [store]);
 
   // a new locale: the notes' labels are read again (see reparseNotes)
-  const locale = useLocale();
+  const locale = useContentLocale();
   const parsedLocale = useRef(locale);
   useEffect(() => {
     if (parsedLocale.current === locale) return;

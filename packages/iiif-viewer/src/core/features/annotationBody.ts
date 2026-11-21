@@ -3,6 +3,7 @@
 
 import type { AnnotationImage, AnnotationTag } from '../types/main';
 import { labelIn } from '../services/paintedModels';
+import { preferredLanguages } from '../services/contentLanguage';
 
 type Json = Record<string, unknown>;
 
@@ -186,7 +187,11 @@ export const pickBodies = (bodies: AnnotationBodyItem[], locale: string): Annota
     if (b.choice === undefined) return b;
     const g = groups.get(b.choice) ?? [b];
     const lang = (l?: string) => l?.toLowerCase().split('-')[0];
-    return g.find((x) => lang(x.language) === lang(locale)) ?? g[0];
+    for (const want of preferredLanguages(locale)) {
+      const hit = g.find((x) => lang(x.language) === lang(want));
+      if (hit) return hit;
+    }
+    return g[0];
   });
 };
 

@@ -13,10 +13,11 @@ import {
   type MapPlace,
   type MapShape,
   type MapView,
+  uiLanguage,
 } from '../../core';
 import { manifestAtom } from '../atoms';
 import { navRequestAtom, nextSeq, useManifestSwitch } from '../displays/structureState';
-import { useLocale, useTranslations } from '../env';
+import { useContentLocale, useTranslations } from '../env';
 import type { Panel, PanelContext } from './types';
 
 // A tab that puts places (navPlace, GeoJSON annotations) on a map. No map library: OpenStreetMap tiles are laid out
@@ -35,7 +36,7 @@ const dateOf = (iso: string, locale: string): string => {
   const t = Date.parse(iso);
   if (!Number.isFinite(t)) return iso;
   try {
-    return new Intl.DateTimeFormat(locale, { timeZone: 'UTC', year: 'numeric', month: 'short', day: 'numeric' }).format(t);
+    return new Intl.DateTimeFormat(uiLanguage(locale), { timeZone: 'UTC', year: 'numeric', month: 'short', day: 'numeric' }).format(t);
   } catch {
     return iso;
   }
@@ -43,7 +44,7 @@ const dateOf = (iso: string, locale: string): string => {
 
 function MapPanel({ manifest, container }: PanelContext) {
   const t = useTranslations('Map');
-  const locale = useLocale();
+  const locale = useContentLocale();
   const fromAtom = useAtomValue(manifestAtom);
   const m = manifest ?? fromAtom;
   const setRequest = useSetAtom(navRequestAtom);

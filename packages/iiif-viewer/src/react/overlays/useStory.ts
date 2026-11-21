@@ -5,7 +5,7 @@ import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { containersOf, readingTime, scrollOf, stepTarget, storyOf, type ManifestV4, type StoryStep } from '../../core';
 import { manifestAtom } from '../atoms';
 import { navRequestAtom, nextSeq } from '../displays/structureState';
-import { useLocale } from '../env';
+import { useContentLocale } from '../env';
 import { selectedCanvasAnnotationAtom } from './canvasAnnotationState';
 import { storyCameraAtom, storyNotesAtom, storyStepAtom } from './storyState';
 
@@ -17,7 +17,7 @@ export const autoplayDelay = (step: StoryStep, locale: string): number => readin
 export function useStory(given?: ManifestV4 | null) {
   const own = useAtomValue(manifestAtom);
   const manifest = given ?? own;
-  const locale = useLocale();
+  const locale = useContentLocale();
   const story = useMemo(() => storyOf(manifest, locale), [manifest, locale]);
   const sizes = useMemo(() => {
     const m = new Map<string, { width?: number; height?: number }>();

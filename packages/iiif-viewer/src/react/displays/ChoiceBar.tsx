@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { useAtom } from 'jotai';
 import { defaultChoiceIndex, labelIn, type MediaOption, type PaintingContent } from '../../core';
 import { modelChoicesAtom, type ChoiceCompareMode } from '../atoms';
-import { useLocale, useTranslations } from '../env';
+import { useContentLocale, useTranslations } from '../env';
 
 const optionLabel = (o: MediaOption, locale: string) =>
   labelIn(o.label, locale) || decodeURIComponent(o.url.split('/').pop() ?? o.url);
@@ -62,7 +62,7 @@ export default function ChoiceBar({
   children?: ReactNode;
 }) {
   const t = useTranslations('Viewer');
-  const locale = useLocale();
+  const locale = useContentLocale();
   const [choices, setChoices] = useAtom(modelChoicesAtom);
   const index = controlled ?? chosenIndex(painting, choices);
   if (painting.options.length < 2) return null;

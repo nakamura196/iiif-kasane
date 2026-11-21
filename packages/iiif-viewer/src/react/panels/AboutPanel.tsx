@@ -11,7 +11,7 @@ import {
   type AboutScope,
 } from '../../core';
 import { manifestAtom } from '../atoms';
-import { useLocale, useTranslations } from '../env';
+import { useContentLocale, useTranslations } from '../env';
 import { MetadataList, SafeHtml } from './SafeHtml';
 import type { Panel, PanelContext } from './types';
 
@@ -209,7 +209,7 @@ const Heading = ({ children, sub }: { children: ReactNode; sub?: string }) => (
 );
 
 function useAbout({ container, manifest }: PanelContext) {
-  const locale = useLocale();
+  const locale = useContentLocale();
   const fromAtom = useAtomValue(manifestAtom);
   return aboutOf(manifest ?? fromAtom, container?.id, locale);
 }

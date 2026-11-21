@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useAtomValue } from 'jotai';
 import type { ContainerInfo, ManifestV4 } from '../../../core';
 import { useTranslations } from '../../env';
+import ContentLanguageSelect from '../ContentLanguageSelect';
 import { withExtraPanels } from '../../panels/registry';
 import type { Panel } from '../../panels/types';
 import { annotationsAtom, shownManifestAtom } from '../../atoms';
@@ -74,6 +75,7 @@ const Info = ({ tab, onTabChange, container, manifest, extraPanels, hiddenPanels
             {p.label ?? t(p.id)}
           </button>
         ))}
+        <ContentLanguageSelect resource={manifest} />
       </div>
 
       {/* tab content */}

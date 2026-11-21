@@ -14,7 +14,7 @@ import {
 } from '../../core';
 import { sequenceIdAtom } from '../internalState';
 import { navRequestAtom, nextSeq } from '../displays/structureState';
-import { useLocale, useTranslations } from '../env';
+import { useContentLocale, useTranslations } from '../env';
 import { usePlayback } from '../playback';
 import type { Panel, PanelContext } from './types';
 
@@ -43,7 +43,7 @@ function Tree({
   /** right-to-left books: the thumbnail grid fills from the right */
   rtl: boolean;
 }) {
-  const locale = useLocale();
+  const locale = useContentLocale();
   const t = useTranslations('Structure');
 
   const row = (n: TocNode) => {
@@ -108,7 +108,7 @@ function Tree({
 // The table of contents (structures > Range) and the choice of page order (sequence Range).
 function StructurePanel({ container, manifest }: PanelContext) {
   const t = useTranslations('Structure');
-  const locale = useLocale();
+  const locale = useContentLocale();
   const [sequenceId, setSequenceId] = useAtom(sequenceIdAtom);
   const setRequest = useSetAtom(navRequestAtom);
   const { currentTime } = usePlayback();

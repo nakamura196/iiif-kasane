@@ -34,7 +34,7 @@ import {
   layerPlaybackOptionsAtom,
   layerSettingsAtom,
 } from '../atoms';
-import { useLocale, useTranslations } from '../env';
+import { useContentLocale, useTranslations } from '../env';
 import { usePlayback } from '../playback';
 import ChoiceBar, { compareBIndex, type ChoiceCompareControls } from './ChoiceBar';
 import ImageCompareView from './ImageCompareView';
@@ -83,7 +83,7 @@ function ImageBody({
   physdim?: Physdim;
 }) {
   const t = useTranslations('Viewer');
-  const locale = useLocale();
+  const locale = useContentLocale();
   const { container } = props;
   const [failedBase, setFailedBase] = useState(false);
   // the bottom image whose picture has come (until then the ring is shown), and its tiles still coming

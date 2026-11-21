@@ -14,7 +14,7 @@ import {
 import { Provider, createStore, useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { containersOf, type ContainerInfo, type ManifestV4 } from '../core';
 import { manifestAtom, manifestUrlAtom, modelChoicesAtom, shownManifestAtom } from './atoms';
-import { backFailedAtom, pickedIndex, pickedPageAtom, quietSeqAtom } from './internalState';
+import { backFailedAtom, contentLanguageAtom, contentLanguageChangeAtom, pickedIndex, pickedPageAtom, quietSeqAtom } from './internalState';
 import { navRequestAtom, nextSeq, trailAtom } from './displays/structureState';
 import { ViewerEnv, type ResolvedTheme } from './env';
 import {
@@ -45,6 +45,16 @@ export interface ViewerProviderProps {
   /** Called each time a manifest (or Collection) is shown, with where it is (see `ViewerShown`). */
   onShownChange?: (shown: ViewerShown) => void;
   locale?: 'ja' | 'en';
+  /**
+   * The language of the resource's own text (labels, metadata, annotation bodies), as a language tag ("zh", "fr").
+   * It is separate from `locale`, which is the language of the viewer's own text. Where a value has no text in this
+   * language, the viewer falls back to `locale` and then to its usual order. Without it the text follows `locale`.
+   * When the resource has two or more languages the viewer lets the reader choose; `onContentLanguageChange`
+   * reports the choice.
+   */
+  contentLanguage?: string;
+  /** Called when the reader chooses a content language (undefined: back to automatic). */
+  onContentLanguageChange?: (language: string | undefined) => void;
   theme?: 'light' | 'dark' | 'auto';
   /**
    * The Canvas (and region) to show, set by the host page. The viewer moves there when the
@@ -122,6 +132,8 @@ export function ViewerProvider({
   collection,
   onShownChange,
   locale = 'ja',
+  contentLanguage,
+  onContentLanguageChange,
   theme = 'auto',
   target,
   onSelect,
@@ -129,7 +141,18 @@ export function ViewerProvider({
   className = '',
   children,
 }: ViewerProviderProps) {
-  const [store] = useState(() => createStore());
+  const [store] = useState(() => {
+    const s = createStore();
+    // set before the first render, so a given language does not flash the UI language's text first
+    s.set(contentLanguageAtom, contentLanguage?.trim() || null);
+    return s;
+  });
+  useEffect(() => {
+    store.set(contentLanguageAtom, contentLanguage?.trim() || null);
+  }, [store, contentLanguage]);
+  useEffect(() => {
+    store.set(contentLanguageChangeAtom, onContentLanguageChange ? { call: onContentLanguageChange } : null);
+  }, [store, onContentLanguageChange]);
   const prefersDark = usePrefersDark(theme === 'auto');
   const resolvedTheme: ResolvedTheme = theme === 'auto' ? (prefersDark ? 'dark' : 'light') : theme;
 

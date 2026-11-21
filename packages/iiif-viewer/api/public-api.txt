@@ -25,6 +25,7 @@ export [type] type CompareBlend = 'normal' | 'difference' | 'tint';
 export [value] CompareChip: (props: { children: ReactNode; className?: string | undefined; bottom?: boolean | undefined; }) => Element
 export [value] CompareHint: (props: { children: ReactNode; }) => Element
 export [type] type CompareMode = 'side' | 'swipe' | 'spyglass' | 'overlay';
+export [value] ContentLanguageSelect: (props: { resource: unknown; }) => Element | null
 export [value] DEFAULT_PUZZLE_SIZE: 4
 export [type] interface Display {
     id: string;
@@ -173,6 +174,8 @@ export [type] interface ViewerProps {
     collection?: ViewerProviderProps['collection'];
     onShownChange?: ViewerProviderProps['onShownChange'];
     locale?: 'ja' | 'en';
+    contentLanguage?: ViewerProviderProps['contentLanguage'];
+    onContentLanguageChange?: ViewerProviderProps['onContentLanguageChange'];
     theme?: 'light' | 'dark' | 'auto';
     tab?: InfoTab;
     onTabChange?: (tab: InfoTab) => void;
@@ -192,6 +195,8 @@ export [type] interface ViewerProviderProps {
     collection?: string[];
     onShownChange?: (shown: ViewerShown) => void;
     locale?: 'ja' | 'en';
+    contentLanguage?: string;
+    onContentLanguageChange?: (language: string | undefined) => void;
     theme?: 'light' | 'dark' | 'auto';
     target?: ViewerTarget;
     onSelect?: (selection: ViewerSelection) => void;
@@ -257,6 +262,7 @@ export [value] shownManifestAtom: PrimitiveAtom<ShownManifest | null> & WithInit
 export [value] useAuthStates: (probes: (AuthProbeRef | undefined)[], locale: string) => (AuthState | undefined)[]
 export [value] useCanvasImages: (iiifContent: null | string, canvasId: string | undefined) => CanvasImages | undefined
 export [value] useCompareSources: (urls: string[], locale: string) => Found & { ready: boolean; }
+export [value] useContentLocale: () => string
 export [value] useLocale: () => string
 export [value] useManifest: (iiifContent: null | string, collection?: string[] | undefined) => { failed: boolean; }
 export [value] useOptionalViewer: () => ViewerState | null
@@ -1854,6 +1860,7 @@ export [value] compareDetailWidthOf: (a: CompareSide, b: CompareSide) => number 
 export [value] compareIndexesOf: (matched: { index: number; }[]) => number[]
 export [value] computeFocusCamera: (input: FocusInput) => FocusResult
 export [value] containersOf: (manifest: ManifestV4 | null | undefined) => ContainerInfo[]
+export [value] contentLocale: (uiLocale: string, chosen?: null | string | undefined) => string
 export [value] contentParam: (manifestUrl: string) => string
 export [value] contentSearchAnnotationPage: (canvasId: string, matches: ContentSearchMatch[]) => Record<string, unknown>
 export [value] contentSearchTargetOf: (target: unknown) => undefined | { canvasId: string; xywh?: [number, number, number, number] | undefined; point?: [number, number, number] | undefined; }
@@ -1965,6 +1972,7 @@ export [value] kotenLines: (boxes: ArrayLike<number>, scores: ArrayLike<number>,
 export [value] labelIn: (label: unknown, locale: string) => string
 export [value] labelStrings: (label: unknown) => string[]
 export [value] languageMapOf: (label: unknown) => LanguageMap | undefined
+export [value] languagesOf: (resource: unknown) => string[]
 export [value] largestPart: (mask: ArrayLike<number>, w: number, h: number) => null | { mask: Uint8Array<ArrayBufferLike>; size: number; }
 export [value] layerCountOf: (painting: PaintingContent[], withVideos?: boolean) => number
 export [value] layerItemsOf: (paintings: CanvasPainting[], props?: { videos?: boolean | undefined; }) => LayerItem[]
@@ -2070,8 +2078,10 @@ export [value] ppocrDetTensor: (px: Uint8ClampedArray<ArrayBufferLike>, w: numbe
 export [value] ppocrQuadBox: (quad: XY[]) => { x: number; y: number; w: number; h: number; polygon?: XY[] | undefined; }
 export [value] ppocrRead: (page: Uint8ClampedArray<ArrayBufferLike>, W: number, H: number, chars: string[], run: PpocrRunners) => Promise<PpocrLine[]>
 export [value] ppocrRecTensor: (px: Uint8ClampedArray<ArrayBufferLike>, w: number, h: number) => { data: Float32Array<ArrayBufferLike>; width: number; }
+export [value] preferredLanguages: (locale: string) => string[]
 export [value] presentCanvasTags: (annotations: Pick<CanvasAnnotation, "bodies">[], chosen: string[], locale: string) => string[]
 export [value] presentChoices: (chosen: readonly string[], facets: readonly Facet[]) => string[]
+export [value] primaryLanguage: (locale: string) => string
 export [value] probeServiceOf: (resource: unknown, locale?: string) => AuthProbeRef | undefined
 export [value] project: (args: LngLat) => [number, number]
 export [value] puzzlePlacedCount: (b: PuzzleBoard) => number
@@ -2187,6 +2197,7 @@ export [value] traceBoundary: (mask: ArrayLike<number>, w: number, h: number) =>
 export [value] transcriptFilesOf: (manifest: ManifestV4 | null | undefined) => TranscriptFile[]
 export [value] transcriptOf: (supplementing: SupplementingContent[]) => SupplementingContent | undefined
 export [value] transformMatrixOf: (transform: unknown) => M4 | undefined
+export [value] uiLanguage: (locale: string) => string
 export [value] unitFactor: (from: SourceUnit, to: DisplayUnit) => number
 export [value] unproject: (args: [number, number]) => LngLat
 export [value] upgradeToV3: (json: unknown) => unknown

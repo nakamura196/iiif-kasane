@@ -134,6 +134,9 @@ const ViewerContent: NextPage = () => {
       for (const c of shown.collections) params.append('collection', c);
       const tab = new URLSearchParams(window.location.search).get('tab');
       if (tab) params.set('tab', tab);
+      // the content language stays across the entries of a Collection
+      const contentLang = new URLSearchParams(window.location.search).get('content-lang');
+      if (contentLang) params.set('content-lang', contentLang);
       const next = `?${params.toString()}`;
       const here = window.location.search;
       if (locationKey(next) === locationKey(here)) return;
@@ -194,6 +197,19 @@ const ViewerContent: NextPage = () => {
           ]
         : [],
     [manifestUrl, isLocal, compare, puzzle, closePuzzleLink, otherViewsLabel],
+  );
+
+  // ?content-lang=zh: the language of the resource's own text, apart from the page's language (the reader's choice is written back)
+  const contentLang = searchParams?.get('content-lang')?.trim() || undefined;
+  const handleContentLanguageChange = useCallback(
+    (language: string | undefined) => {
+      const params = new URLSearchParams(window.location.search);
+      if (language) params.set('content-lang', language);
+      else params.delete('content-lang');
+      // replace: a choice of language is not a place to go back to
+      router.replace(`?${params.toString()}`);
+    },
+    [router],
   );
 
   const tabParam = searchParams?.get('tab');
@@ -265,6 +281,8 @@ const ViewerContent: NextPage = () => {
             collection={collection}
             onShownChange={handleShownChange}
             locale={locale === 'en' ? 'en' : 'ja'}
+            contentLanguage={contentLang}
+            onContentLanguageChange={handleContentLanguageChange}
             theme={resolvedTheme === 'dark' ? 'dark' : 'light'}
             tab={tab}
             onTabChange={handleTabChange}

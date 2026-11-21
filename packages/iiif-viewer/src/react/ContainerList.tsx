@@ -29,7 +29,7 @@ import {
   usePageOrder,
   useManifestSwitch,
 } from './displays/structureState';
-import { useLocale, useTranslations } from './env';
+import { useContentLocale, useTranslations } from './env';
 import { readManifestSource } from './useManifest';
 
 interface Props {
@@ -65,7 +65,7 @@ export default function ContainerList({ containers, selected, onSelect, pager = 
   const setCompare = useSetAtom(compareAtom);
   const setCompareMulti = useSetAtom(compareMultiAtom);
   const multiRun = useRef(0);
-  const locale = useLocale();
+  const locale = useContentLocale();
   const { open, back, canGoBack } = useManifestSwitch();
   const backFailed = useAtomValue(backFailedAtom);
   const { viewing, groups } = usePageOrder(manifest, containers);

@@ -11,7 +11,7 @@ import { nextZoomDistance, zoomLimitsFor } from '../../core';
 import { labelIn } from '../../core';
 import { useProgress } from '@react-three/drei';
 import { useTheme } from '../env';
-import { useLocale, useTranslations } from '../env';
+import { useContentLocale, useTranslations } from '../env';
 import * as THREE from 'three';
 import { Spinner } from '../layout/Loading';
 import type { OrbitControls as OrbitControlsType } from 'three-stdlib';
@@ -147,7 +147,7 @@ const CanvasComponent = ({ glbUrl, extraModels, attribution }: CanvasComponentPr
   const [manifest] = useAtom(manifestAtom);
   const sceneId = useAtomValue(sceneIdAtom);
   const [animation, setAnimation] = useAtom(modelAnimationAtom);
-  const locale = useLocale();
+  const locale = useContentLocale();
   // 実寸（spatialScale）が分かる Scene だけ「測る」ボタンを出す
   const canMeasure = useMemo(() => !!sceneSpatialScaleOf(manifest, sceneId), [manifest, sceneId]);
   const [measuring, setMeasuring] = useAtom(measuringAtom);

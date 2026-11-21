@@ -20,6 +20,7 @@ import { containersOf, sceneOf } from '../services/containers';
 import { sceneStoryAnnotationsOf, type DefaultCamera } from '../services/manifestParser';
 import { readAnnotationBodies } from './annotationBody';
 import { labelIn } from '../services/paintedModels';
+import { preferredLanguages } from '../services/contentLanguage';
 import {
   embeddedCanvasAnnotations,
   pickBodies,
@@ -120,7 +121,7 @@ export function storyBodies(step: StoryStep, locale: string): AnnotationBodyItem
   const lang = (l?: string) => l?.toLowerCase().split('-')[0];
   const langs = [...new Set(picked.map((b) => lang(b.language)).filter((l): l is string => !!l))];
   if (langs.length < 2) return picked;
-  const want = langs.includes(lang(locale) ?? '') ? lang(locale) : langs[0];
+  const want = preferredLanguages(locale).map(lang).find((l) => l && langs.includes(l)) ?? langs[0];
   return picked.filter((b) => !b.language || lang(b.language) === want);
 }
 

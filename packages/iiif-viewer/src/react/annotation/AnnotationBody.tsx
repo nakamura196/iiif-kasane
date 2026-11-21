@@ -11,7 +11,7 @@ import {
   wikidataLabelUrl,
   type AnnotationBodyItem,
 } from '../../core';
-import { useLocale, useTranslations } from '../env';
+import { useContentLocale, useTranslations } from '../env';
 import { useCanvasNavigation } from '../navigation';
 import AnnotationImages from './AnnotationImages';
 
@@ -72,7 +72,7 @@ export default function AnnotationBody({
   assumeHtml?: boolean;
 }) {
   const t = useTranslations('Info');
-  const locale = useLocale();
+  const locale = useContentLocale();
   const { goToCanvas } = useCanvasNavigation();
   const wikidata = useWikidataLabel(body.url ?? '', locale, body.kind !== 'text' && !labelIn(body.label, locale));
   if (body.kind === 'text') {

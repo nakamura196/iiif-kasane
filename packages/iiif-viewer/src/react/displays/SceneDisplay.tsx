@@ -6,7 +6,7 @@ import { authorizedUrl, chosenOption, probeServiceOf } from '../../core';
 import { tryPrepareShow, type PreparedShow } from '../useManifest';
 import { annotationsAtom, paintedModelsAtom, sceneIdAtom, selectedAnnotationIdAtom, modelChoicesAtom } from '../atoms';
 import { sceneDisplayAtom } from '../internalState';
-import { useLocale, useTranslations } from '../env';
+import { useContentLocale, useTranslations } from '../env';
 import AuthPrompt from '../auth/AuthPrompt';
 import { useAuthStates } from '../auth/authStore';
 import ModelChoice from '../three/ModelChoice';
@@ -30,7 +30,7 @@ export function writeSceneState(store: ReturnType<typeof createStore>, sceneId: 
 
 function SceneDisplay({ container, manifest, iiifContent, shownUrl, renderActions, selectedIndex }: DisplayProps) {
   const t = useTranslations('Viewer');
-  const locale = useLocale();
+  const locale = useContentLocale();
   const modelChoices = useAtomValue(modelChoicesAtom);
   const store = useStore();
 

@@ -9,9 +9,10 @@ import {
   timedTextsOf,
   transcriptOf,
   type CaptionFile,
+  primaryLanguage,
 } from '../../core';
 import TranscriptPanel, { CueList } from '../displays/TranscriptPanel';
-import { useLocale, useTranslations } from '../env';
+import { useContentLocale, useTranslations } from '../env';
 import { usePlayback } from '../playback';
 import type { Panel, PanelContext } from './types';
 
@@ -33,11 +34,11 @@ const sources = (ctx: PanelContext) => {
 };
 
 const sameLang = (a: string | undefined, locale: string) =>
-  !!a && a.split('-')[0].toLowerCase() === locale.split('-')[0].toLowerCase();
+  !!a && a.split('-')[0].toLowerCase() === primaryLanguage(locale).split('-')[0].toLowerCase();
 
 function CaptionFiles({ files }: { files: CaptionFile[] }) {
   const t = useTranslations('Transcript');
-  const locale = useLocale();
+  const locale = useContentLocale();
   const { currentTime, seek } = usePlayback();
   const [picked, setPicked] = useState<string | null>(null);
   const url = picked && files.some((f) => f.url === picked) ? picked : (files.find((f) => sameLang(f.language, locale)) ?? files[0]).url;
