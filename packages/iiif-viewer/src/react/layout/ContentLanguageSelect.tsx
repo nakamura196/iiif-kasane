@@ -30,10 +30,10 @@ export default function ContentLanguageSelect({ resource }: { resource: unknown 
   const selected = chosen ? (matchLanguage(chosen, languages) ?? chosen) : '';
   const options = selected && !languages.includes(selected) ? [...languages, selected] : languages;
   return (
-    <label className="shrink-0 flex items-center gap-1 px-2 text-xs text-gray-500 dark:text-gray-300">
-      <span className="hidden sm:inline">{t('label')}</span>
+    <label className="shrink-0 flex items-center gap-2 px-4 py-1.5 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60 text-xs text-gray-600 dark:text-gray-300">
+      <span>{t('label')}</span>
       <select
-        className="rounded border border-gray-300 dark:border-gray-600 bg-transparent px-1 py-0.5 text-gray-700 dark:text-gray-200"
+        className="rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-1.5 py-0.5 text-gray-700 dark:text-gray-200"
         aria-label={t('label')}
         value={selected}
         onChange={(e) => {
