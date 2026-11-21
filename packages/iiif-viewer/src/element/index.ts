@@ -1,4 +1,4 @@
-// <iiif-kasane iiif-content="..." collection="<url> <url>" locale="ja" theme="auto" options='{"tab":"metadata","panelOpen":false,"pager":false,"environment":"none"}'></iiif-kasane>
+// <iiif-kasane iiif-content="..." collection="<url> <url>" locale="ja" content-language="zh" theme="auto" options='{"tab":"metadata","panelOpen":false,"pager":false,"environment":"none"}'></iiif-kasane>
 // Light DOM (no shadow root) so that the host page can set --iiif-viewer-* variables.
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -56,12 +56,18 @@ function parseCollection(raw: string | null): string[] {
 }
 
 export class IiifViewerElement extends HTMLElement {
-  static observedAttributes = ['iiif-content', 'collection', 'locale', 'theme', 'options'];
+  static observedAttributes = ['iiif-content', 'collection', 'locale', 'content-language', 'theme', 'options'];
 
   private root: Root | null = null;
   private container: HTMLDivElement | null = null;
   // Side panel tab: starts from options.tab, then follows the user's clicks.
   private tab: InfoTab | undefined;
+  // Content language: starts from the attribute, then follows the reader's choice (an attribute change takes over again).
+  // '' is automatic. The prop given to the viewer always follows this value, so setting the attribute back to an
+  // earlier value after the reader chose another one still changes the prop.
+  private contentLanguage = '';
+  // true once the reader has chosen (also "Automatic"): a reconnect keeps it
+  private contentLanguageByReader = false;
 
   connectedCallback() {
     if (!this.container) {
@@ -70,6 +76,7 @@ export class IiifViewerElement extends HTMLElement {
       this.appendChild(this.container);
     }
     this.tab ??= parseOptions(this.getAttribute('options')).tab;
+    if (!this.contentLanguageByReader) this.contentLanguage = this.getAttribute('content-language')?.trim() ?? '';
     // After a reconnect the old root is gone; create a new one.
     this.root ??= createRoot(this.container);
     this.render();
@@ -81,6 +88,11 @@ export class IiifViewerElement extends HTMLElement {
   }
 
   attributeChangedCallback(name: string) {
+    if (name === 'content-language') {
+      // the page set the attribute: it takes over again from the reader's choice
+      this.contentLanguageByReader = false;
+      this.contentLanguage = this.getAttribute('content-language')?.trim() ?? ''; // absent or empty: automatic
+    }
     if (name === 'options') this.tab = parseOptions(this.getAttribute('options')).tab;
     if (this.root) this.render();
   }
@@ -113,6 +125,17 @@ export class IiifViewerElement extends HTMLElement {
         onShownChange: (shown) =>
           this.dispatchEvent(new CustomEvent('kasane-shown', { detail: shown, bubbles: true, composed: true })),
         locale,
+        contentLanguage: this.contentLanguage,
+        // the reader's choice is kept here and told to the embedding page (it may write it into its own URL)
+        onContentLanguageChange: (language) => {
+          this.contentLanguage = language ?? '';
+          this.contentLanguageByReader = true;
+          // render again so that the prop follows the reader (a later attribute change is then a change of the prop)
+          this.render();
+          this.dispatchEvent(
+            new CustomEvent('kasane-content-language', { detail: { language }, bubbles: true, composed: true }),
+          );
+        },
         theme,
         tab: this.tab,
         panelOpen: parseOptions(this.getAttribute('options')).panelOpen,

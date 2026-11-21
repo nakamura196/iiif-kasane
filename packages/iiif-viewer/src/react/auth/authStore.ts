@@ -10,9 +10,9 @@ import {
   type AuthSubstitute,
 } from '../../core';
 
-// IIIF Authorization Flow API 2.0 のクライアント（https://iiif.io/api/auth/2.0/ の "Workflow from the Client Perspective"）。
-// Probe service ごとに 1 つの進行（Controller）を持ち、複数の画像が同じ Probe を共有できる。
-// アクセストークンはメモリだけに置く（localStorage には入れない）。
+// A client of IIIF Authorization Flow API 2.0 ("Workflow from the Client Perspective" at https://iiif.io/api/auth/2.0/).
+// One flow (Controller) per probe service, so that several images can share the same probe.
+// The access token is kept in memory only (not in localStorage).
 
 export type AuthPhase =
   | 'probing' // asking the probe / the services
@@ -55,6 +55,14 @@ class Controller {
     readonly probe: AuthProbeRef,
     private locale: string,
   ) {}
+
+  /** The locale used to read the access services' texts (a new content language changes it while the Controller lives). */
+  get language() {
+    return this.locale;
+  }
+  setLocale(locale: string) {
+    this.locale = locale;
+  }
 
   subscribe = (fn: () => void) => {
     this.listeners.add(fn);
@@ -286,6 +294,9 @@ function wakeWaiting(from: Controller, accessId: string) {
 export function useAuth(probe: AuthProbeRef | undefined, locale: string): { state: AuthState; controller: Controller } | undefined {
   const c = probe ? getController(probe, locale) : undefined;
   useEffect(() => {
+    c?.setLocale(locale);
+  }, [c, locale]);
+  useEffect(() => {
     if (!c) return;
     c.retain();
     return () => c.release();
@@ -300,7 +311,8 @@ export function useAuth(probe: AuthProbeRef | undefined, locale: string): { stat
 
 const noopSubscribe = () => () => {};
 
-function getController(probe: AuthProbeRef, locale: string): Controller {
+/** The Controller of a probe (one per probe URL). Its locale is set by the hooks, in an effect (the content language can change at runtime). */
+export function getController(probe: AuthProbeRef, locale: string): Controller {
   let c = controllers.get(probe.id);
   if (!c) {
     c = new Controller(probe, locale);
@@ -319,6 +331,9 @@ export function useAuthStates(probes: (AuthProbeRef | undefined)[], locale: stri
   const key = probes.map((p) => p?.id ?? '').join('\n');
   // eslint-disable-next-line react-hooks/exhaustive-deps -- the probe ids (key) decide which controllers are used
   const cs = useMemo(() => probes.map((p) => (p ? getController(p, locale) : undefined)), [key, locale]);
+  useEffect(() => {
+    cs.forEach((c) => c?.setLocale(locale));
+  }, [cs, locale]);
   useEffect(() => {
     const used = cs.filter((c): c is Controller => !!c);
     used.forEach((c) => c.retain());

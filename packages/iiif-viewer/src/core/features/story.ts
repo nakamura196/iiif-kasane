@@ -1,25 +1,26 @@
-// ストーリー（ガイドツアー）: 説明の注釈を順に送りながら、その領域に寄って本文を読ませる。
+// Story (guided tour): steps through the describing annotations, zooms to each region and has the reader read the text.
 //
-// 専用の形式は作らず、次の慣習に合わせる（docs/notes/storytelling.md）。
-//  - Canvas に書かれた describing / commenting の注釈が、配列の順にステップになる
-//    （Digirati Manifest Editor の Exhibition の tour、Cogapp の Storiiies、倭寇図巻の m.json が同じ型）
-//  - 本文 HTML の先頭の見出し（h1〜h6）が、そのステップの見出し（Digirati の splitTourStepHtml と同じ規則）
-// そのうえで、書いてあれば使うもの:
-//  - 章: structures の Range。Range が指す領域（Canvas#xywh）と同じか、それを含む領域のステップが、その章に入る
-//  - 多言語: 本文の Choice か、language の違う TextualBody を並べたもの。UI の言語のものを選ぶ
-//  - 複数の Canvas: Canvas の順に、それぞれのステップをつなげる
-// Range が無いときは、見出しのあるステップと無いステップが混ざっていれば、見出しのあるステップを章の頭とみなす。
+// No format of its own: it follows these conventions (docs/notes/storytelling.md).
+//  - The describing / commenting annotations written on a Canvas become the steps, in the order of the array
+//    (the Digirati Manifest Editor's Exhibition tour, Cogapp's Storiiies and the Wakou scroll's m.json have the same form)
+//  - The heading at the start of the body HTML (h1 to h6) is the heading of the step (the same rule as Digirati's splitTourStepHtml)
+// On top of that, these are used when they are written:
+//  - Chapters: the Ranges of structures. A step whose region is the same as, or inside, the region a Range points to (Canvas#xywh) belongs to that chapter
+//  - Languages: a Choice of bodies, or TextualBodies with different language. The one in the UI language is chosen
+//  - Several Canvases: the steps of each Canvas are joined in the order of the Canvases
+// Without Ranges, when steps with a heading and steps without are mixed, a step with a heading is taken as the head of a chapter.
 //
-// 3D（Scene）では、Presentation 4.0 の Guided Viewing and Storytelling に従う（manifestParser.ts の
-// sceneStoryAnnotationsOf）。ステップは Scene の annotations にある describing / commenting の注釈で、
-// `scope` が指す Camera がそのステップの視点になる。behavior "sequence" の AnnotationPage があれば、
-// その頁の注釈がステップ。無ければ、Camera を指す注釈だけがステップになる。
+// In 3D (a Scene) it follows Guided Viewing and Storytelling of Presentation 4.0 (sceneStoryAnnotationsOf in
+// manifestParser.ts). The steps are the describing / commenting annotations in the annotations of the Scene, and
+// the Camera that `scope` points to is the viewpoint of the step. If there is an AnnotationPage with behavior "sequence",
+// the annotations on that page are the steps. If not, only the annotations that point to a Camera are steps.
 
 import type { ManifestV4 } from '../types/iiif';
 import { containersOf, sceneOf } from '../services/containers';
 import { sceneStoryAnnotationsOf, type DefaultCamera } from '../services/manifestParser';
 import { readAnnotationBodies } from './annotationBody';
 import { labelIn } from '../services/paintedModels';
+import { chosenLanguage, matchLanguage, sameLanguageFamily, uiLanguage } from '../services/contentLanguage';
 import {
   embeddedCanvasAnnotations,
   pickBodies,
@@ -118,9 +119,19 @@ const isHtml = (b: AnnotationBodyItem) => /html/i.test(b.format ?? '');
 export function storyBodies(step: StoryStep, locale: string): AnnotationBodyItem[] {
   const picked = pickBodies(step.bodies, locale).filter((b) => b.kind === 'text');
   const lang = (l?: string) => l?.toLowerCase().split('-')[0];
+  // with a content language chosen, its own bodies (never across scripts) are the ones to show
+  const chosen = chosenLanguage(locale);
+  if (chosen) {
+    const langs = [...new Set(picked.map((b) => b.language).filter((l): l is string => !!l))];
+    const want = langs.length > 1 ? matchLanguage(chosen, langs) : undefined;
+    // the same language in the same script as the match: "fr" keeps "fr-CA" too, but never another script
+    if (want) return picked.filter((b) => !b.language || sameLanguageFamily(b.language, want));
+  }
+  // otherwise as it always was: bodies grouped by primary subtag, the UI language first
+  const ui = lang(uiLanguage(locale));
   const langs = [...new Set(picked.map((b) => lang(b.language)).filter((l): l is string => !!l))];
   if (langs.length < 2) return picked;
-  const want = langs.includes(lang(locale) ?? '') ? lang(locale) : langs[0];
+  const want = langs.includes(ui ?? '') ? ui : langs[0];
   return picked.filter((b) => !b.language || lang(b.language) === want);
 }
 

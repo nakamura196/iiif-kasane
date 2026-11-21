@@ -11,16 +11,16 @@ import { nextZoomDistance, zoomLimitsFor } from '../../core';
 import { labelIn } from '../../core';
 import { useProgress } from '@react-three/drei';
 import { useTheme } from '../env';
-import { useLocale, useTranslations } from '../env';
+import { useContentLocale, useTranslations } from '../env';
 import * as THREE from 'three';
 import { Spinner } from '../layout/Loading';
 import type { OrbitControls as OrbitControlsType } from 'three-stdlib';
 
-// MapLibre風のイージング関数
+// MapLibre-like easing function
 const easeOutCubic = (t: number): number => {
   return 1 - Math.pow(1 - t, 3);
 };
-// ローディングコンポーネント
+// Loading component
 const LoadingScreen = ({ loadingText }: { loadingText: string }) => {
   const { progress, total, loaded } = useProgress();
 
@@ -44,7 +44,7 @@ const LoadingScreen = ({ loadingText }: { loadingText: string }) => {
   );
 };
 
-// カメラズーム制御用のコンポーネント（MapLibre風スムーズズーム）
+// Component for camera zoom control (MapLibre-like smooth zoom)
 interface CameraControllerProps {
   controlsRef: React.RefObject<OrbitControlsType | null>;
 }
@@ -56,8 +56,8 @@ interface ZoomAnimation {
   targetDistance: number;
 }
 
-const ZOOM_DURATION = 300; // ミリ秒
-const ZOOM_FACTOR = 0.3; // ズーム量（割合）
+const ZOOM_DURATION = 300; // milliseconds
+const ZOOM_FACTOR = 0.3; // zoom amount (a fraction)
 
 const CameraController = forwardRef<{ zoomIn: () => void; zoomOut: () => void }, CameraControllerProps>(
   ({ controlsRef }, ref) => {
@@ -66,7 +66,7 @@ const CameraController = forwardRef<{ zoomIn: () => void; zoomOut: () => void },
     const targetRef = useRef(new THREE.Vector3(0, 0, 0));
     const modelRadius = useAtomValue(modelRadiusAtom);
 
-    // アニメーションフレーム処理
+    // animation frame handling
     useFrame(() => {
       if (!zoomAnimationRef.current || !controlsRef.current) return;
 
@@ -75,22 +75,22 @@ const CameraController = forwardRef<{ zoomIn: () => void; zoomOut: () => void },
       const progress = Math.min(elapsed / duration, 1);
       const easedProgress = easeOutCubic(progress);
 
-      // OrbitControlsのターゲットを取得
+      // get the target of OrbitControls
       const target = controlsRef.current.target;
       targetRef.current.copy(target);
 
-      // カメラからターゲットへの方向ベクトル
+      // direction vector from the camera to the target
       const direction = new THREE.Vector3();
       direction.subVectors(camera.position, targetRef.current).normalize();
 
-      // 現在の距離を補間
+      // interpolate the current distance
       const currentDistance = startDistance + (targetDistance - startDistance) * easedProgress;
 
-      // カメラ位置を更新
+      // update the camera position
       camera.position.copy(targetRef.current).addScaledVector(direction, currentDistance);
       controlsRef.current.update();
 
-      // アニメーション完了
+      // animation finished
       if (progress >= 1) {
         zoomAnimationRef.current = null;
       }
@@ -102,7 +102,7 @@ const CameraController = forwardRef<{ zoomIn: () => void; zoomOut: () => void },
       const target = controlsRef.current.target;
       const currentDistance = camera.position.distanceTo(target);
 
-      // 模型の大きさに合わせた距離の制限（単位が mm でも m でも効くように）
+      // limit the distance to the size of the model (so that it works whether the unit is mm or m)
       const targetDistance = nextZoomDistance(currentDistance, zoomIn, ZOOM_FACTOR, zoomLimitsFor(modelRadius ?? 1));
 
       zoomAnimationRef.current = {
@@ -147,11 +147,11 @@ const CanvasComponent = ({ glbUrl, extraModels, attribution }: CanvasComponentPr
   const [manifest] = useAtom(manifestAtom);
   const sceneId = useAtomValue(sceneIdAtom);
   const [animation, setAnimation] = useAtom(modelAnimationAtom);
-  const locale = useLocale();
-  // 実寸（spatialScale）が分かる Scene だけ「測る」ボタンを出す
+  const locale = useContentLocale();
+  // show the "measure" button only for a Scene whose real size (spatialScale) is known
   const canMeasure = useMemo(() => !!sceneSpatialScaleOf(manifest, sceneId), [manifest, sceneId]);
   const [measuring, setMeasuring] = useAtom(measuringAtom);
-  // 別の Scene に移ったら、測るを切る（点も消える）
+  // when moving to another Scene, turn measuring off (the points go too)
   useEffect(() => {
     if (!canMeasure) setMeasuring(false);
   }, [canMeasure, setMeasuring]);
@@ -199,7 +199,7 @@ const CanvasComponent = ({ glbUrl, extraModels, attribution }: CanvasComponentPr
         }}
         gl={{
           antialias: true,
-          // Voyager並みの質感に：物理ベースのフィルミックなトーンマッピング
+          // physically based filmic tone mapping, for a Voyager-like quality
           toneMapping: THREE.ACESFilmicToneMapping,
           toneMappingExposure: 1,
         }}
@@ -229,11 +229,11 @@ const CanvasComponent = ({ glbUrl, extraModels, attribution }: CanvasComponentPr
             autoRotate={autoRotate}
           />
           <CameraController ref={cameraControllerRef} controlsRef={controlsRef} />
-          {/* IBL(環境マップ)で PBR マテリアルに反射・陰影を与える＝Voyagerに近い質感の主因。
-              背景は差し替えず(テーマ色を維持)、ライティングのみ利用。 */}
+          {/* IBL (environment map) gives reflections and shading to PBR materials = the main reason for a Voyager-like quality.
+              The background is not replaced (the theme color stays); only the lighting is used. */}
           <SceneEnvironment isDark={isDark} />
-          {/* フラットな環境光は最小限に(IBLと二重に効くと白飛びするため)、
-              directional は陰影の方向づけ用のキーライトとして残す。 */}
+          {/* Keep the flat ambient light to a minimum (with IBL it would double up and blow out to white),
+              leave the directional light as a key light that gives the shading a direction. */}
           <ambientLight intensity={isDark ? 0.15 : 0.25} />
           <directionalLight position={[10, 10, 5]} intensity={isDark ? 0.5 : 0.7} />
         </Suspense>
@@ -246,7 +246,7 @@ const CanvasComponent = ({ glbUrl, extraModels, attribution }: CanvasComponentPr
           </div>
         </div>
       )}
-      {/* ズームボタン（MapLibre GL風） */}
+      {/* Zoom buttons (MapLibre GL-like) */}
       <div className="absolute top-4 right-4 z-10 flex flex-col rounded overflow-hidden shadow">
         <button
           onClick={handleZoomIn}
@@ -267,7 +267,7 @@ const CanvasComponent = ({ glbUrl, extraModels, attribution }: CanvasComponentPr
           </svg>
         </button>
       </div>
-      {/* 視点ボタン: ズームの下に、汎用の 3 つと、マニフェストのカメラごとに 1 つ */}
+      {/* Viewpoint buttons: below the zoom, three general ones and one for each camera of the manifest */}
       <div className="absolute top-[78px] right-4 z-10 flex flex-col items-end gap-2 max-w-[min(14rem,calc(100%-2rem))]">
         <div className="flex flex-col rounded overflow-hidden shadow">
           <button
@@ -343,7 +343,7 @@ const CanvasComponent = ({ glbUrl, extraModels, attribution }: CanvasComponentPr
           </div>
         )}
       </div>
-      {/* Attribution（MapLibre GL風） */}
+      {/* Attribution (MapLibre GL-like) */}
       {attribution && (
         <div className="absolute bottom-3 right-3 z-10 bg-white/90 dark:bg-gray-800/90 px-3 py-1.5 text-sm text-gray-800 dark:text-gray-200 rounded shadow-sm font-medium">
           {attribution}

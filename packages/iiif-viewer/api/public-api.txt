@@ -25,6 +25,7 @@ export [type] type CompareBlend = 'normal' | 'difference' | 'tint';
 export [value] CompareChip: (props: { children: ReactNode; className?: string | undefined; bottom?: boolean | undefined; }) => Element
 export [value] CompareHint: (props: { children: ReactNode; }) => Element
 export [type] type CompareMode = 'side' | 'swipe' | 'spyglass' | 'overlay';
+export [value] ContentLanguageSelect: (props: { resource: unknown; }) => Element | null
 export [value] DEFAULT_PUZZLE_SIZE: 4
 export [type] interface Display {
     id: string;
@@ -173,6 +174,8 @@ export [type] interface ViewerProps {
     collection?: ViewerProviderProps['collection'];
     onShownChange?: ViewerProviderProps['onShownChange'];
     locale?: 'ja' | 'en';
+    contentLanguage?: ViewerProviderProps['contentLanguage'];
+    onContentLanguageChange?: ViewerProviderProps['onContentLanguageChange'];
     theme?: 'light' | 'dark' | 'auto';
     tab?: InfoTab;
     onTabChange?: (tab: InfoTab) => void;
@@ -192,6 +195,8 @@ export [type] interface ViewerProviderProps {
     collection?: string[];
     onShownChange?: (shown: ViewerShown) => void;
     locale?: 'ja' | 'en';
+    contentLanguage?: string;
+    onContentLanguageChange?: (language: string | undefined) => void;
     theme?: 'light' | 'dark' | 'auto';
     target?: ViewerTarget;
     onSelect?: (selection: ViewerSelection) => void;
@@ -257,6 +262,7 @@ export [value] shownManifestAtom: PrimitiveAtom<ShownManifest | null> & WithInit
 export [value] useAuthStates: (probes: (AuthProbeRef | undefined)[], locale: string) => (AuthState | undefined)[]
 export [value] useCanvasImages: (iiifContent: null | string, canvasId: string | undefined) => CanvasImages | undefined
 export [value] useCompareSources: (urls: string[], locale: string) => Found & { ready: boolean; }
+export [value] useContentLocale: () => string
 export [value] useLocale: () => string
 export [value] useManifest: (iiifContent: null | string, collection?: string[] | undefined) => { failed: boolean; }
 export [value] useOptionalViewer: () => ViewerState | null
@@ -1275,6 +1281,7 @@ export [value] NDL_REC: readonly [{ readonly chars: 30; readonly width: 256; }, 
 export [value] NDL_REC_H: 16
 export [value] NDL_REC_RETRY: readonly [25, 45]
 export [value] NDL_REC_SPLIT: 98
+export [value] NOT_PREFERRED: 1000
 export [type] interface NdlLine {
     x: number;
     y: number;
@@ -1835,6 +1842,7 @@ export [value] captionFilesOf: (container: unknown) => CaptionFile[]
 export [value] captionKindOf: (provides: string[]) => CaptionKind
 export [value] chapterLabel: (c: StoryChapter, locale: string) => string
 export [value] choiceSidesOf: (images: CanvasImages, choice: CanvasPainting, pick: [number, number]) => [CompareSide, CompareSide] | undefined
+export [value] chosenLanguage: (locale: string) => string | undefined
 export [value] chosenLayersOf: (paintings: CanvasPainting[], indexOf: (p: CanvasPainting) => number) => ImageLayer[]
 export [value] chosenOption: (model: PaintedModel, choices: Record<string, number>) => ModelOption
 export [value] chosenUrl: (model: PaintedModel, choices: Record<string, number>) => string
@@ -1854,6 +1862,8 @@ export [value] compareDetailWidthOf: (a: CompareSide, b: CompareSide) => number 
 export [value] compareIndexesOf: (matched: { index: number; }[]) => number[]
 export [value] computeFocusCamera: (input: FocusInput) => FocusResult
 export [value] containersOf: (manifest: ManifestV4 | null | undefined) => ContainerInfo[]
+export [value] contentLanguageOfInput: (value: null | string | undefined) => null | string | undefined
+export [value] contentLocale: (uiLocale: string, chosen?: null | string | undefined) => string
 export [value] contentParam: (manifestUrl: string) => string
 export [value] contentSearchAnnotationPage: (canvasId: string, matches: ContentSearchMatch[]) => Record<string, unknown>
 export [value] contentSearchTargetOf: (target: unknown) => undefined | { canvasId: string; xywh?: [number, number, number, number] | undefined; point?: [number, number, number] | undefined; }
@@ -1885,6 +1895,7 @@ export [value] fallbackStyleOf: (anno: AnnotationStyleSource, order: string[]) =
 export [value] fetchContentSearchTerms: (autocomplete: { id: string; }, q: string, fetchJson: ContentSearchFetch, locale?: string) => Promise<ContentSearchTerm[]>
 export [value] fetchJson: (url: string) => Promise<unknown>
 export [value] fetchManifest: (manifestUrl: string) => Promise<unknown>
+export [value] filterAfterAnnotationsChange: (filter: AnnotationFilter, annotations: Annotation[], sameSource: boolean) => AnnotationFilter
 export [value] filterAnnotations: (annotations: Annotation[], filter: AnnotationFilter) => Annotation[]
 export [value] filterGeorefFeatures: (features: GeoFeature[], annotations: Annotation[], filter: GeorefListFilter) => number[]
 export [value] filterItems: (items: SearchItem[], query: string, selection: FacetSelection) => SearchItem[]
@@ -1947,6 +1958,7 @@ export [value] isFilterActive: (f: AnnotationFilter) => boolean
 export [value] isGeoreferencing: (anno: Json) => boolean
 export [value] isImageBody: (b: AnnotationBodyItem) => boolean
 export [value] isImageInfoJson: (json: unknown) => boolean
+export [value] isLanguageTag: (value: string) => boolean
 export [value] isLayerVisible: (item: LayerItem, settings: Record<string, LayerSetting>) => boolean
 export [value] isPictureWithVideo: (container: unknown) => boolean
 export [value] isPresentation2: (json: unknown) => boolean
@@ -1959,12 +1971,15 @@ export [value] isTocNodeActive: (node: TocNode, canvasId: string | undefined, ti
 export [value] isUnresolvableEditorId: (url: string | undefined) => boolean
 export [value] isVideoLayer: (layer: ImageLayer) => boolean
 export [value] isVtt: (s: SupplementingContent) => boolean
+export [value] keysInOrder: (map: Record<string, unknown>, locale: string) => string[]
 export [value] kindFacets: (kinds: readonly string[]) => Facet[]
 export [value] kotenDetTensor: (square: Uint8ClampedArray<ArrayBufferLike>, side: number) => Float32Array<ArrayBufferLike>
 export [value] kotenLines: (boxes: ArrayLike<number>, scores: ArrayLike<number>, W: number, H: number) => KotenLine[]
 export [value] labelIn: (label: unknown, locale: string) => string
 export [value] labelStrings: (label: unknown) => string[]
 export [value] languageMapOf: (label: unknown) => LanguageMap | undefined
+export [value] languageRank: (tag: string | undefined, locale: string) => number
+export [value] languagesOf: (resource: unknown) => string[]
 export [value] largestPart: (mask: ArrayLike<number>, w: number, h: number) => null | { mask: Uint8Array<ArrayBufferLike>; size: number; }
 export [value] layerCountOf: (painting: PaintingContent[], withVideos?: boolean) => number
 export [value] layerItemsOf: (paintings: CanvasPainting[], props?: { videos?: boolean | undefined; }) => LayerItem[]
@@ -1987,6 +2002,7 @@ export [value] mapBoundsOf: (places: MapPlace[]) => [number, number, number, num
 export [value] mapPlacesOf: (resource: unknown, locale: string) => MapPlace[]
 export [value] mapViewParams: (v: GeorefMapView) => Partial<Record<"annotations" | "autoRotateOnSelect" | "canvas" | "centerX" | "centerY" | "clustering" | "id" | "license" | "mapLat" | "mapLng" | "mapZoom" | "rotation" | "search" | "zoom", null | string>>
 export [value] maskToPolygon: (mask: ArrayLike<number>, w: number, h: number, eps?: number) => XY[] | null
+export [value] matchLanguage: (tag: string, candidates: readonly string[]) => string | undefined
 export [value] matchTarget: (targets: (CanvasTarget & { manifestUrl?: string | undefined; })[], containers: ContainerInfo[]) => (CanvasTarget & { index: number; }) | null
 export [value] matchTargets: (targets: (CanvasTarget & { manifestUrl?: string | undefined; })[], containers: ContainerInfo[]) => (CanvasTarget & { index: number; })[]
 export [value] matchesCanvasAnnotation: (a: Pick<CanvasAnnotation, "bodies" | "resources" | "title">, terms: string[], tags: string[], locale: string) => boolean
@@ -2070,8 +2086,10 @@ export [value] ppocrDetTensor: (px: Uint8ClampedArray<ArrayBufferLike>, w: numbe
 export [value] ppocrQuadBox: (quad: XY[]) => { x: number; y: number; w: number; h: number; polygon?: XY[] | undefined; }
 export [value] ppocrRead: (page: Uint8ClampedArray<ArrayBufferLike>, W: number, H: number, chars: string[], run: PpocrRunners) => Promise<PpocrLine[]>
 export [value] ppocrRecTensor: (px: Uint8ClampedArray<ArrayBufferLike>, w: number, h: number) => { data: Float32Array<ArrayBufferLike>; width: number; }
+export [value] preferredLanguages: (locale: string) => string[]
 export [value] presentCanvasTags: (annotations: Pick<CanvasAnnotation, "bodies">[], chosen: string[], locale: string) => string[]
 export [value] presentChoices: (chosen: readonly string[], facets: readonly Facet[]) => string[]
+export [value] primaryLanguage: (locale: string) => string
 export [value] probeServiceOf: (resource: unknown, locale?: string) => AuthProbeRef | undefined
 export [value] project: (args: LngLat) => [number, number]
 export [value] puzzlePlacedCount: (b: PuzzleBoard) => number
@@ -2122,6 +2140,7 @@ export [value] sam2Outline: (masks: ArrayLike<number>, iou: ArrayLike<number>, c
 export [value] sam2PointInput: (points: Sam2Point[], crop: Sam2Box) => { coords: number[]; labels: number[]; }
 export [value] sam2Tensor: (px: Uint8ClampedArray<ArrayBufferLike>, size?: number) => Float32Array<ArrayBufferLike>
 export [value] sam2ViewCrop: (view: Sam2Box, w: number, h: number, min?: number) => Sam2Box
+export [value] sameLanguageFamily: (a: string, b: string) => boolean
 export [value] sameUrlList: (a: readonly string[], b: readonly string[]) => boolean
 export [value] sanitizeAboutHtml: (html: unknown) => string
 export [value] sanitizeAnnotationHtml: (html: string) => string
@@ -2187,6 +2206,7 @@ export [value] traceBoundary: (mask: ArrayLike<number>, w: number, h: number) =>
 export [value] transcriptFilesOf: (manifest: ManifestV4 | null | undefined) => TranscriptFile[]
 export [value] transcriptOf: (supplementing: SupplementingContent[]) => SupplementingContent | undefined
 export [value] transformMatrixOf: (transform: unknown) => M4 | undefined
+export [value] uiLanguage: (locale: string) => string
 export [value] unitFactor: (from: SourceUnit, to: DisplayUnit) => number
 export [value] unproject: (args: [number, number]) => LngLat
 export [value] upgradeToV3: (json: unknown) => unknown

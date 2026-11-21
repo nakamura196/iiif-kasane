@@ -11,7 +11,7 @@ import {
   type AboutScope,
 } from '../../core';
 import { manifestAtom } from '../atoms';
-import { useLocale, useTranslations } from '../env';
+import { useContentLocale, useTranslations } from '../env';
 import { MetadataList, SafeHtml } from './SafeHtml';
 import type { Panel, PanelContext } from './types';
 
@@ -69,7 +69,7 @@ const Agent = ({ agent }: { agent: AboutAgent }) => {
   );
 };
 
-// 場所は座標の一覧と OpenStreetMap への外部リンクで示す（地図の部品は持たない）。
+// A place is shown as a list of coordinates and an external link to OpenStreetMap (it has no map part of its own).
 const Place = ({ place }: { place: AboutPlace }) => {
   const t = useTranslations('About');
   const c = place.center;
@@ -92,8 +92,8 @@ const Place = ({ place }: { place: AboutPlace }) => {
   );
 };
 
-// Mirador に倣い、右パネルを「資料情報」（何の資料か）と「権利」（使ってよいか・誰のものか）に分ける。
-// 資料情報は、表示中のページ → 資料全体 → 目次の項目の順に並べる。
+// Following Mirador, the right panel is split into "Resource information" (what the resource is) and "Rights" (whether it may be used, and whose it is).
+// The resource information is ordered: the page shown, the whole resource, then the items of the table of contents.
 
 function InfoScope({ scope, title }: { scope: AboutScope; title: boolean }) {
   const t = useTranslations('About');
@@ -209,12 +209,12 @@ const Heading = ({ children, sub }: { children: ReactNode; sub?: string }) => (
 );
 
 function useAbout({ container, manifest }: PanelContext) {
-  const locale = useLocale();
+  const locale = useContentLocale();
   const fromAtom = useAtomValue(manifestAtom);
   return aboutOf(manifest ?? fromAtom, container?.id, locale);
 }
 
-/** 資料情報: 表示中のページ、資料全体、目次の項目。 */
+/** Resource information: the page shown, the whole resource, and the items of the table of contents. */
 export function InfoView(ctx: PanelContext) {
   const t = useTranslations('About');
   const info = useAbout(ctx);
@@ -247,7 +247,7 @@ export function InfoView(ctx: PanelContext) {
   );
 }
 
-/** 権利: 出典表記・ライセンス・提供者。ページや目次の項目が別の権利を持つときは、それも出す。 */
+/** Rights: attribution, license and providers. When a page or an item of the table of contents has other rights, they are shown too. */
 function RightsView(ctx: PanelContext) {
   const t = useTranslations('About');
   const info = useAbout(ctx);
@@ -275,7 +275,7 @@ function RightsView(ctx: PanelContext) {
 }
 
 export const infoPanel: Panel = {
-  // URL の ?tab=metadata を壊さないよう、id は前のまま
+  // keep the id as it was, so that ?tab=metadata in the URL does not break
   id: 'metadata',
 
   order: 10,

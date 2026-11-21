@@ -5,7 +5,7 @@ import { useAtomValue, useSetAtom } from 'jotai';
 import { containersOf, labelIn, pageMediaOf, pageThumbnailUrl, type MediaKind } from '../../core';
 import { manifestAtom } from '../atoms';
 import { navRequestAtom, nextSeq, usePageOrder } from '../displays/structureState';
-import { useLocale, useTranslations } from '../env';
+import { useContentLocale, useTranslations } from '../env';
 import { readingPageAtom } from '../inference/batch';
 import { PageThumbMarks, PagesBatchBar, PagesReadingStyle } from './PagesBatch';
 import type { Panel, PanelContext } from './types';
@@ -109,7 +109,7 @@ const inView = (el: HTMLElement, band: HTMLElement | null): boolean => {
 
 function PagesView({ container, manifest }: PanelContext) {
   const t = useTranslations('Structure');
-  const locale = useLocale();
+  const locale = useContentLocale();
   const fromAtom = useAtomValue(manifestAtom);
   const m = manifest ?? fromAtom;
   const setRequest = useSetAtom(navRequestAtom);

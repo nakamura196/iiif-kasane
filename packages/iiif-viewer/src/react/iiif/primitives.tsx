@@ -2,7 +2,7 @@
 import React from 'react';
 import { sanitizeAboutHtml } from '../../core';
 import { LINK_CLASS } from '../panels/SafeHtml';
-import { useLocale } from '../env';
+import { useContentLocale } from '../env';
 import { labelIn } from '../../core/services/paintedModels';
 
 export type IIIFLabel = string | string[] | Record<string, string | string[]>;
@@ -14,7 +14,7 @@ interface LabelProps {
 }
 
 export function Label({ label, as = 'span', className = '' }: LabelProps) {
-  const locale = useLocale();
+  const locale = useContentLocale();
   if (!label) return null;
   const displayText = labelIn(label, locale);
 
@@ -37,7 +37,7 @@ interface SummaryProps {
 }
 
 export function Summary({ summary, className = '' }: SummaryProps) {
-  const locale = useLocale();
+  const locale = useContentLocale();
   if (!summary) return null;
   const displayText = labelIn(summary, locale);
 
@@ -55,7 +55,7 @@ interface MetadataProps {
 }
 
 export function Metadata({ metadata, className = '' }: MetadataProps) {
-  const locale = useLocale();
+  const locale = useContentLocale();
   if (!metadata || !Array.isArray(metadata)) return null;
 
   return (

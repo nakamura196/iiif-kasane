@@ -2,7 +2,7 @@
 
 import { startTransition } from 'react';
 import { useAtom } from 'jotai';
-import { useLocale } from '../env';
+import { useContentLocale } from '../env';
 import { modelChoicesAtom, paintedModelsAtom } from '../atoms';
 import { labelIn } from '../../core';
 
@@ -11,7 +11,7 @@ import { labelIn } from '../../core';
 export default function ModelChoice({ className = '' }: { className?: string }) {
   const [models] = useAtom(paintedModelsAtom);
   const [choices, setChoices] = useAtom(modelChoicesAtom);
-  const locale = useLocale();
+  const locale = useContentLocale();
   const choiceModels = models.filter((m) => m.options.length > 1);
   if (choiceModels.length === 0) return null;
 

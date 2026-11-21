@@ -1,8 +1,9 @@
-// annotationBody: 注釈 1 件の本文の読み方（見出し・本文・タグ・画像・リンク）。2D の注釈一覧と 3D の注釈一覧の両方が使う。
-// React に依存しない。本文は言語を決めずに読み、言語は表示や 3D の注釈を作るときに選ぶ（pickBodies）。
+// annotationBody: how to read the body of one annotation (heading, text, tags, images, links). Used by both the 2D and the 3D annotation list.
+// No dependency on React. The body is read without choosing a language; the language is chosen when it is shown or when 3D notes are made (pickBodies).
 
 import type { AnnotationImage, AnnotationTag } from '../types/main';
 import { labelIn } from '../services/paintedModels';
+import { chosenLanguage, matchLanguage, uiLanguage } from '../services/contentLanguage';
 
 type Json = Record<string, unknown>;
 
@@ -186,7 +187,11 @@ export const pickBodies = (bodies: AnnotationBodyItem[], locale: string): Annota
     if (b.choice === undefined) return b;
     const g = groups.get(b.choice) ?? [b];
     const lang = (l?: string) => l?.toLowerCase().split('-')[0];
-    return g.find((x) => lang(x.language) === lang(locale)) ?? g[0];
+    // the chosen content language first (never across scripts), then the UI language by its primary subtag, as it always was
+    const chosen = chosenLanguage(locale);
+    const found = chosen ? matchLanguage(chosen, g.map((x) => x.language).filter((l): l is string => !!l)) : undefined;
+    const chosenHit = found ? g.find((x) => x.language === found) : undefined;
+    return chosenHit ?? g.find((x) => lang(x.language) === lang(uiLanguage(locale))) ?? g[0];
   });
 };
 

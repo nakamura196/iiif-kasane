@@ -14,7 +14,7 @@ import {
   type CollectionEntry,
 } from '../../core';
 import { shownManifestAtom } from '../atoms';
-import { useLocale, useTranslations } from '../env';
+import { useContentLocale, useTranslations } from '../env';
 import { displayAfter } from './registry';
 import { useManifestSwitch } from './structureState';
 import type { Display, DisplayProps } from './types';
@@ -107,7 +107,7 @@ export async function fetchedEntriesFor(manifest: { id: string }): Promise<Colle
 function CollectionDisplay(props: DisplayProps) {
   const { manifest, containers } = props;
   const t = useTranslations('Structure');
-  const locale = useLocale();
+  const locale = useContentLocale();
   const { open } = useManifestSwitch();
   const isCollection = (manifest as { type?: string }).type === 'Collection';
   const [state, setState] = useState<{ id: string; kind: 'opening' | 'error' } | null>(null);

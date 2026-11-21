@@ -11,7 +11,7 @@ import {
   wikidataLabelUrl,
   type AnnotationBodyItem,
 } from '../../core';
-import { useLocale, useTranslations } from '../env';
+import { useContentLocale, useTranslations } from '../env';
 import { useCanvasNavigation } from '../navigation';
 import AnnotationImages from './AnnotationImages';
 
@@ -19,7 +19,7 @@ import AnnotationImages from './AnnotationImages';
 const isHtml = (b: AnnotationBodyItem, assumeHtml = false) => (b.format ? /html/i.test(b.format) : assumeHtml);
 const plainText = (html: string) => html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 
-// Wikidata のラベル。同じ項目は 1 回だけ取りに行く。失敗は覚えず、表示は URL のままにする。
+// Wikidata labels. The same item is fetched only once. A failure is not remembered, and the URL stays as it is.
 const wikidataCache = new Map<string, Promise<string | undefined>>();
 
 const fetchWikidataLabel = (id: string, locale: string): Promise<string | undefined> => {
@@ -72,7 +72,7 @@ export default function AnnotationBody({
   assumeHtml?: boolean;
 }) {
   const t = useTranslations('Info');
-  const locale = useLocale();
+  const locale = useContentLocale();
   const { goToCanvas } = useCanvasNavigation();
   const wikidata = useWikidataLabel(body.url ?? '', locale, body.kind !== 'text' && !labelIn(body.label, locale));
   if (body.kind === 'text') {
@@ -87,7 +87,7 @@ export default function AnnotationBody({
       );
     }
     if (isHtml(body, assumeHtml)) {
-      // サニタイズ済み（許可したタグ・属性だけ）
+      // already sanitized (only the allowed tags and attributes)
       return (
         <div
           className="text-sm text-gray-800 dark:text-gray-100 break-words [&_a]:text-blue-600 [&_a]:underline [&_img]:max-w-full [&_img]:inline [&_img]:h-5 [&_p]:my-1"

@@ -17,7 +17,7 @@ import {
 } from '../../core';
 import { canvasLayersAtom, layerOrderAtom, layerSettingsAtom } from '../atoms';
 import AuthPrompt from '../auth/AuthPrompt';
-import { useLocale, useTranslations } from '../env';
+import { useContentLocale, useTranslations } from '../env';
 import { flatDisplay } from './FlatDisplay';
 import { imageCanvasDisplay } from './ImageCanvasDisplay';
 import ImageLayerView, { useImageInfo } from './ImageTiles';
@@ -116,7 +116,7 @@ function StagedPage({
   active?: boolean;
   onClick?: () => void;
 }) {
-  const locale = useLocale();
+  const locale = useContentLocale();
   const label = labelIn(container.label, locale);
   // If neither the Canvas nor the painting body declared a size, learn it from the first layer's info.json.
   const fallbackService = !paint.width || !paint.height ? paint.layers[0]?.layer.service : undefined;
@@ -251,7 +251,7 @@ function PageImage({
   active?: boolean;
   onClick?: () => void;
 }) {
-  const locale = useLocale();
+  const locale = useContentLocale();
   if (waitingRaw) {
     if (inStrip) {
       const ratio = container.width && container.height ? `${container.width} / ${container.height}` : undefined;

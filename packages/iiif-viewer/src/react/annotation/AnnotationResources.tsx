@@ -2,7 +2,7 @@
 
 import { useId, useState, type SyntheticEvent } from 'react';
 import { localizedString, type AnnotationResource } from '../../core';
-import { useLocale, useTranslations } from '../env';
+import { useContentLocale, useTranslations } from '../env';
 import AnnotationBody from './AnnotationBody';
 import AnnotationImages from './AnnotationImages';
 
@@ -27,7 +27,7 @@ function Heading({ children }: { children: string }) {
 function ResourceLink({ resource }: { resource: AnnotationResource }) {
   const t = useTranslations('AnnotationResources');
   const tag = resource.kind === 'wikidata' ? 'Wikidata' : resource.kind === 'wikipedia' ? 'Wikipedia' : null;
-  const locale = useLocale();
+  const locale = useContentLocale();
   const text = localizedString(resource.label, locale);
   // the tag says it is Wikipedia, so the editor's "Wikipedia: " prefix is dropped
   const label = tag ? text.replace(/^Wikipedia:\s*/i, '') : text;
@@ -49,7 +49,7 @@ function ResourceLink({ resource }: { resource: AnnotationResource }) {
  */
 export function AnnotationResourcesContent({ resources }: { resources: AnnotationResource[] }) {
   const t = useTranslations('AnnotationResources');
-  const locale = useLocale();
+  const locale = useContentLocale();
   const place = resources.filter((r) => r.role === 'place' && r.kind === 'image');
   const identifying = resources.filter((r) => r.role === 'identifying');
   const related = resources.filter((r) => !place.includes(r) && !identifying.includes(r));

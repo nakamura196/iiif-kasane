@@ -6,7 +6,7 @@ import { authorizedUrl, chosenOption, probeServiceOf } from '../../core';
 import { tryPrepareShow, type PreparedShow } from '../useManifest';
 import { annotationsAtom, paintedModelsAtom, sceneIdAtom, selectedAnnotationIdAtom, modelChoicesAtom } from '../atoms';
 import { sceneDisplayAtom } from '../internalState';
-import { useLocale, useTranslations } from '../env';
+import { useContentLocale, useTranslations } from '../env';
 import AuthPrompt from '../auth/AuthPrompt';
 import { useAuthStates } from '../auth/authStore';
 import ModelChoice from '../three/ModelChoice';
@@ -20,17 +20,29 @@ const CanvasComponent = lazy(() => import('../three/Canvas'));
 
 const EMPTY: PreparedShow['paintedModels'] = [];
 
-/** What the display of a Scene puts in the store: its Scene id, painted models and notes (a new Scene or locale clears the selection). */
-export function writeSceneState(store: ReturnType<typeof createStore>, sceneId: string, read: PreparedShow | null): void {
+/**
+ * What the display of a Scene puts in the store: its Scene id, painted models and notes. The selection is cleared,
+ * except when `keepSelection` says the same mounted display read the same Scene again (a new content language) and
+ * the note still exists. (The Scene id in the store outlives the display: coming back to the Scene later is not that.)
+ */
+export function writeSceneState(
+  store: ReturnType<typeof createStore>,
+  sceneId: string,
+  read: PreparedShow | null,
+  keepSelection = false,
+): void {
+  const annotations = read?.annotations ?? [];
   store.set(sceneIdAtom, sceneId);
   store.set(paintedModelsAtom, read?.paintedModels ?? []);
-  store.set(annotationsAtom, read?.annotations ?? []);
-  store.set(selectedAnnotationIdAtom, null);
+  store.set(annotationsAtom, annotations);
+  // the same Scene read again (a new content language): the selected note stays while it still exists
+  const selected = store.get(selectedAnnotationIdAtom);
+  if (!(keepSelection && selected !== null && annotations.some((a) => a.id === selected))) store.set(selectedAnnotationIdAtom, null);
 }
 
 function SceneDisplay({ container, manifest, iiifContent, shownUrl, renderActions, selectedIndex }: DisplayProps) {
   const t = useTranslations('Viewer');
-  const locale = useLocale();
+  const locale = useContentLocale();
   const modelChoices = useAtomValue(modelChoicesAtom);
   const store = useStore();
 
@@ -40,9 +52,13 @@ function SceneDisplay({ container, manifest, iiifContent, shownUrl, renderAction
   const sceneId = container.id;
   const read = useMemo(() => tryPrepareShow(manifest, locale, sceneId), [manifest, sceneId, locale]);
   const broken = read === null;
+  // what this mounted display wrote last: the same Scene of the same manifest read again keeps the selected note
+  const written = useRef<{ manifest: unknown; sceneId: string } | null>(null);
   useEffect(() => {
-    writeSceneState(store, sceneId, read);
-  }, [store, sceneId, read]);
+    const again = written.current?.manifest === manifest && written.current.sceneId === sceneId;
+    writeSceneState(store, sceneId, read, again);
+    written.current = { manifest, sceneId };
+  }, [store, manifest, sceneId, read]);
   useEffect(() => {
     store.set(sceneDisplayAtom, { mounted: true, sceneId });
     return () => store.set(sceneDisplayAtom, (d) => ({ ...d, mounted: false }));

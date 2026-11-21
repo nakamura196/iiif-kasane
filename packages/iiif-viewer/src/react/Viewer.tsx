@@ -27,6 +27,10 @@ export interface ViewerProps {
   /** Called each time a manifest (or Collection) is shown (see `ViewerProviderProps.onShownChange`). */
   onShownChange?: ViewerProviderProps['onShownChange'];
   locale?: 'ja' | 'en';
+  /** The language of the resource's own text, apart from `locale` (see `ViewerProviderProps.contentLanguage`). */
+  contentLanguage?: ViewerProviderProps['contentLanguage'];
+  /** Called when the reader chooses a content language (see `ViewerProviderProps.onContentLanguageChange`). */
+  onContentLanguageChange?: ViewerProviderProps['onContentLanguageChange'];
   theme?: 'light' | 'dark' | 'auto';
   /** Controlled side panel tab. Without it the viewer keeps the tab itself. */
   tab?: InfoTab;
@@ -105,6 +109,8 @@ export function Viewer({
   collection,
   onShownChange,
   locale = 'ja',
+  contentLanguage,
+  onContentLanguageChange,
   theme = 'auto',
   target,
   onSelect,
@@ -118,6 +124,8 @@ export function Viewer({
       collection={collection}
       onShownChange={onShownChange}
       locale={locale}
+      contentLanguage={contentLanguage}
+      onContentLanguageChange={onContentLanguageChange}
       theme={theme}
       target={target}
       onSelect={onSelect}

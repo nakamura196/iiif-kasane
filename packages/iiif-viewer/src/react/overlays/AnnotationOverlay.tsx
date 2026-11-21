@@ -22,7 +22,7 @@ import {
   type StyleDeclarations,
 } from '../../core';
 import { manifestAtom, showAnnotationsAtom } from '../atoms';
-import { useLocale } from '../env';
+import { useContentLocale } from '../env';
 import {
   canvasAnnotationGranularityAtom,
   canvasAnnotationKindsAtom,
@@ -129,7 +129,7 @@ function NumberBadge({
 // Overlay the regions of Canvas annotations on the image. Positions are fractions of Canvas coordinates (inside a layer the same size as the image).
 // Annotations on the whole Canvas get no frame (they appear only in the right panel).
 export function AnnotationOverlayView({ container, canvasWidth, canvasHeight, stage }: OverlayProps) {
-  const locale = useLocale();
+  const locale = useContentLocale();
   const manifest = useAtomValue(manifestAtom);
   const { annotations, styleOf } = useCanvasAnnotations(manifest, container);
   // the same numbers as the cards of the list (none when there are very many)

@@ -2,12 +2,13 @@ import {
   annotationFilterAtom,
   annotationsAtom,
   manifestAtom,
+  sceneIdAtom,
   selectedAnnotationIdAtom,
   visibleAnnotationsAtom,
 } from '../atoms';
-import { useAtom } from 'jotai';
+import { useAtom, useAtomValue } from 'jotai';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { useLocale, useTranslations } from '../env';
+import { useContentLocale, useTranslations } from '../env';
 import AnnotationCard, { AnnotationCardDetail } from '../annotation/AnnotationCard';
 import { RegionGroupFrame } from '../annotation/AnnotationCardFrame';
 import { buildAnnotationGraph, groupByRegion, labelIn, opensDetail } from '../../core';
@@ -16,6 +17,7 @@ import {
   annotationKindFacets,
   creatorFacets,
   isFilterActive,
+  filterAfterAnnotationsChange,
   tagFacets,
 } from '../../core';
 import { FilterChips } from './FilterChips';
@@ -31,7 +33,7 @@ export default function AnnotationList() {
   const [filter, setFilter] = useAtom(annotationFilterAtom);
   const [selectedAnnotationId, setSelectedAnnotationId] = useAtom(selectedAnnotationIdAtom);
   const [manifest] = useAtom(manifestAtom);
-  const locale = useLocale();
+  const locale = useContentLocale();
   const selectedRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -47,9 +49,18 @@ export default function AnnotationList() {
     setSelectedAnnotationId(annotationId);
   };
 
-  // Opening another manifest clears the search and the filters
+  // New annotations clear the search and the filters, as they always did. The same annotations read again in
+  // another content language (same manifest and Scene, the locale changed) keep them (see filterAfterAnnotationsChange).
+  const sceneId = useAtomValue(sceneIdAtom);
+  const lastSource = useRef<{ locale: string; manifestId: string | null; sceneId: string | null } | null>(null);
   useEffect(() => {
-    setFilter(EMPTY_FILTER);
+    const now = { locale, manifestId: manifest?.id ?? null, sceneId };
+    const was = lastSource.current;
+    lastSource.current = now;
+    const sameSource = !!was && was.locale !== now.locale && was.manifestId === now.manifestId && was.sceneId === now.sceneId;
+    setFilter((f) => filterAfterAnnotationsChange(f, annotations, sameSource));
+    // only a change of the annotations counts: the locale and the source are read as they are then
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [annotations, setFilter]);
 
   const creators = useMemo(() => creatorFacets(annotations), [annotations]);

@@ -23,11 +23,11 @@ import {
   type ImageRegion,
 } from '../../core';
 import { useAuth } from '../auth/authStore';
-import { useLocale, useTranslations } from '../env';
+import { useContentLocale, useTranslations } from '../env';
 import { rotatePoint, type StageInfo } from './ImageView';
 
-// Image API の深いズーム。info.json から「どの大きさの画像を、どの範囲だけ」取るかを決め、
-// 見えている範囲のタイルだけを <img> で並べる（依存なし・CSS の位置指定だけ）。
+// Deep zoom with the Image API. From info.json it decides which size of image to take and which part of it,
+// and lays out only the tiles in the visible area as <img> (no dependency; only CSS positioning).
 
 interface LoadedInfo {
   info: ImageInfo | null;
@@ -112,7 +112,7 @@ export default function ImageLayerView({
   showLoading?: boolean;
 }) {
   const t = useTranslations('Viewer');
-  const locale = useLocale();
+  const locale = useContentLocale();
   // the probe the manifest declares; an info.json may declare one too (read once its first fetch is back)
   const [infoProbe, setInfoProbe] = useState<AuthProbeRef | undefined>();
   const probe = given.auth ?? infoProbe;

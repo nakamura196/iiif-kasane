@@ -1,12 +1,13 @@
-// chronology: Collection の項目を navDate（Cookbook 0230）で年代順に並べ、年ごとにまとめる。
-// React に依存しない。この機能の担当だけがこのファイルを書く。
-// navDate は xsd:dateTime。紀元前（"-0500-01-01T00:00:00Z"）や 5 桁以上の年は Date.parse が
-// 読めないので、並べる鍵は先頭の年から自分で作る。
+// chronology: sorts the items of a Collection by navDate (Cookbook 0230) and groups them by year.
+// No dependency on React. Only the owner of this feature writes this file.
+// navDate is an xsd:dateTime. Date.parse cannot read a BCE date ("-0500-01-01T00:00:00Z") or a year of five or more digits,
+// so the sort key is built here from the year at the front.
 import type { CollectionEntry } from './structure';
+import { uiLanguage } from '../services/contentLanguage';
 
 export interface DatedEntry {
   entry: CollectionEntry;
-  /** 元の navDate */
+  /** the original navDate */
   iso: string;
   year: number;
 }
@@ -17,15 +18,15 @@ export interface ChronologyYear {
 }
 
 export interface Chronology {
-  /** 年の古い順。同じ年の中は日時の古い順、同じ日時は元の順。 */
+  /** Oldest year first. Within a year, the older date and time first; the same date and time keep their original order. */
   years: ChronologyYear[];
-  /** navDate が無いか読めない項目（元の順）。 */
+  /** Items without a navDate, or with one that cannot be read (in their original order). */
   undated: CollectionEntry[];
 }
 
 const DATE_RE = /^\s*([+-]?\d{1,9})(?:-(\d{2})(?:-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2}))?)?)?)?/;
 
-/** navDate から年と、並べるための数値を取る。読めなければ null。 */
+/** The year and a number to sort by, from a navDate. null if it cannot be read. */
 export function navDateKey(iso: string | undefined): { year: number; key: number } | null {
   if (!iso) return null;
   const m = DATE_RE.exec(iso);
@@ -33,12 +34,12 @@ export function navDateKey(iso: string | undefined): { year: number; key: number
   const year = Number(m[1]);
   if (!Number.isFinite(year)) return null;
   const part = (s: string | undefined) => (s ? Number(s) : 0);
-  // 年 × 1e10 に月日時分秒を足す（同じ年の中だけで順序が要る。タイムゾーンは無視）
+  // year x 1e10 plus month, day, hour, minute and second (the order is only needed within one year; the time zone is ignored)
   const rest = ((((part(m[2]) * 100 + part(m[3])) * 100 + part(m[4])) * 100 + part(m[5])) * 100) + part(m[6]);
   return { year, key: year * 1e10 + rest };
 }
 
-/** navDate を持つ項目が 2 件以上あるか（年代順に並べる意味があるか）。 */
+/** Whether two or more items have a navDate (whether sorting by date means anything). */
 export function hasChronology(entries: CollectionEntry[]): boolean {
   let n = 0;
   for (const e of entries) if (navDateKey(e.navDate) && ++n >= 2) return true;
@@ -63,14 +64,14 @@ export function chronologyOf(entries: CollectionEntry[]): Chronology {
   return { years, undated };
 }
 
-/** 年の表示。紀元前は「前 500」/「500 BCE」。 */
+/** How a year is shown. A BCE year is "500 BCE" in English (and its Japanese form in Japanese). */
 export function yearText(year: number, locale: string): string {
   if (year > 0) return String(year);
-  const bce = 1 - year; // 天文年 0 = 紀元前 1 年
-  return locale.startsWith('ja') ? `紀元前 ${bce}` : `${bce} BCE`;
+  const bce = 1 - year; // astronomical year 0 = 1 BCE
+  return uiLanguage(locale).startsWith('ja') ? `紀元前 ${bce}` : `${bce} BCE`;
 }
 
-/** 日付の表示。時刻が 0 時なら日付だけ。紀元前など Intl が扱えない値は年だけ。 */
+/** How a date is shown. Only the date when the time is midnight. For a value Intl cannot handle (BCE and the like), only the year. */
 export function navDateText(iso: string, locale: string): string {
   const k = navDateKey(iso);
   if (!k) return iso;
@@ -78,12 +79,12 @@ export function navDateText(iso: string, locale: string): string {
   const t = Date.parse(iso);
   if (!Number.isFinite(t)) return yearText(k.year, locale);
   const d = new Date(t);
-  // 1 月 1 日 0 時は「年だけ」の意味で使われることが多い（0230 もそう）
+  // January 1 at 00:00 is often used to mean "the year only" (0230 does too)
   if (d.getUTCMonth() === 0 && d.getUTCDate() === 1 && d.getUTCHours() === 0 && d.getUTCMinutes() === 0) {
     return yearText(k.year, locale);
   }
   try {
-    return new Intl.DateTimeFormat(locale, { timeZone: 'UTC', year: 'numeric', month: 'short', day: 'numeric' }).format(d);
+    return new Intl.DateTimeFormat(uiLanguage(locale), { timeZone: 'UTC', year: 'numeric', month: 'short', day: 'numeric' }).format(d);
   } catch {
     return iso;
   }

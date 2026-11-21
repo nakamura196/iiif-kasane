@@ -18,6 +18,16 @@ export function pickedIndex(picked: { shown: number; index: number }, shownSeq: 
   return Math.min(picked.shown === shownSeq ? picked.index : 0, Math.max(count - 1, 0));
 }
 
+/**
+ * The language of the resource's own text chosen by the reader (or given by the host as `contentLanguage`).
+ * null: not chosen, so the text follows the UI locale as before.
+ */
+export const contentLanguageAtom = atom<string | null>(null);
+
+/** The host's `onContentLanguageChange`, called when the reader chooses a language (null: none given). */
+// (wrapped in an object: jotai would call a function given to set() as an updater)
+export const contentLanguageChangeAtom = atom<{ call: (lang: string | undefined) => void } | null>(null);
+
 /** Counts every manifest shown; it only grows (clearing what is shown does not take it back). */
 export const shownSeqAtom = atom(0);
 

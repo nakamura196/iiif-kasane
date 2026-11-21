@@ -32,7 +32,7 @@ import {
 import { annotationsAtom, selectedAnnotationIdAtom } from '../atoms';
 import { fmt } from '../displays/TranscriptPanel';
 import { navRequestAtom, nextSeq } from '../displays/structureState';
-import { useLocale, useTranslations } from '../env';
+import { useContentLocale, useTranslations } from '../env';
 import { BUTTON } from '../common/buttonClasses';
 import { CopyButton } from '../common/CopyButton';
 import { inferenceResultsAtom } from '../inference/state';
@@ -192,7 +192,7 @@ function MatchText({ match }: { match: ContentSearchMatch }) {
 export function ContentSearchPanelBody(ctx: PanelContext) {
   const { container, manifest } = ctx;
   const t = useTranslations('ContentSearch');
-  const locale = useLocale();
+  const locale = useContentLocale();
   const service = useMemo(() => findContentSearchService(manifest, locale), [manifest, locale]);
   const localOk = canSearchLocal(ctx);
   const manifestId = manifest?.id ?? '';
