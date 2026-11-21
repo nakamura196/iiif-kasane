@@ -658,7 +658,7 @@ export const USE_CASES: UseCase[] = [
     },
     open: {
       page: 'viewer',
-      manifest: 'https://nakamura196.github.io/hyakki-video-layers/manifest.json',
+      manifest: 'https://hyakki-video.ldas.jp/manifest.json',
       canvas: 'https://example.org/hyakki/canvas/1#xywh=38500,0,6500,3082',
       tab: 'layers',
     },
