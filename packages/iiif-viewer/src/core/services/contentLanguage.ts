@@ -35,13 +35,26 @@ export const languageRank = (tag: string | undefined, locale: string): number =>
   const chosen = chosenLanguage(locale);
   if (chosen && matchLanguage(chosen, [tag]) !== undefined) return 0;
   // the UI language: the same primary subtag, as it always was
-  return tag.split('-')[0] === primaryOfUi(locale) ? (chosen ? 1 : 0) : NOT_PREFERRED;
+  return tag.toLowerCase().split('-')[0] === primaryOfUi(locale) ? (chosen ? 1 : 0) : NOT_PREFERRED;
 };
 
-const primaryOfUi = (locale: string): string => uiLanguage(locale).split('-')[0];
+const primaryOfUi = (locale: string): string => uiLanguage(locale).toLowerCase().split('-')[0];
 
-// The script subtag of a language tag ("hant" in "zh-Hant"), or '' when it has none.
-const scriptOf = (tag: string): string => tag.toLowerCase().split('-').slice(1).find((p) => /^[a-z]{4}$/.test(p)) ?? '';
+// The script of a language tag: its script subtag ("hant" in "zh-Hant"), else the script a Chinese region implies
+// (zh-TW, zh-HK, zh-MO are Traditional; zh-CN, zh-SG are Simplified), else ''.
+const scriptOf = (tag: string): string => {
+  const parts = tag.toLowerCase().split('-');
+  const explicit = parts.slice(1).find((p) => /^[a-z]{4}$/.test(p));
+  if (explicit) return explicit;
+  if (parts[0] !== 'zh') return '';
+  if (parts.some((p) => p === 'tw' || p === 'hk' || p === 'mo')) return 'hant';
+  if (parts.some((p) => p === 'cn' || p === 'sg')) return 'hans';
+  return '';
+};
+
+/** Whether two tags are the same language in the same script (regions may differ: "fr" and "fr-CA"). */
+export const sameLanguageFamily = (a: string, b: string): boolean =>
+  a.toLowerCase().split('-')[0] === b.toLowerCase().split('-')[0] && scriptOf(a) === scriptOf(b);
 
 /**
  * The candidate that stands for `tag`, or undefined. Exact match first, then without regard to case. Then the
@@ -84,12 +97,11 @@ export const uiLanguage = (locale: string): string => preferredLanguages(locale)
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
-// A language map: keys that look like language tags, each holding a list of strings.
-const TAG = /^(none|[a-zA-Z]{2,3}(-[a-zA-Z0-9]{2,8})*)$/;
+// A language map: keys that are language tags (or "none"), each holding a list of strings.
 const isLanguageMap = (v: unknown): v is Record<string, string[]> => {
   if (!isObj(v)) return false;
   const keys = Object.keys(v);
-  return keys.length > 0 && keys.every((k) => TAG.test(k) && Array.isArray(v[k]) && (v[k] as unknown[]).every((e) => typeof e === 'string'));
+  return keys.length > 0 && keys.every((k) => (k === 'none' || isLanguageTag(k)) && Array.isArray(v[k]) && (v[k] as unknown[]).every((e) => typeof e === 'string'));
 };
 
 // Properties that hold language maps, or hold things that do (metadata entries, requiredStatement).

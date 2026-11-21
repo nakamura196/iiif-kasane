@@ -20,7 +20,7 @@ import { containersOf, sceneOf } from '../services/containers';
 import { sceneStoryAnnotationsOf, type DefaultCamera } from '../services/manifestParser';
 import { readAnnotationBodies } from './annotationBody';
 import { labelIn } from '../services/paintedModels';
-import { chosenLanguage, matchLanguage, uiLanguage } from '../services/contentLanguage';
+import { chosenLanguage, matchLanguage, sameLanguageFamily, uiLanguage } from '../services/contentLanguage';
 import {
   embeddedCanvasAnnotations,
   pickBodies,
@@ -124,7 +124,8 @@ export function storyBodies(step: StoryStep, locale: string): AnnotationBodyItem
   if (chosen) {
     const langs = [...new Set(picked.map((b) => b.language).filter((l): l is string => !!l))];
     const want = langs.length > 1 ? matchLanguage(chosen, langs) : undefined;
-    if (want) return picked.filter((b) => !b.language || b.language === want);
+    // the same language in the same script as the match: "fr" keeps "fr-CA" too, but never another script
+    if (want) return picked.filter((b) => !b.language || sameLanguageFamily(b.language, want));
   }
   // otherwise as it always was: bodies grouped by primary subtag, the UI language first
   const ui = lang(uiLanguage(locale));

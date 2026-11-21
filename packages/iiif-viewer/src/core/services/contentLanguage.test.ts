@@ -219,4 +219,27 @@ describe('review fixes', () => {
     const json = { entities: { Q1: { labels: { 'ja-jp': { value: 'x' }, en: { value: 'E' } } } } };
     expect(pickWikidataLabel(json, 'Q1', 'ja')).toBe('E');
   });
+
+  it('caption rank compares the UI language without regard to case, as main did ([ja, EN], UI en gives EN)', () => {
+    expect(languageRank('EN', 'en')).toBe(0);
+    expect(languageRank('JA', 'ja')).toBe(0);
+    const tracks = [{ language: 'ja' }, { language: 'EN' }];
+    expect(tracks.sort((a, b) => languageRank(a.language, 'en') - languageRank(b.language, 'en'))[0].language).toBe('EN');
+  });
+
+  it('reads one language-tag pattern: a label map with ja and ja-x-kana lists both', () => {
+    expect(languagesOf({ type: 'Manifest', label: { ja: ['a'], 'ja-x-kana': ['b'] } })).toEqual(['ja', 'ja-x-kana']);
+  });
+
+  it('storyBodies with a chosen language keeps the same language in the same script ([fr, fr-CA, ja], fr chosen)', () => {
+    const t = (language: string, value: string) => ({ kind: 'text', value, language });
+    const step = { bodies: [t('fr', 'F'), t('fr-CA', 'C'), t('ja', 'J')] } as never;
+    expect(storyBodies(step, contentLocale('ja', 'fr')).map((b) => b.value)).toEqual(['F', 'C']);
+  });
+
+  it('regions of Chinese imply their script: zh-TW and zh-CN are different, so a plain zh matches neither', () => {
+    expect(matchLanguage('zh', ['zh-TW', 'zh-CN'])).toBeUndefined();
+    expect(matchLanguage('zh', ['zh-TW', 'zh-HK'])).toBe('zh-TW');
+    expect(labelIn({ 'zh-TW': ['繁'], 'zh-CN': ['简'], en: ['E'] }, contentLocale('ja', 'zh'))).toBe('E');
+  });
 });

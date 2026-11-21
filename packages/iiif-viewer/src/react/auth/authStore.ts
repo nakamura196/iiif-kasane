@@ -294,6 +294,9 @@ function wakeWaiting(from: Controller, accessId: string) {
 export function useAuth(probe: AuthProbeRef | undefined, locale: string): { state: AuthState; controller: Controller } | undefined {
   const c = probe ? getController(probe, locale) : undefined;
   useEffect(() => {
+    c?.setLocale(locale);
+  }, [c, locale]);
+  useEffect(() => {
     if (!c) return;
     c.retain();
     return () => c.release();
@@ -308,11 +311,10 @@ export function useAuth(probe: AuthProbeRef | undefined, locale: string): { stat
 
 const noopSubscribe = () => () => {};
 
-/** The Controller of a probe (one per probe URL), told the locale of this call: the content language can change at runtime. */
+/** The Controller of a probe (one per probe URL). Its locale is set by the hooks, in an effect (the content language can change at runtime). */
 export function getController(probe: AuthProbeRef, locale: string): Controller {
   let c = controllers.get(probe.id);
-  if (c) c.setLocale(locale);
-  else {
+  if (!c) {
     c = new Controller(probe, locale);
     controllers.set(probe.id, c);
     const started = c;
@@ -329,6 +331,9 @@ export function useAuthStates(probes: (AuthProbeRef | undefined)[], locale: stri
   const key = probes.map((p) => p?.id ?? '').join('\n');
   // eslint-disable-next-line react-hooks/exhaustive-deps -- the probe ids (key) decide which controllers are used
   const cs = useMemo(() => probes.map((p) => (p ? getController(p, locale) : undefined)), [key, locale]);
+  useEffect(() => {
+    cs.forEach((c) => c?.setLocale(locale));
+  }, [cs, locale]);
   useEffect(() => {
     const used = cs.filter((c): c is Controller => !!c);
     used.forEach((c) => c.retain());
