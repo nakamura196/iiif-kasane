@@ -20,7 +20,7 @@ import { containersOf, sceneOf } from '../services/containers';
 import { sceneStoryAnnotationsOf, type DefaultCamera } from '../services/manifestParser';
 import { readAnnotationBodies } from './annotationBody';
 import { labelIn } from '../services/paintedModels';
-import { matchLanguage, preferredLanguages } from '../services/contentLanguage';
+import { chosenLanguage, matchLanguage, uiLanguage } from '../services/contentLanguage';
 import {
   embeddedCanvasAnnotations,
   pickBodies,
@@ -118,10 +118,20 @@ const isHtml = (b: AnnotationBodyItem) => /html/i.test(b.format ?? '');
  */
 export function storyBodies(step: StoryStep, locale: string): AnnotationBodyItem[] {
   const picked = pickBodies(step.bodies, locale).filter((b) => b.kind === 'text');
-  const langs = [...new Set(picked.map((b) => b.language).filter((l): l is string => !!l))];
+  const lang = (l?: string) => l?.toLowerCase().split('-')[0];
+  // with a content language chosen, its own bodies (never across scripts) are the ones to show
+  const chosen = chosenLanguage(locale);
+  if (chosen) {
+    const langs = [...new Set(picked.map((b) => b.language).filter((l): l is string => !!l))];
+    const want = langs.length > 1 ? matchLanguage(chosen, langs) : undefined;
+    if (want) return picked.filter((b) => !b.language || b.language === want);
+  }
+  // otherwise as it always was: bodies grouped by primary subtag, the UI language first
+  const ui = lang(uiLanguage(locale));
+  const langs = [...new Set(picked.map((b) => lang(b.language)).filter((l): l is string => !!l))];
   if (langs.length < 2) return picked;
-  const want = preferredLanguages(locale).map((l) => matchLanguage(l, langs)).find(Boolean) ?? langs[0];
-  return picked.filter((b) => !b.language || b.language === want);
+  const want = langs.includes(ui ?? '') ? ui : langs[0];
+  return picked.filter((b) => !b.language || lang(b.language) === want);
 }
 
 /** The heading of a step (from the first text body), and its bodies with that heading taken off. */

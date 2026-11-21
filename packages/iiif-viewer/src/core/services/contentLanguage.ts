@@ -25,20 +25,29 @@ export const primaryLanguage = (locale: string): string => preferredLanguages(lo
 export const NOT_PREFERRED = 1000;
 
 /**
- * How well a language tag fits the reader: the position of its primary subtag in the preference list (0 is the
- * best; by `matchLanguage`, so scripts are not mixed up), or `NOT_PREFERRED` when it is not in the list. Used to order captions and the like; ties keep their order.
+ * How well a language tag fits the reader: 0 for the chosen content language (by `matchLanguage`, so scripts are
+ * not mixed up) or, with none chosen, for the UI language (same primary subtag, as it always was); 1 for the UI
+ * language when a content language is chosen. The position in the preference list (0 is the
+ * best), or `NOT_PREFERRED` when it is not in the list. Used to order captions and the like; ties keep their order.
  */
 export const languageRank = (tag: string | undefined, locale: string): number => {
   if (!tag) return NOT_PREFERRED;
-  const i = preferredLanguages(locale).findIndex((want) => matchLanguage(want, [tag]) !== undefined);
-  return i < 0 ? NOT_PREFERRED : i;
+  const chosen = chosenLanguage(locale);
+  if (chosen && matchLanguage(chosen, [tag]) !== undefined) return 0;
+  // the UI language: the same primary subtag, as it always was
+  return tag.split('-')[0] === primaryOfUi(locale) ? (chosen ? 1 : 0) : NOT_PREFERRED;
 };
+
+const primaryOfUi = (locale: string): string => uiLanguage(locale).split('-')[0];
+
+// The script subtag of a language tag ("hant" in "zh-Hant"), or '' when it has none.
+const scriptOf = (tag: string): string => tag.toLowerCase().split('-').slice(1).find((p) => /^[a-z]{4}$/.test(p)) ?? '';
 
 /**
  * The candidate that stands for `tag`, or undefined. Exact match first, then without regard to case. Then the
- * primary subtag, but never across scripts or regions: a plain "zh" matches a lone "zh-Hans", and "zh-Hant"
- * matches a plain "zh" key, but "zh-Hant" does not match "zh-Hans", and a plain "zh" matches nothing when
- * "zh-Hans" and "zh-Hant" are both there.
+ * primary subtag, but never across scripts: a plain "zh" matches a lone "zh-Hans" (or several candidates of one
+ * script, "en-US" and "en-GB": the first), but not "zh-Hans" together with "zh-Hant"; "zh-Hant" matches a plain "zh"
+ * key, but never "zh-Hans". This is for the language the reader chose; the UI language keeps its own plain matching.
  */
 export const matchLanguage = (tag: string, candidates: readonly string[]): string | undefined => {
   const lower = tag.toLowerCase();
@@ -46,8 +55,17 @@ export const matchLanguage = (tag: string, candidates: readonly string[]): strin
   if (exact) return exact;
   const primary = lower.split('-')[0];
   const same = candidates.filter((k) => k.toLowerCase().split('-')[0] === primary);
-  if (lower === primary) return same.length === 1 ? same[0] : undefined;
+  if (lower === primary) return new Set(same.map(scriptOf)).size <= 1 ? same[0] : undefined;
   return same.find((k) => k.toLowerCase() === primary);
+};
+
+/**
+ * The language the reader chose for the content (the first of the list), or undefined when the locale is the plain
+ * UI locale. Only this language is matched with `matchLanguage`; with none chosen every lookup is as it always was.
+ */
+export const chosenLanguage = (locale: string): string | undefined => {
+  const list = preferredLanguages(locale);
+  return list.length > 1 ? list[0] : undefined;
 };
 
 /**

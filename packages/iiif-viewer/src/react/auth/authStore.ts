@@ -56,6 +56,14 @@ class Controller {
     private locale: string,
   ) {}
 
+  /** The locale used to read the access services' texts (a new content language changes it while the Controller lives). */
+  get language() {
+    return this.locale;
+  }
+  setLocale(locale: string) {
+    this.locale = locale;
+  }
+
   subscribe = (fn: () => void) => {
     this.listeners.add(fn);
     return () => {
@@ -300,9 +308,11 @@ export function useAuth(probe: AuthProbeRef | undefined, locale: string): { stat
 
 const noopSubscribe = () => () => {};
 
-function getController(probe: AuthProbeRef, locale: string): Controller {
+/** The Controller of a probe (one per probe URL), told the locale of this call: the content language can change at runtime. */
+export function getController(probe: AuthProbeRef, locale: string): Controller {
   let c = controllers.get(probe.id);
-  if (!c) {
+  if (c) c.setLocale(locale);
+  else {
     c = new Controller(probe, locale);
     controllers.set(probe.id, c);
     const started = c;

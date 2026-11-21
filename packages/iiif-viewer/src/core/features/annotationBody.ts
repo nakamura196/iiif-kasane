@@ -3,7 +3,7 @@
 
 import type { AnnotationImage, AnnotationTag } from '../types/main';
 import { labelIn } from '../services/paintedModels';
-import { matchLanguage, preferredLanguages } from '../services/contentLanguage';
+import { chosenLanguage, matchLanguage, uiLanguage } from '../services/contentLanguage';
 
 type Json = Record<string, unknown>;
 
@@ -186,13 +186,12 @@ export const pickBodies = (bodies: AnnotationBodyItem[], locale: string): Annota
   return out.map((b) => {
     if (b.choice === undefined) return b;
     const g = groups.get(b.choice) ?? [b];
-    const langs = g.map((x) => x.language).filter((l): l is string => !!l);
-    for (const want of preferredLanguages(locale)) {
-      const found = matchLanguage(want, langs);
-      const hit = found ? g.find((x) => x.language === found) : undefined;
-      if (hit) return hit;
-    }
-    return g[0];
+    const lang = (l?: string) => l?.toLowerCase().split('-')[0];
+    // the chosen content language first (never across scripts), then the UI language by its primary subtag, as it always was
+    const chosen = chosenLanguage(locale);
+    const found = chosen ? matchLanguage(chosen, g.map((x) => x.language).filter((l): l is string => !!l)) : undefined;
+    const chosenHit = found ? g.find((x) => x.language === found) : undefined;
+    return chosenHit ?? g.find((x) => lang(x.language) === lang(uiLanguage(locale))) ?? g[0];
   });
 };
 

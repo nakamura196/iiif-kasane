@@ -193,4 +193,30 @@ describe('review fixes', () => {
     const m = { type: 'Manifest', label: { en: ['a'] }, annotations: [{ items: [{ body: { value: 'x', language: 'English' } }, { body: { value: 'y', language: 'en_US' } }, { body: { value: 'z', language: 'fr' } }] }] };
     expect(languagesOf(m)).toEqual(['en', 'fr']);
   });
+
+  it('with no content language, regions of one language are matched as on main ([ja, en-US, en-GB], UI en gives en-US)', () => {
+    const body = (language: string, value: string) => ({ kind: 'text', value, language, choice: 0 });
+    const bodies = [body('ja', '日'), body('en-US', 'US'), body('en-GB', 'GB')] as never;
+    expect(pickBodies(bodies, 'en')[0]).toMatchObject({ value: 'US' });
+    expect(pickBodies(bodies, contentLocale('ja', 'en'))[0]).toMatchObject({ value: 'US' });
+    expect(matchLanguage('en', ['en-US', 'en-GB'])).toBe('en-US');
+    expect(matchLanguage('zh', ['zh-Hans', 'zh-Hant'])).toBeUndefined();
+    const story = { bodies: [body('ja', '日'), body('en-US', 'US'), body('en-GB', 'GB')] } as never;
+    expect(storyBodies(story, 'en').map((b) => b.value)).toEqual(['US']);
+  });
+
+  it('storyBodies counts languages as on main when none is chosen (en and en-US are one language)', () => {
+    const t = (language: string, value: string) => ({ kind: 'text', value, language });
+    const same = { bodies: [t('en', 'A'), t('en-US', 'B')] } as never;
+    expect(storyBodies(same, 'ja').map((b) => b.value)).toEqual(['A', 'B']);
+    expect(storyBodies(same, 'en').map((b) => b.value)).toEqual(['A', 'B']);
+  });
+
+  it('keeps the UI language step of the plain lookups: caption rank and Wikidata are as on main without a choice', () => {
+    expect(languageRank('ja-JP', 'ja')).toBe(0);
+    expect(languageRank('en', 'ja')).toBeGreaterThan(0);
+    expect(wikidataLabelUrl('Q1', 'ja')).toContain('languages=ja|en&');
+    const json = { entities: { Q1: { labels: { 'ja-jp': { value: 'x' }, en: { value: 'E' } } } } };
+    expect(pickWikidataLabel(json, 'Q1', 'ja')).toBe('E');
+  });
 });

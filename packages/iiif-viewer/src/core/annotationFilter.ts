@@ -72,3 +72,18 @@ export const tagFacets = (annotations: Annotation[]): Facet[] =>
 
 /** The kinds of the annotations (by motivation), with how many each has. */
 export const annotationKindFacets = (annotations: Annotation[]): Facet[] => kindFacets(annotations.map(annotationKindOf));
+
+/**
+ * The filter after the list of annotations changed. A new manifest or Scene clears it. The same annotations read
+ * again in another content language (`sameSource`: the same manifest and Scene, and the locale changed) keep it,
+ * except the tags that no longer exist (tag keys follow the language).
+ */
+export const filterAfterAnnotationsChange = (
+  filter: AnnotationFilter,
+  annotations: Annotation[],
+  sameSource: boolean,
+): AnnotationFilter => {
+  if (!sameSource) return EMPTY_FILTER;
+  const present = new Set(annotations.flatMap((a) => (a.tags ?? []).map(tagKey)));
+  return filter.tags.every((k) => present.has(k)) ? filter : { ...filter, tags: filter.tags.filter((k) => present.has(k)) };
+};

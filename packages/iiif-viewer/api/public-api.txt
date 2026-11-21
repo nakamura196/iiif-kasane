@@ -1842,6 +1842,7 @@ export [value] captionFilesOf: (container: unknown) => CaptionFile[]
 export [value] captionKindOf: (provides: string[]) => CaptionKind
 export [value] chapterLabel: (c: StoryChapter, locale: string) => string
 export [value] choiceSidesOf: (images: CanvasImages, choice: CanvasPainting, pick: [number, number]) => [CompareSide, CompareSide] | undefined
+export [value] chosenLanguage: (locale: string) => string | undefined
 export [value] chosenLayersOf: (paintings: CanvasPainting[], indexOf: (p: CanvasPainting) => number) => ImageLayer[]
 export [value] chosenOption: (model: PaintedModel, choices: Record<string, number>) => ModelOption
 export [value] chosenUrl: (model: PaintedModel, choices: Record<string, number>) => string
@@ -1894,6 +1895,7 @@ export [value] fallbackStyleOf: (anno: AnnotationStyleSource, order: string[]) =
 export [value] fetchContentSearchTerms: (autocomplete: { id: string; }, q: string, fetchJson: ContentSearchFetch, locale?: string) => Promise<ContentSearchTerm[]>
 export [value] fetchJson: (url: string) => Promise<unknown>
 export [value] fetchManifest: (manifestUrl: string) => Promise<unknown>
+export [value] filterAfterAnnotationsChange: (filter: AnnotationFilter, annotations: Annotation[], sameSource: boolean) => AnnotationFilter
 export [value] filterAnnotations: (annotations: Annotation[], filter: AnnotationFilter) => Annotation[]
 export [value] filterGeorefFeatures: (features: GeoFeature[], annotations: Annotation[], filter: GeorefListFilter) => number[]
 export [value] filterItems: (items: SearchItem[], query: string, selection: FacetSelection) => SearchItem[]
