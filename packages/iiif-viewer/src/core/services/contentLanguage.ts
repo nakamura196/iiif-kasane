@@ -4,10 +4,15 @@
 // "Chinese first; where a value has none, the UI language (ja) and then the usual order". A string
 // without a comma is the plain UI locale, exactly as before.
 
-/** The locale string the lookups take: the chosen content language first, then the UI locale. */
+// A language tag as it is accepted from outside (a URL, an attribute): letters and digits in dash-separated
+// subtags. Anything else (a "&", "|", ",", a space) is not a tag, so it cannot reach a URL or the preference list.
+const TAG_PATTERN = /^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{1,8})*$/;
+export const isLanguageTag = (value: string): boolean => TAG_PATTERN.test(value);
+
+/** The locale string the lookups take: the chosen content language first, then the UI locale. An invalid tag is ignored. */
 export const contentLocale = (uiLocale: string, chosen?: string | null): string => {
   const c = chosen?.trim();
-  return c && c !== uiLocale && !c.includes(',') ? `${c},${uiLocale}` : uiLocale;
+  return c && c !== uiLocale && isLanguageTag(c) ? `${c},${uiLocale}` : uiLocale;
 };
 
 /** The languages to try first, in order. */
@@ -31,14 +36,30 @@ export const languageRank = (tag: string | undefined, locale: string): number =>
 };
 
 /**
+ * The candidate that stands for `tag`, or undefined. Exact match first, then without regard to case. Then the
+ * primary subtag, but never across scripts or regions: a plain "zh" matches a lone "zh-Hans", and "zh-Hant"
+ * matches a plain "zh" key, but "zh-Hant" does not match "zh-Hans", and a plain "zh" matches nothing when
+ * "zh-Hans" and "zh-Hant" are both there.
+ */
+export const matchLanguage = (tag: string, candidates: readonly string[]): string | undefined => {
+  const lower = tag.toLowerCase();
+  const exact = candidates.find((k) => k === tag) ?? candidates.find((k) => k.toLowerCase() === lower);
+  if (exact) return exact;
+  const primary = lower.split('-')[0];
+  const same = candidates.filter((k) => k.toLowerCase().split('-')[0] === primary);
+  if (lower === primary) return same.length === 1 ? same[0] : undefined;
+  return same.find((k) => k.toLowerCase() === primary);
+};
+
+/**
  * A content language given from outside (a prop or attribute) as the viewer keeps it. undefined: not given, so
- * whatever the reader chose stays. "" (or something that cannot be a tag, such as a list with a comma): back to
+ * whatever the reader chose stays. "" (or something that is not a language tag, such as a list with a comma, or text with "&"): back to
  * automatic (null).
  */
 export const contentLanguageOfInput = (value: string | undefined | null): string | null | undefined => {
   if (value === undefined || value === null) return undefined;
   const t = value.trim();
-  return t && !t.includes(',') ? t : null;
+  return t && isLanguageTag(t) ? t : null;
 };
 
 /** The UI language (the last of the list). Dates and other UI formatting follow this, not the content language. */
@@ -65,8 +86,9 @@ const LINK_KEYS = new Set(['homepage', 'seeAlso', 'rendering', 'partOf', 'provid
  * annotation text bodies (objects with a `value`). The `language` of a link, a painting body or a media file
  * says what the target is in, not what the text is, so it is not counted. "none" is left out.
  *
- * Tags are lower-cased. A tag that has a region or script ("zh-hans") is merged into the one language map key
- * with the same primary subtag ("zh") when there is exactly one such key; the order is that of first appearance.
+ * Label-map keys are returned as written (two keys that differ only in case count once). The tags of text bodies
+ * are lower-cased, and one that `matchLanguage` finds among the keys ("zh" for a lone "zh-Hans") is not listed
+ * again. The order is that of first appearance.
  */
 export const languagesOf = (resource: unknown): string[] => {
   const keys = new Map<string, string>(); // lower-cased -> as written, from language maps
@@ -102,32 +124,22 @@ export const languagesOf = (resource: unknown): string[] => {
     }
   };
   walk(resource, 0);
-  const primary = (t: string) => t.split('-')[0];
   const out = [...keys.values()];
   for (const tag of tags) {
-    if (keys.has(tag) || out.includes(tag)) continue;
-    // exactly one key with the same primary subtag: the same language ("zh" and "zh-hans")
-    if ([...keys.keys()].filter((k) => primary(k) === primary(tag)).length !== 1) out.push(tag);
+    if (!matchLanguage(tag, [...keys.keys()]) && !out.includes(tag)) out.push(tag);
   }
   return out;
 };
 
 /**
- * The keys of a language map in the order to try them for `locale`: the content language (matched without regard to
- * case, and to a region or script: "zh" finds "zh-Hans" when it is the only such key), the UI locale, then none,
+ * The keys of a language map in the order to try them for `locale`: the content language (matched with `matchLanguage`: without
+ * regard to case, and a plain "zh" finds a lone "zh-Hans", but never across scripts), the UI locale, then none,
  * en and the rest. A plain UI locale (no content language) is matched exactly, as it always was.
  */
 export const keysInOrder = (map: Record<string, unknown>, locale: string): string[] => {
   const keys = Object.keys(map);
   const wanted = preferredLanguages(locale);
   const loose = wanted.length > 1;
-  const resolve = (lang: string, last: boolean): string[] => {
-    if (!loose || last) return [lang];
-    const lower = lang.toLowerCase();
-    const exact = keys.filter((k) => k.toLowerCase() === lower);
-    if (exact.length) return exact;
-    const same = keys.filter((k) => k.toLowerCase().split('-')[0] === lower.split('-')[0]);
-    return same.length === 1 ? same : [lang];
-  };
+  const resolve = (lang: string, last: boolean): string[] => [(!loose || last ? undefined : matchLanguage(lang, keys)) ?? lang];
   return [...wanted.flatMap((l, i) => resolve(l, i === wanted.length - 1)), 'none', 'en', ...keys];
 };

@@ -17,7 +17,7 @@ import { containersOf, convertToV4, fetchManifest, manifestFromParams } from 'ii
 import { HIDDEN_VIEWER_TABS, OTHER_VIEWS_TAB, viewerTabOf } from '@/lib/viewerTabs';
 import { puzzleFromParams } from '@/lib/puzzleLink';
 import { PushedLocations, locationKey } from '@/lib/pushedLocations';
-import { contentLangForViewer, shownLocationSearch, withContentLang } from '@/lib/contentLang';
+import { chooseContentLang, contentLangForViewer, settleContentLang, shownLocationSearch, withContentLang, type ContentLangState } from '@/lib/contentLang';
 import { otherViewsPanel, type CompareTarget } from '@/components/OtherViewsPanel';
 import { LocalImageError, filesFromDataTransfer, isLocalManifestUrl, openLocalImages } from '@/lib/localImage';
 
@@ -119,12 +119,14 @@ const ViewerContent: NextPage = () => {
   const urlLang = searchParams?.get('content-lang')?.trim() || undefined;
   // Kept in the page: an address without the parameter (an entry of a Collection, the browser's Back) must not lose
   // the reader's choice. '' is "Automatic", chosen on purpose. The address wins when it has a value.
-  const [chosenLang, setChosenLang] = useState<string | undefined>(urlLang);
-  if (urlLang !== undefined && urlLang !== chosenLang) setChosenLang(urlLang);
-  const contentLang = contentLangForViewer(urlLang, chosenLang);
+  const [langState, setLangState] = useState<ContentLangState>(() => ({ chosen: urlLang, pending: null }));
+  const settledLang = settleContentLang(langState, urlLang);
+  if (settledLang !== langState) setLangState(settledLang);
+  const chosenLang = settledLang.chosen;
+  const contentLang = contentLangForViewer(urlLang, settledLang);
   const handleContentLanguageChange = useCallback(
     (language: string | undefined) => {
-      setChosenLang(language ?? '');
+      setLangState(chooseContentLang(language));
       // replace: a choice of language is not a place to go back to
       router.replace(`?${withContentLang(new URLSearchParams(window.location.search), language).toString()}`);
     },
@@ -132,9 +134,9 @@ const ViewerContent: NextPage = () => {
   );
   // arrived at an address without the parameter (Back, a link to an entry) while a language is chosen: write it again
   useEffect(() => {
-    if (!manifestUrl || !chosenLang || urlLang !== undefined) return;
+    if (!manifestUrl || !chosenLang || urlLang !== undefined || settledLang.pending !== null) return;
     router.replace(`?${withContentLang(new URLSearchParams(window.location.search), chosenLang).toString()}`);
-  }, [manifestUrl, chosenLang, urlLang, router]);
+  }, [manifestUrl, chosenLang, urlLang, settledLang.pending, router]);
 
   // The reader opened an entry of a Collection, or went back: write where that is into the address bar, so that
   // the link opens it (and the browser's Back returns to the place before). The arguments of the item left

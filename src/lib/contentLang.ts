@@ -4,9 +4,35 @@
 
 export const CONTENT_LANG_PARAM = 'content-lang';
 
-/** The value for the viewer: the address wins; else the reader's choice ('' is "Automatic" chosen by the reader). */
-export const contentLangForViewer = (fromUrl: string | undefined, chosen: string | undefined): string | undefined =>
-  fromUrl ?? chosen;
+/**
+ * What the page knows of the content language. `chosen` is the reader's choice ('' is "Automatic", chosen on purpose).
+ * `pending` is set while the reader's choice is on its way into the address (router.replace is a transition: for a
+ * moment the address still has the old value, which must not overwrite the choice).
+ */
+export interface ContentLangState {
+  chosen: string | undefined;
+  pending: string | null;
+}
+
+/** The reader chose `language` (undefined: Automatic). */
+export const chooseContentLang = (language: string | undefined): ContentLangState => ({
+  chosen: language ?? '',
+  pending: language ?? '',
+});
+
+/**
+ * Bring the state in step with the address. While a choice is pending, the address is not read until it has the
+ * chosen value (no parameter for Automatic). Otherwise a value in the address (a link, the browser's Back to an
+ * older entry) becomes the choice. Returns the same object when nothing changes.
+ */
+export function settleContentLang(state: ContentLangState, fromUrl: string | undefined): ContentLangState {
+  if (state.pending !== null) return (fromUrl ?? '') === state.pending ? { chosen: state.chosen, pending: null } : state;
+  return fromUrl !== undefined && fromUrl !== state.chosen ? { chosen: fromUrl, pending: null } : state;
+}
+
+/** The value for the viewer: the choice while one is pending; else the address wins, then the choice. */
+export const contentLangForViewer = (fromUrl: string | undefined, state: ContentLangState): string | undefined =>
+  state.pending !== null ? state.chosen : (fromUrl ?? state.chosen);
 
 /** Write (or remove) the parameter. `lang` of undefined or '' removes it. Returns the same params object. */
 export function withContentLang(params: URLSearchParams, lang: string | undefined): URLSearchParams {

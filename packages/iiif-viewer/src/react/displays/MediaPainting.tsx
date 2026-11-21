@@ -71,7 +71,7 @@ export default function MediaPainting({
   );
   useEffect(() => () => annotated.forEach((t) => URL.revokeObjectURL(t.url)), [annotated]);
   tracks.push(...annotated);
-  // 端末の言語に合う字幕を最初に出す（default は先頭の 1 つ）
+  // captions in the reader's languages first (the chosen content language, then the UI language); the first one is the default
   tracks.sort((a, b) => languageRank(a.language, locale) - languageRank(b.language, locale));
 
   const youTubeId = option.kind === 'Video' ? youTubeIdOf(option.url) : null;

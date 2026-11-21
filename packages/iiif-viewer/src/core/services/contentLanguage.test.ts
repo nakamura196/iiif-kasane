@@ -3,7 +3,7 @@ import type { ManifestV4 } from '../types/iiif';
 import { aboutOf } from '../features/about';
 import { pickBodies } from '../features/annotationBody';
 import { pickWikidataLabel, wikidataLabelUrl } from '../features/wikidataLabel';
-import { contentLanguageOfInput, contentLocale, languageRank, languagesOf, primaryLanguage, uiLanguage } from './contentLanguage';
+import { contentLanguageOfInput, contentLocale, languageRank, languagesOf, matchLanguage, primaryLanguage, uiLanguage } from './contentLanguage';
 import { labelIn } from './paintedModels';
 
 const multi = {
@@ -137,5 +137,33 @@ describe('review fixes', () => {
     expect(contentLanguageOfInput('')).toBeNull();
     expect(contentLanguageOfInput(' fr ')).toBe('fr');
     expect(contentLanguageOfInput('fr,ja')).toBeNull();
+  });
+
+  it('does not let a language from outside reach the Wikidata URL (only language tags pass)', () => {
+    expect(contentLanguageOfInput('en&props=claims')).toBeNull();
+    expect(contentLanguageOfInput('en|fr')).toBeNull();
+    expect(contentLanguageOfInput('zh-Hant')).toBe('zh-Hant');
+    expect(contentLocale('ja', 'en&props=claims')).toBe('ja');
+    expect(contentLocale('ja', 'en|fr')).toBe('ja');
+    // and whatever gets in, each language is escaped
+    const url = wikidataLabelUrl('Q1', 'en&props=claims,ja');
+    expect(url).not.toContain('props=claims');
+    expect(wikidataLabelUrl('Q1', 'en|fr,ja')).toContain('languages=en%7Cfr|ja|en&');
+  });
+
+  it('does not treat different scripts as the same language', () => {
+    const both = { 'zh-Hans': ['简'], 'zh-Hant': ['繁'], en: ['E'] };
+    expect(labelIn(both, contentLocale('ja', 'zh-Hant'))).toBe('繁');
+    expect(labelIn(both, contentLocale('ja', 'zh-Hans'))).toBe('简');
+    // a plain zh matches neither of two scripts: it falls to the usual order (en)
+    expect(labelIn(both, contentLocale('ja', 'zh'))).toBe('E');
+    // zh-Hant never picks a lone zh-Hans value; a plain zh key is fine for either
+    expect(labelIn({ 'zh-Hans': ['简'], en: ['E'] }, contentLocale('ja', 'zh-Hant'))).toBe('E');
+    expect(labelIn({ zh: ['中'], 'zh-Hans': ['简'] }, contentLocale('ja', 'zh-Hant'))).toBe('中');
+    expect(matchLanguage('zh', ['zh-Hans'])).toBe('zh-Hans');
+    expect(matchLanguage('zh', ['zh-Hans', 'zh-Hant'])).toBeUndefined();
+    expect(matchLanguage('ZH-HANT', ['zh-Hans', 'zh-Hant'])).toBe('zh-Hant');
+    // a body tag of another script is its own language
+    expect(languagesOf({ type: 'Manifest', label: { 'zh-Hans': ['a'], en: ['b'] }, annotations: [{ items: [{ body: { value: 'x', language: 'zh-Hant' } }] }] })).toEqual(['zh-Hans', 'en', 'zh-hant']);
   });
 });
