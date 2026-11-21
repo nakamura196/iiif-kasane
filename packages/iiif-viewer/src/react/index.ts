@@ -32,9 +32,9 @@ export { default as SidePanel } from './layout/SidePanel';
 export { default as Info, type InfoTab } from './layout/panels/Info';
 export { PANEL_IDS } from './panels/registry';
 export type { Panel, PanelContext } from './panels/types';
-// 権利のタブ（/georef の右の欄でも使う）
+// The rights tab (also used in the right column of /georef)
 export { rightsPanel } from './panels/AboutPanel';
-// パズルの始める欄（タブを隠して、使う側のタブに置くとき）
+// The start section of the puzzle (to hide the tab and put it in a tab of the host)
 export { Puzzle, canPlayPuzzle, PUZZLE_SIZES, DEFAULT_PUZZLE_SIZE, type PuzzleProps } from './panels/PuzzlePanel';
 export { default as ContentLanguageSelect } from './layout/ContentLanguageSelect';
 export { default as AnnotationList } from './annotation/AnnotationList';
@@ -57,6 +57,6 @@ export {
   type GeoImagePoint,
   type GeoImageViewProps,
 } from './georef/GeoImageView';
-// 推論タブのモデルの定義（一覧ページ用。重い処理は load() の先にあるので、読み込んでも動き出さない）
+// The definitions of the inference models (for a list page; the heavy work is behind load(), so importing them does not start anything)
 export { MODELS as INFERENCE_MODELS } from './inference/models/registry';
 export type { InferenceModel } from './inference/models/types';

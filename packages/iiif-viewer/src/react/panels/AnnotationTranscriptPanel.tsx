@@ -16,18 +16,18 @@ import { useContentLocale, useTranslations } from '../env';
 import { usePlayback } from '../playback';
 import type { Panel, PanelContext } from './types';
 
-// 共有の「文字起こし」タブ（transcriptOf）が拾えないものを並べるタブ。
-//  1. 時刻つきの注釈（target が #t=... の TextualBody。0103 など）を、時刻の一覧にする
-//  2. Choice に入った言語別の字幕（0074）を、言語を選んで一覧にする
-//  3. Canvas の rendering にある文字起こしのテキスト（0017）
-// 一覧の見た目と、押すと時刻へ移る動きは、文字起こしの VTT と同じ（CueList）。
+// A tab for what the shared "transcript" tab (transcriptOf) cannot pick up.
+//  1. Timed annotations (a TextualBody whose target is #t=...; 0103 and the like), as a list of times
+//  2. Captions by language inside a Choice (0074), as a list for the language the reader picks
+//  3. The transcript text in the rendering of a Canvas (0017)
+// The look of the list, and moving to a time when it is clicked, are the same as the transcript VTT (CueList).
 
 const sources = (ctx: PanelContext) => {
   const raw = ctx.container ? rawContainerOf(ctx.manifest, ctx.container.id) : undefined;
   const hasTranscript = !!transcriptOf(ctx.container?.supplementing ?? []);
   return {
     cues: timedTextsOf(raw),
-    // 共有の文字起こしタブがあるときは、そちらで足りる
+    // when there is the shared transcript tab, that is enough
     captions: hasTranscript ? [] : captionFilesOf(raw),
     rendering: hasTranscript ? undefined : renderingTranscriptOf(raw),
   };

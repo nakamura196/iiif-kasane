@@ -21,9 +21,9 @@ const plain = (html: string) => html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' 
 const STROKE = '#2563eb';
 const SELECTED = '#f97316';
 
-// 動画の上に、時間と範囲を指す注釈（target が "#t=5,6&xywh=..."）の枠を出す。
-// 枠は、その時間のあいだだけ出る。位置は Canvas 座標の割合で置く（動画と同じ大きさの箱の中）。
-// 枠そのものは押せない（動画の操作の邪魔をしない）。左上の名札を押すと、右パネルの一覧でその注釈が選ばれる。
+// Over the video, draws the frames of annotations that point to a time and a region (target "#t=5,6&xywh=...").
+// A frame is shown only during that time. It is placed by fractions of the Canvas coordinates (in a box the size of the video).
+// The frame itself cannot be clicked (it does not get in the way of the video controls). Clicking the name tag at the top left selects the annotation in the list of the right panel.
 export default function VideoAnnotations({ container }: { container: ContainerInfo }) {
   const locale = useContentLocale();
   const manifest = useAtomValue(manifestAtom);
@@ -38,8 +38,8 @@ export default function VideoAnnotations({ container }: { container: ContainerIn
     [annotations],
   );
 
-  // 再生中は timeupdate（1 秒に 4 回ほど）より細かく追う。止まっている間は追わない。
-  // 出す枠の組が変わったときだけ描き直す。
+  // While playing, follow more finely than timeupdate (about 4 times a second). While paused, do not follow.
+  // Redraw only when the set of frames to show changes.
   const [shown, setShown] = useState<string>('');
   useEffect(() => {
     if (placed.length === 0) return;

@@ -30,11 +30,11 @@ import { videoLayersPlayingAtom, videoLayersSoundAtom } from '../displays/videoL
 import { useContentLocale, useTranslations } from '../env';
 import type { Panel, PanelContext } from './types';
 
-// 重なった画像（合成の画像・Choice の候補）を 1 枚ずつ、表示・非表示、不透明度、重ね順で操作する。
-// 一覧は上が手前（画像編集ソフトのレイヤーと同じ向き）。重ね順はドラッグか ▲▼ で変える。
-// Mirador の Layers パネルと同じ操作をそろえた。
-// ▶ で、表示中の画像を手前から 1 枚ずつ隠していく（起こし絵図をめくるように見せる）。
-// 再生の状態はタブの外（atom）にあり、タイマーは画像の表示が動かす。別のタブに移っても続く。
+// Works on overlapping images (composite images, the candidates of a Choice) one by one: show / hide, opacity and stacking order.
+// The top of the list is the front (the same direction as layers in an image editor). Change the order by dragging or with the up / down arrows.
+// The operations match those of Mirador's Layers panel.
+// The play button hides the images on show one by one from the front (like turning the pages of an unfolding picture).
+// The playback state is outside the tab (an atom), and the image display runs the timer. It goes on when another tab is opened.
 
 const BUTTON =
   'shrink-0 grid place-items-center w-7 h-7 rounded text-[var(--ds-fg)] hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 disabled:hover:bg-transparent';
@@ -57,7 +57,7 @@ function PlayIcon({ playing }: { playing: boolean }) {
   );
 }
 
-// 再生の間隔（秒）
+// the interval of the playback (seconds)
 const INTERVALS = [0.5, 1, 1.5, 2, 3, 5];
 
 // The thumbnail of a video row: the same place cut from the base image (the clip was made from it), so opening
@@ -132,7 +132,7 @@ function LayersTab({ container }: PanelContext) {
       setPlayback(null);
       return;
     }
-    // 表示中の画像だけを使う。2 枚に満たなければ、すべてを使う
+    // use only the images on show. If there are fewer than two, use all of them
     const shown = bottomFirst.filter((it) => isLayerVisible(it, settings));
     const playItems = shown.length >= 2 ? shown : bottomFirst;
     const playIds = playItems.map((it) => it.id);
@@ -171,7 +171,7 @@ function LayersTab({ container }: PanelContext) {
           <select
             value={direction}
             onChange={(e) => {
-              // 向きを変えたら、いったん止める（次の再生から新しい向き）
+              // when the direction changes, stop for now (the next playback goes in the new direction)
               setPlayback(null);
               setOptions((o) => ({ ...o, direction: e.target.value as PlaybackDirection }));
             }}

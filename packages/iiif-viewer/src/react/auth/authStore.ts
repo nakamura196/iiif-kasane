@@ -10,9 +10,9 @@ import {
   type AuthSubstitute,
 } from '../../core';
 
-// IIIF Authorization Flow API 2.0 のクライアント（https://iiif.io/api/auth/2.0/ の "Workflow from the Client Perspective"）。
-// Probe service ごとに 1 つの進行（Controller）を持ち、複数の画像が同じ Probe を共有できる。
-// アクセストークンはメモリだけに置く（localStorage には入れない）。
+// A client of IIIF Authorization Flow API 2.0 ("Workflow from the Client Perspective" at https://iiif.io/api/auth/2.0/).
+// One flow (Controller) per probe service, so that several images can share the same probe.
+// The access token is kept in memory only (not in localStorage).
 
 export type AuthPhase =
   | 'probing' // asking the probe / the services

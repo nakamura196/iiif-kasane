@@ -24,12 +24,12 @@ import { useReferencedPages } from './useReferencedPages';
 import VideoAnnotations from './VideoAnnotations';
 import YouTubeView from './YouTubeView';
 
-// 動画・音声（選ばれた中身）の表示。字幕は <track> に渡す。
-// 字幕は共有の読み取り（supplementing）に加えて、Choice に入った複数言語の字幕（0074）も、
-// manifest の素のデータから足す。言語の切り替えは動画の標準の字幕メニューで行う。
-// 時刻つきの注釈で書かれた字幕（0079。参照だけのページにあることが多い）は、
-// WebVTT に組み立て直して <track> に渡す。
-// 中身が YouTube のページなら、YouTube の埋め込みプレーヤーで流す（字幕は YouTubeView が重ねる）。
+// Shows video and audio (the chosen content). Captions go to <track>.
+// Besides the shared reading (supplementing), captions in several languages inside a Choice (0074) are
+// added from the plain data of the manifest. The language is switched with the video's own caption menu.
+// Captions written as timed annotations (0079; often on a page that is only referenced) are
+// rebuilt as WebVTT and given to <track>.
+// If the content is a YouTube page, it is played in YouTube's embedded player (YouTubeView draws the captions over it).
 export default function MediaPainting({
   container,
   option,

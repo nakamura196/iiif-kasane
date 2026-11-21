@@ -1,5 +1,5 @@
-// about: 資料についての情報（権利・提供者・リンク・日時・場所・多言語のメタデータ）の読み取り。
-// React に依存しない。この機能の担当だけがこのファイルを書く。
+// about: reads the information about a resource (rights, providers, links, dates, places, multilingual metadata).
+// No dependency on React. Only the owner of this feature writes this file.
 import type { ManifestV4 } from '../types/iiif';
 import { labelIn } from '../services/paintedModels';
 import { keysInOrder, uiLanguage } from '../services/contentLanguage';
@@ -11,21 +11,21 @@ const asList = (v: unknown): unknown[] => (Array.isArray(v) ? v : v == null ? []
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v ? v : undefined);
 
 // ---------------------------------------------------------------------------
-// HTML の無害化（許可リスト方式）
+// Sanitizing HTML (an allow list)
 // ---------------------------------------------------------------------------
-// Presentation 3 が値に許す HTML は a, b, br, i, img, p, small, span, sub, sup だけ。
-// ここでは、それ以外のタグは外し（中の文字は残す）、script / style などは中身ごと捨てる。
-// 属性は a の href、img の src・alt・width・height、全体の lang だけを残す。
-// href / src は http・https・mailto と、スキームの無い相対 URL だけを通す。
+// The only HTML Presentation 3 allows in a value is a, b, br, i, img, p, small, span, sub, sup.
+// Any other tag is dropped here (its text stays); script, style and the like are dropped with their content.
+// Of the attributes only href on a, src / alt / width / height on img, and lang on any tag are kept.
+// href / src pass only for http, https, mailto and a relative URL without a scheme.
 
 const ALLOWED_TAGS = new Set(['a', 'b', 'br', 'i', 'img', 'p', 'small', 'span', 'sub', 'sup']);
 const VOID_TAGS = new Set(['br', 'img']);
-// 許さないが、区切りのあるタグ。タグを外すと前後の文字がつながる（"項目1項目2"）ので、改行を入れる。
-// Presentation 3 の範囲外だが、Wellcome の Auth の note などは <ul><li> で書かれている
+// Tags that are not allowed but separate text. Dropping the tag would join the text around it ("item1item2"), so a line break goes in.
+// Outside Presentation 3, but notes such as Wellcome's Auth are written with <ul><li>
 const BREAK_TAGS = new Set([
   'li', 'ul', 'ol', 'div', 'dt', 'dd', 'dl', 'tr', 'blockquote', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
 ]);
-// 中身ごと捨てるタグ
+// Tags dropped with their content
 const DROP_WITH_CONTENT = new Set([
   'script', 'style', 'noscript', 'template', 'iframe', 'object', 'embed', 'textarea', 'title', 'svg', 'math',
 ]);
@@ -48,12 +48,12 @@ const escapeAttr = (s: string): string => escapeText(s).replace(/"/g, '&quot;');
 
 /** A URL that is safe to put in href / src: http, https, mailto, or relative. Else ''. */
 export const safeAboutUrl = (raw: string): string => {
-  // 実体参照や制御文字で scheme を隠す手口（&#106;avascript: / java\tscript:）を先に外す
+  // first remove the tricks that hide a scheme behind character references or control characters (&#106;avascript: / java\tscript:)
   const url = decodeEntities(raw).replace(/[\u0000- \u007f-\u009f]+/g, '');
   if (!url) return '';
   const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(url);
   if (scheme) return /^(https?|mailto)$/i.test(scheme[1]) ? url : '';
-  // スキームの無い形。"//host" は許す。":" で始まるなどの変な形は捨てる。
+  // A form without a scheme. "//host" is allowed. Odd forms, such as one that starts with ":", are dropped.
   return /^[^:]*(?:[/?#].*)?$/.test(url) && !url.startsWith(':') ? url : '';
 };
 
@@ -95,7 +95,7 @@ export const sanitizeAboutHtml = (html: unknown): string => {
   let i = 0;
   let dropUntil: string | null = null;
   let pendingBreak = false;
-  // 文字や許したタグを足す。外した区切りのタグの後で、直前が段落の切れ目でなければ改行を挟む
+  // Add the text and the allowed tag. After a separating tag that was dropped, put in a line break unless the text before ends a paragraph
   const push = (piece: string) => {
     if (pendingBreak && piece.trim()) {
       const last = out[out.length - 1];
@@ -112,7 +112,7 @@ export const sanitizeAboutHtml = (html: unknown): string => {
       break;
     }
     if (lt > i && !dropUntil) push(escapeTextKeepEntities(src.slice(i, lt)));
-    // コメント
+    // comment
     if (src.startsWith('<!--', lt)) {
       const end = src.indexOf('-->', lt + 4);
       i = end < 0 ? src.length : end + 3;
@@ -120,7 +120,7 @@ export const sanitizeAboutHtml = (html: unknown): string => {
     }
     const m = /^<(\/?)([a-zA-Z][a-zA-Z0-9:-]*)/.exec(src.slice(lt, lt + 40));
     if (!m) {
-      // "<" の後がタグの形でない: 文字として扱う（"<!doctype" や "<?" も、ここで捨てる）
+      // What follows "<" is not a tag: treat it as text ("<!doctype" and "<?" are dropped here too)
       if (/^<[!?]/.test(src.slice(lt, lt + 2))) {
         const end = src.indexOf('>', lt);
         i = end < 0 ? src.length : end + 1;
@@ -130,7 +130,7 @@ export const sanitizeAboutHtml = (html: unknown): string => {
       }
       continue;
     }
-    // タグの終わり（引用符の中の ">" を飛ばす）
+    // the end of the tag (skip a ">" inside quotes)
     let j = lt + m[0].length;
     let quote = '';
     while (j < src.length) {
@@ -155,7 +155,7 @@ export const sanitizeAboutHtml = (html: unknown): string => {
       continue;
     }
     if (!ALLOWED_TAGS.has(tag)) {
-      // タグだけ外して中の文字は残す。区切りのタグなら、次に文字が来たときに改行を入れる
+      // drop only the tag and keep the text inside. For a separating tag, put in a line break when text comes next
       if (BREAK_TAGS.has(tag)) pendingBreak = true;
       continue;
     }
@@ -173,7 +173,7 @@ export const sanitizeAboutHtml = (html: unknown): string => {
   return out.join('');
 };
 
-// 文字の部分: "&amp;" のような正しい実体参照は残し、単独の & と < > は escape する。
+// Text part: a valid character reference such as "&amp;" is kept; a lone & and < > are escaped.
 const escapeTextKeepEntities = (s: string): string =>
   s
     .replace(/&(?!(?:#x[0-9a-f]+|#[0-9]+|[a-z][a-z0-9]*);)/gi, '&amp;')
@@ -185,10 +185,10 @@ export const htmlToText = (html: unknown): string =>
   decodeEntities(sanitizeAboutHtml(html).replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, '')).trim();
 
 // ---------------------------------------------------------------------------
-// 多言語の文字列
+// Multilingual strings
 // ---------------------------------------------------------------------------
 
-// Presentation 2 の書き方（"text" / {"@value","@language"} / その配列）も読む。
+// Also reads the Presentation 2 forms ("text" / {"@value","@language"} / a list of them).
 const v2Values = (v: unknown): string[] =>
   asList(v)
     .map((e) => (isObj(e) ? str(e['@value']) : typeof e === 'string' ? e : undefined))
@@ -209,7 +209,7 @@ export const valuesIn = (map: unknown, locale: string): string[] => {
 };
 
 // ---------------------------------------------------------------------------
-// 型
+// Types
 // ---------------------------------------------------------------------------
 
 export interface AboutMetadataItem {
@@ -285,7 +285,7 @@ export interface AboutInfo {
 }
 
 // ---------------------------------------------------------------------------
-// 読み取り
+// Reading
 // ---------------------------------------------------------------------------
 
 const metadataItem = (raw: unknown, locale: string): AboutMetadataItem | null => {
@@ -491,7 +491,7 @@ const scopeOf = (raw: Json, locale: string, withAnnotations: boolean): AboutScop
   };
 };
 
-// full=false: 資料全体の説明・メタデータ・サムネイルは「メタデータ」タブにあるので数えない。
+// full=false: the description, metadata and thumbnail of the whole resource are in the "Metadata" tab, so they are not counted.
 const hasContent = (s: AboutScope, full: boolean): boolean =>
   !!(
     (full && (s.summary.length || s.metadata.length || s.thumbnails.length)) ||
@@ -518,7 +518,7 @@ const collectRanges = (v: unknown, locale: string, out: AboutScope[], depth = 0)
   for (const r of asList(v)) {
     if (!isObj(r) || r.type !== 'Range') continue;
     const s = scopeOf(r, locale, false);
-    // Range の items にぶら下がる Range も辿る
+    // also follow the Ranges that hang from the items of a Range
     if (s.metadata.length || s.summary.length || s.rights || s.requiredStatement || s.navDate || s.places.length) out.push(s);
     collectRanges(r.items, locale, out, depth + 1);
   }

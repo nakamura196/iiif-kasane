@@ -1,5 +1,5 @@
-// annotationBody: 注釈 1 件の本文の読み方（見出し・本文・タグ・画像・リンク）。2D の注釈一覧と 3D の注釈一覧の両方が使う。
-// React に依存しない。本文は言語を決めずに読み、言語は表示や 3D の注釈を作るときに選ぶ（pickBodies）。
+// annotationBody: how to read the body of one annotation (heading, text, tags, images, links). Used by both the 2D and the 3D annotation list.
+// No dependency on React. The body is read without choosing a language; the language is chosen when it is shown or when 3D notes are made (pickBodies).
 
 import type { AnnotationImage, AnnotationTag } from '../types/main';
 import { labelIn } from '../services/paintedModels';
