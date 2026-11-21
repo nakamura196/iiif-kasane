@@ -17,6 +17,7 @@ import {
   creatorFacets,
   isFilterActive,
   tagFacets,
+  tagKey,
 } from '../../core';
 import { FilterChips } from './FilterChips';
 import { ShowMarksToggle } from './ShowMarksToggle';
@@ -47,9 +48,15 @@ export default function AnnotationList() {
     setSelectedAnnotationId(annotationId);
   };
 
-  // Opening another manifest clears the search and the filters
+  // Opening another manifest (other annotations) clears the search and the filters. The same annotations read in
+  // another content language keep them, except the tags that no longer exist (tag keys follow the language).
+  const idsKey = useMemo(() => annotations.map((a) => a.id).join('\n'), [annotations]);
   useEffect(() => {
     setFilter(EMPTY_FILTER);
+  }, [idsKey, setFilter]);
+  useEffect(() => {
+    const present = new Set(annotations.flatMap((a) => (a.tags ?? []).map(tagKey)));
+    setFilter((f) => (f.tags.every((k) => present.has(k)) ? f : { ...f, tags: f.tags.filter((k) => present.has(k)) }));
   }, [annotations, setFilter]);
 
   const creators = useMemo(() => creatorFacets(annotations), [annotations]);

@@ -20,7 +20,7 @@ import { containersOf, sceneOf } from '../services/containers';
 import { sceneStoryAnnotationsOf, type DefaultCamera } from '../services/manifestParser';
 import { readAnnotationBodies } from './annotationBody';
 import { labelIn } from '../services/paintedModels';
-import { preferredLanguages } from '../services/contentLanguage';
+import { matchLanguage, preferredLanguages } from '../services/contentLanguage';
 import {
   embeddedCanvasAnnotations,
   pickBodies,
@@ -118,11 +118,10 @@ const isHtml = (b: AnnotationBodyItem) => /html/i.test(b.format ?? '');
  */
 export function storyBodies(step: StoryStep, locale: string): AnnotationBodyItem[] {
   const picked = pickBodies(step.bodies, locale).filter((b) => b.kind === 'text');
-  const lang = (l?: string) => l?.toLowerCase().split('-')[0];
-  const langs = [...new Set(picked.map((b) => lang(b.language)).filter((l): l is string => !!l))];
+  const langs = [...new Set(picked.map((b) => b.language).filter((l): l is string => !!l))];
   if (langs.length < 2) return picked;
-  const want = preferredLanguages(locale).map(lang).find((l) => l && langs.includes(l)) ?? langs[0];
-  return picked.filter((b) => !b.language || lang(b.language) === want);
+  const want = preferredLanguages(locale).map((l) => matchLanguage(l, langs)).find(Boolean) ?? langs[0];
+  return picked.filter((b) => !b.language || b.language === want);
 }
 
 /** The heading of a step (from the first text body), and its bodies with that heading taken off. */

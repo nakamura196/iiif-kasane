@@ -26,12 +26,11 @@ export const NOT_PREFERRED = 1000;
 
 /**
  * How well a language tag fits the reader: the position of its primary subtag in the preference list (0 is the
- * best), or `NOT_PREFERRED` when it is not in the list. Used to order captions and the like; ties keep their order.
+ * best; by `matchLanguage`, so scripts are not mixed up), or `NOT_PREFERRED` when it is not in the list. Used to order captions and the like; ties keep their order.
  */
 export const languageRank = (tag: string | undefined, locale: string): number => {
-  const primary = (t: string) => t.toLowerCase().split('-')[0];
   if (!tag) return NOT_PREFERRED;
-  const i = preferredLanguages(locale).map(primary).indexOf(primary(tag));
+  const i = preferredLanguages(locale).findIndex((want) => matchLanguage(want, [tag]) !== undefined);
   return i < 0 ? NOT_PREFERRED : i;
 };
 
@@ -98,7 +97,8 @@ export const languagesOf = (resource: unknown): string[] => {
     if (l !== 'none' && !keys.has(l.toLowerCase())) keys.set(l.toLowerCase(), l);
   };
   const addTag = (l: unknown) => {
-    if (typeof l === 'string' && l.trim() && l.trim() !== 'none') tags.add(l.trim().toLowerCase());
+    // only what the menu and the lookups can use: a language tag (not "English" or "en_US")
+    if (typeof l === 'string' && isLanguageTag(l.trim())) tags.add(l.trim().toLowerCase());
   };
   const walk = (v: unknown, depth: number): void => {
     if (depth > 12 || visited++ > 200000) return;

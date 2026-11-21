@@ -157,16 +157,22 @@ describe('SceneDisplay with SpecificResource-wrapped models', () => {
     expect(store.get(selectedAnnotationIdAtom)).toBeNull();
   });
 
-  it('keeps the selected note when the same Scene is read again (a new content language) and the note still exists', () => {
+  it('a language switch in the mounted display keeps the selected note; leaving and returning to the Scene clears it', () => {
     const manifest = wrapped('https://example.org/wr4/m.json');
     const id = `${manifest.id}/scene/2`;
     const store = createStore();
     writeSceneState(store, id, tryPrepareShow(manifest, 'en', id));
     const note = store.get(annotationsAtom)[0].id;
     store.set(selectedAnnotationIdAtom, note);
-    writeSceneState(store, id, tryPrepareShow(manifest, 'fr,en', id));
+    // the same display reads the Scene again for a new content language
+    writeSceneState(store, id, tryPrepareShow(manifest, 'fr,en', id), true);
     expect(store.get(selectedAnnotationIdAtom)).toBe(note);
+    // a note that no longer exists is dropped
     store.set(selectedAnnotationIdAtom, 'gone');
+    writeSceneState(store, id, tryPrepareShow(manifest, 'en', id), true);
+    expect(store.get(selectedAnnotationIdAtom)).toBeNull();
+    // the reader went to a Canvas and came back: the store still has the Scene id, but this is a new display
+    store.set(selectedAnnotationIdAtom, note);
     writeSceneState(store, id, tryPrepareShow(manifest, 'en', id));
     expect(store.get(selectedAnnotationIdAtom)).toBeNull();
   });

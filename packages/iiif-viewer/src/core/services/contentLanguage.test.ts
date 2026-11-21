@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ManifestV4 } from '../types/iiif';
 import { aboutOf } from '../features/about';
 import { pickBodies } from '../features/annotationBody';
+import { storyBodies } from '../features/story';
 import { pickWikidataLabel, wikidataLabelUrl } from '../features/wikidataLabel';
 import { contentLanguageOfInput, contentLocale, languageRank, languagesOf, matchLanguage, primaryLanguage, uiLanguage } from './contentLanguage';
 import { labelIn } from './paintedModels';
@@ -165,5 +166,31 @@ describe('review fixes', () => {
     expect(matchLanguage('ZH-HANT', ['zh-Hans', 'zh-Hant'])).toBe('zh-Hant');
     // a body tag of another script is its own language
     expect(languagesOf({ type: 'Manifest', label: { 'zh-Hans': ['a'], en: ['b'] }, annotations: [{ items: [{ body: { value: 'x', language: 'zh-Hant' } }] }] })).toEqual(['zh-Hans', 'en', 'zh-hant']);
+  });
+
+  it('picks annotation bodies and story bodies by the same matching, never across scripts', () => {
+    const body = (language: string, value: string) => ({ kind: 'text', value, language, choice: 0 });
+    const hans = [body('zh-Hans', '简'), body('zh-Hant', '繁')] as never;
+    expect(pickBodies(hans, contentLocale('ja', 'zh-Hant'))[0]).toMatchObject({ value: '繁' });
+    expect(pickBodies(hans, contentLocale('ja', 'zh-Hans'))[0]).toMatchObject({ value: '简' });
+    const mixed = [body('ja', '日'), body('zh-Hans', '简')] as never;
+    expect(pickBodies(mixed, contentLocale('ja', 'zh-Hant'))[0]).toMatchObject({ value: '日' });
+    const steps = { bodies: [{ kind: 'text', value: '简', language: 'zh-Hans' }, { kind: 'text', value: '繁', language: 'zh-Hant' }] } as never;
+    expect(storyBodies(steps, contentLocale('ja', 'zh-Hant')).map((b) => b.value)).toEqual(['繁']);
+    expect(storyBodies({ bodies: [{ kind: 'text', value: '日', language: 'ja' }, { kind: 'text', value: '简', language: 'zh-Hans' }] } as never, contentLocale('ja', 'zh-Hant')).map((b) => b.value)).toEqual(['日']);
+  });
+
+  it('ranks captions and asks Wikidata by the same matching', () => {
+    const l = contentLocale('ja', 'zh-Hant');
+    expect(languageRank('zh-Hans', l)).toBeGreaterThan(1);
+    expect(languageRank('zh-Hant', l)).toBe(0);
+    expect(wikidataLabelUrl('Q1', l)).toContain('languages=zh-hant|ja|en&');
+    const json = { entities: { Q1: { labels: { 'zh-hans': { value: '简' }, ja: { value: '日' } } } } };
+    expect(pickWikidataLabel(json, 'Q1', l)).toBe('日');
+  });
+
+  it('lists only body tags that are language tags', () => {
+    const m = { type: 'Manifest', label: { en: ['a'] }, annotations: [{ items: [{ body: { value: 'x', language: 'English' } }, { body: { value: 'y', language: 'en_US' } }, { body: { value: 'z', language: 'fr' } }] }] };
+    expect(languagesOf(m)).toEqual(['en', 'fr']);
   });
 });
