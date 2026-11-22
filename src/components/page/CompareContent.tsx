@@ -182,6 +182,7 @@ const CompareContent: NextPage = () => {
   const [alignUrl, setAlignUrl] = useState<string | null>(null);
   const [alignment, setAlignment] = useState<Alignment | null>(null);
   const [aligned, setAligned] = useState(true);
+  const [sameScale, setSameScale] = useState(false);
   // after a source is added: B becomes its first image once it is read (index of the source)
   const pendingB = useRef<number | null>(null);
   // b= was given: keep it (otherwise two sources of the same size open at their first pair)
@@ -210,6 +211,7 @@ const CompareContent: NextPage = () => {
     if (bl && BLENDS.includes(bl)) setBlend(bl);
     setAlignUrl(params.get('align'));
     if (params.get('aligned') === '0') setAligned(false);
+    if (params.get('sameScale') === '1') setSameScale(true);
   }, [setManifestUrl]);
 
   useEffect(() => {
@@ -288,8 +290,9 @@ const CompareContent: NextPage = () => {
     keep('blend', !is3D && mode === 'overlay' && blend !== 'normal' ? blend : null);
     keep('align', alignUrl);
     keep('aligned', alignUrl && !aligned ? '0' : null);
+    keep('sameScale', !is3D && sameScale ? '1' : null);
     window.history.replaceState(null, '', `?${params.toString()}`);
-  }, [manifestUrl, srcs, pick, mode, is3D, canvasIndex, zoom, opacity, direction, blend, alignUrl, aligned]);
+  }, [manifestUrl, srcs, pick, mode, is3D, canvasIndex, zoom, opacity, direction, blend, alignUrl, aligned, sameScale]);
 
   const main = paintedModels[0];
   const options = useMemo(
@@ -394,6 +397,8 @@ const CompareContent: NextPage = () => {
     if (needMore) setShowSources(true);
   }, [needMore]);
 
+  const canSameScale = Boolean(!is3D && sides && sides[0].physdim && sides[1].physdim && !(alignment && aligned));
+
   return (
     <div className="flex flex-col h-dvh">
       <Suspense fallback={null}>
@@ -483,6 +488,12 @@ const CompareContent: NextPage = () => {
                     {aligned && alignB === undefined && <span className="text-xs text-[var(--ds-fg-muted)]">{t('alignNone')}</span>}
                   </label>
                 )}
+                {canSameScale && (
+                  <label className={labelClass}>
+                    <input type="checkbox" checked={sameScale} onChange={(e) => setSameScale(e.target.checked)} />
+                    {t('sameScale')}
+                  </label>
+                )}
                 {!is3D && shownMode === 'overlay' && (
                   <Segmented label={t('blend')} items={BLENDS} value={blend} onChange={setBlend} text={(b) => t(`blends.${b}`)} />
                 )}
@@ -549,6 +560,7 @@ const CompareContent: NextPage = () => {
                       swipeDirection={direction}
                       alignB={aligned ? alignB : undefined}
                       blend={blend}
+                      sameScale={canSameScale && sameScale}
                     />
                   )
                 )}

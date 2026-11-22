@@ -69,7 +69,8 @@
     "unsupportedContent": "This kind of content cannot be displayed",
     "containers": "Contents",
     "choice": "Choice",
-    "zoomHint": "Wheel to zoom, drag to move, double-click to reset"
+    "zoomHint": "Wheel to zoom, drag to move, double-click to reset",
+    "rotate": "Rotate"
   },
   "Transcript": {
     "loading": "Loading transcript...",

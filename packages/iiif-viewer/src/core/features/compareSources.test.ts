@@ -8,6 +8,7 @@ import {
   parseAlignment,
   warpAt,
   fitSide,
+  fitSidesPhysically,
   infoCandidateOf,
   isCollectionJson,
   isImageInfoJson,
@@ -83,6 +84,35 @@ describe('compareSources', () => {
     expect(fitted.layers[0].target).toEqual({ x: 100, y: 0, w: 200, h: 200 });
     // 同じ大きさなら、そのまま
     expect(fitSide(b, { width: 100, height: 100 })).toBe(b);
+  });
+
+  it('fitSidesPhysically: places two sides in a shared millimetre frame', () => {
+    const layer = { url: 'u', rotation: 0, mirror: false, annotations: [] };
+    const large: CompareSide = {
+      layers: [layer],
+      width: 1000,
+      height: 500,
+      physdim: { scale: 0.731, units: 'cm' }, // 7310 x 3655 mm
+    };
+    const small: CompareSide = {
+      layers: [layer],
+      width: 1000,
+      height: 500,
+      physdim: { scale: 0.968, units: 'mm' }, // 968 x 484 mm
+    };
+    const pair = fitSidesPhysically(large, small);
+    expect(pair).not.toBeNull();
+    const [a, b] = pair!;
+    expect(a.width).toBeCloseTo(7310, 5);
+    expect(a.height).toBeCloseTo(3655, 5);
+    expect(b.width).toBeCloseTo(7310, 5);
+    expect(b.height).toBeCloseTo(3655, 5);
+    expect(a.layers[0].target).toEqual({ x: 0, y: 0, w: 7310, h: 3655 });
+    expect(b.layers[0].target?.w).toBeCloseTo(968, 5);
+    expect(b.layers[0].target?.h).toBeCloseTo(484, 5);
+    expect(b.layers[0].target?.x).toBeCloseTo((7310 - 968) / 2, 5);
+    expect(b.layers[0].target?.y).toBeCloseTo((3655 - 484) / 2, 5);
+    expect(fitSidesPhysically(large, { layers: [layer], width: 100, height: 100 })).toBeNull();
   });
 
   it('compareDetailWidthOf: B の細かさを A の枠の幅に直して比べる', () => {

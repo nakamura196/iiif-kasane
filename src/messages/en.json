@@ -239,7 +239,8 @@
     "pairUp": "Pair by number",
     "align": "Align",
     "alignFailed": "(this pair could not be aligned)",
-    "alignNone": "(no alignment for this pair)"
+    "alignNone": "(no alignment for this pair)",
+    "sameScale": "Match physical scale"
   },
   "Samples": {
     "media": {

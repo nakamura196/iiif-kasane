@@ -17,12 +17,15 @@ import {
   type ImageRegion,
 } from './image';
 import { collectionEntriesOf, splitId } from './structure';
+import { physdimOf, unitFactor, type Physdim } from './physdim';
 
 /** One side of a comparison: the images drawn on a frame of this size. */
 export interface CompareSide {
   layers: ImageLayer[];
   width: number;
   height: number;
+  /** Physical dimensions of the Canvas, when advertised via IIIF physdim. */
+  physdim?: Physdim;
 }
 
 /** An image that can be put on either side, with the name shown in the A / B menus. */
@@ -98,9 +101,10 @@ export const candidatesOfManifest = (raw: unknown, locale: string, fallbackLabel
     const layers = chosenLayersOf(images.paintings.filter(paintsImage), () => 0);
     if (layers.length === 0 || !images.width || !images.height) return;
     const own = labelIn(canvas.label, locale) || String(i + 1);
+    const physdim = physdimOf(canvas);
     out.push({
       label: canvases.length > 1 ? `${manifestLabel} — ${own}` : manifestLabel || own,
-      side: { layers, width: images.width, height: images.height },
+      side: { layers, width: images.width, height: images.height, ...(physdim ? { physdim } : {}) },
       canvas: i,
     });
   });
@@ -130,6 +134,41 @@ export const fitSide = (side: CompareSide, frame: { width: number; height: numbe
     return { ...l, target: { x: ox + t.x * k, y: oy + t.y * k, w: t.w * k, h: t.h * k } };
   });
   return { layers, width: frame.width, height: frame.height };
+};
+
+const placeSideInFrame = (
+  side: CompareSide,
+  scale: number,
+  frameW: number,
+  frameH: number,
+): CompareSide => {
+  const w = side.width * scale;
+  const h = side.height * scale;
+  const ox = (frameW - w) / 2;
+  const oy = (frameH - h) / 2;
+  const layers = side.layers.map((l) => {
+    const t = l.target ?? { x: 0, y: 0, w: side.width, h: side.height };
+    return { ...l, target: { x: ox + t.x * scale, y: oy + t.y * scale, w: t.w * scale, h: t.h * scale } };
+  });
+  return { layers, width: frameW, height: frameH, physdim: { scale: 1, units: 'mm' } };
+};
+
+/**
+ * Place both sides into a shared frame in millimetres so their real-world sizes match.
+ * Returns null if either side has no physdim service.
+ */
+export const fitSidesPhysically = (
+  a: CompareSide,
+  b: CompareSide,
+): [CompareSide, CompareSide] | null => {
+  if (!a.physdim || !b.physdim) return null;
+  const aMm = a.physdim.scale * unitFactor(a.physdim.units, 'mm');
+  const bMm = b.physdim.scale * unitFactor(b.physdim.units, 'mm');
+  if (!(aMm > 0) || !(bMm > 0)) return null;
+  const frameW = Math.max(a.width * aMm, b.width * bMm);
+  const frameH = Math.max(a.height * aMm, b.height * bMm);
+  if (!(frameW > 0) || !(frameH > 0)) return null;
+  return [placeSideInFrame(a, aMm, frameW, frameH), placeSideInFrame(b, bMm, frameW, frameH)];
 };
 
 /** Width of the sharper of the two sides, in the frame's units (it decides how far one can zoom in). */
@@ -168,7 +207,7 @@ export const cropSide = (side: CompareSide, region: ImageRegion): CompareSide =>
     const regionSpec = `${r(src.x + (part.x - t.x) * kx)},${r(src.y + (part.y - t.y) * ky)},${r(part.w * kx)},${r(part.h * ky)}`;
     layers.push({ ...l, regionSpec, target: { x: part.x - region.x, y: part.y - region.y, w: part.w, h: part.h } });
   }
-  return { layers, width: region.w, height: region.h };
+  return { layers, width: region.w, height: region.h, ...(side.physdim ? { physdim: side.physdim } : {}) };
 };
 
 /**
@@ -193,7 +232,8 @@ export const curationCandidatesOf = (
       const images = canvasImagesOf(canvases[index]);
       const layers = chosenLayersOf(images.paintings.filter(paintsImage), () => 0);
       if (layers.length === 0 || !images.width || !images.height) continue;
-      const whole: CompareSide = { layers, width: images.width, height: images.height };
+      const physdim = physdimOf(canvases[index]);
+      const whole: CompareSide = { layers, width: images.width, height: images.height, ...(physdim ? { physdim } : {}) };
       const xywh = splitId(m.id).fragment.xywh;
       const side = xywh ? cropSide(whole, { x: xywh[0], y: xywh[1], w: xywh[2], h: xywh[3] }) : whole;
       const name = labelIn(m.label, locale) || String(n + 1);

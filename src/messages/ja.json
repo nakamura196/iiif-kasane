@@ -239,7 +239,8 @@
     "pairUp": "同じ番号どうしにする",
     "align": "位置を合わせる",
     "alignFailed": "（この組は合わせられませんでした）",
-    "alignNone": "（この組の位置合わせはありません）"
+    "alignNone": "（この組の位置合わせはありません）",
+    "sameScale": "同じ実寸縮尺で表示"
   },
   "Samples": {
     "media": {

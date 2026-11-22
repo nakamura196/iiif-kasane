@@ -6,6 +6,7 @@ import type { ContainerInfo, Xywh } from '../../core';
 import { useTranslations } from '../env';
 import { OVERLAYS } from '../overlays/registry';
 import { focusAtom } from '../internalState';
+import RotationControl from './RotationControl';
 
 const MIN = 0.2;
 const MAX = 20;
@@ -159,6 +160,8 @@ interface Props {
   onViewChange?: (view: ViewState) => void;
   /** Drawn over the stage, in box coordinates (e.g. a second stage cut by a clip-path). */
   over?: (stage: StageInfo) => ReactNode;
+  /** Show an arbitrary-angle rotation control at the bottom-right corner. */
+  showRotationControl?: boolean;
 }
 
 // 画像と同じ大きさの透明な層に、重ね表示（OVERLAYS）を載せる。
@@ -208,6 +211,7 @@ export default function ImageView({
   view: controlledView,
   onViewChange,
   over,
+  showRotationControl = false,
 }: Props) {
   const t = useTranslations('Viewer');
   const box = useRef<HTMLDivElement>(null);
@@ -383,6 +387,13 @@ export default function ImageView({
       {stageW > 0 && cw && ch && over?.(stage)}
       {stageW > 0 && cw && ch && container && (
         <OverlayLayer container={container} canvasWidth={cw} canvasHeight={ch} stage={stage} layer="box" />
+      )}
+      {showRotationControl && (
+        <RotationControl
+          degrees={view.rotation ?? 0}
+          onChange={(deg) => setView((v) => ({ ...v, rotation: deg }))}
+          label={t('rotate')}
+        />
       )}
     </div>
   );

@@ -6,6 +6,7 @@ import {
   canvasImagesOf,
   compareDetailWidthOf,
   fitSide,
+  fitSidesPhysically,
   rawCanvasOf,
   type AlignTransform,
   type CanvasImages,
@@ -87,6 +88,8 @@ export interface ImageCompareViewProps {
   alignB?: AlignTransform | null;
   /** Overlay: how B is laid over A (default `normal`: faded by `opacity`). */
   blend?: CompareBlend;
+  /** Place both sides at the same real-world scale when both have physdim. */
+  sameScale?: boolean;
   /**
    * Drawn over the picture in Canvas positions, on both sides (e.g. the annotation boxes of the Canvas
    * whose Choice is compared). Not drawn over B when B is moved by `alignB` (its positions are A's).
@@ -107,6 +110,7 @@ export default function ImageCompareView({
   swipeDirection = 'horizontal',
   alignB,
   blend = 'normal',
+  sameScale = false,
   extra,
   container,
 }: ImageCompareViewProps) {
@@ -115,11 +119,19 @@ export default function ImageCompareView({
   const [split, setSplit] = useState(50); // swipe line, % from the left
   const [lens, setLens] = useState<LensPoint | null>(null);
 
-  const { width, height } = sides[0];
-  // aligned: B in its own units, moved by the transform; otherwise fitted into A's frame
-  const b = useMemo(() => (alignB ? sides[1] : fitSide(sides[1], sides[0])), [sides, alignB]);
-  const layers = [sides[0].layers, b.layers];
-  const detail = compareDetailWidthOf(sides[0], b);
+  // Aligned: B in its own units, moved by the transform.
+  // Same physical scale: both sides placed in a shared millimetre frame.
+  // Otherwise: B fitted into A's frame.
+  const [a, b] = useMemo(() => {
+    if (!alignB && sameScale) {
+      const physical = fitSidesPhysically(sides[0], sides[1]);
+      if (physical) return physical;
+    }
+    return [sides[0], alignB ? sides[1] : fitSide(sides[1], sides[0])] as const;
+  }, [sides, alignB, sameScale]);
+  const { width, height } = a;
+  const layers = [a.layers, b.layers];
+  const detail = compareDetailWidthOf(a, b);
   const tint = mode === 'overlay' && blend === 'tint';
 
   if (!width || !height) return null;
@@ -196,6 +208,7 @@ export default function ImageCompareView({
               detailWidth={detail}
               view={view}
               onViewChange={setView}
+              showRotationControl={side === 1}
               extra={side === 0 || !alignB ? extra : undefined}
               container={container}
             >
@@ -249,6 +262,7 @@ export default function ImageCompareView({
         detailWidth={detail}
         view={view}
         onViewChange={setView}
+        showRotationControl
         over={over}
         extra={extra}
         container={container}

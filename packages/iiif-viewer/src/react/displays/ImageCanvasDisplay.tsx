@@ -229,6 +229,7 @@ function ImageBody({
             canvasHeight={height}
             detailWidth={detailWidthOf(items.map((it) => it.layer))}
             container={container}
+            showRotationControl
             extra={<AnnotationBoxes annotations={annotations} canvasWidth={width} canvasHeight={height} />}
             over={
               physdim

@@ -69,7 +69,8 @@
     "unsupportedContent": "この形式の内容は表示できません",
     "containers": "表示する内容",
     "choice": "選択肢",
-    "zoomHint": "ホイールで拡大縮小、ドラッグで移動、ダブルクリックでもとに戻す"
+    "zoomHint": "ホイールで拡大縮小、ドラッグで移動、ダブルクリックでもとに戻す",
+    "rotate": "回転"
   },
   "Transcript": {
     "loading": "文字起こしを読み込み中...",
