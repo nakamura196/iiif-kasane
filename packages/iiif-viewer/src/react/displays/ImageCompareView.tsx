@@ -139,7 +139,16 @@ export default function ImageCompareView({
   const warpLayer = alignB?.warp ? warpableLayer(b.layers) : undefined;
 
   const draw = (side: 0 | 1, stage: StageInfo) => {
-    const plain = <ImageLayers layers={layers[side]} canvasWidth={width} canvasHeight={height} stage={stage} />;
+    const layerKey = layers[side].map((l) => `${l.url}@${l.regionSpec ?? ''}`).join('|');
+    const plain = (
+      <ImageLayers
+        key={layerKey}
+        layers={layers[side]}
+        canvasWidth={width}
+        canvasHeight={height}
+        stage={stage}
+      />
+    );
     // the ink in a colour: grey picture, then the colour put on with `screen` (white stays white)
     const tinted = (node: ReactNode, box: { x: number; y: number; w: number; h: number }) =>
       tint ? (
