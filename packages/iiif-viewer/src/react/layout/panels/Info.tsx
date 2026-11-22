@@ -68,9 +68,8 @@ const Info = ({ tab, onTabChange, container, manifest, extraPanels, hiddenPanels
 
   return (
     <div className="h-full min-w-0 flex flex-col">
-      {/* tab headers */}
-      <div className="flex border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-        {/* the tabs scroll; the content language menu stays outside the scrolling row, always in view */}
+      {/* tab headers (pr-10 leaves room for SidePanel's floating close button) */}
+      <div className="flex pr-10 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
         <div className="flex flex-1 min-w-0 overflow-x-auto">
           {available.map((p) => (
             <button key={p.id} onClick={() => handleTabChange(p.id)} className={TAB_CLASS(active?.id === p.id)}>
@@ -78,8 +77,8 @@ const Info = ({ tab, onTabChange, container, manifest, extraPanels, hiddenPanels
             </button>
           ))}
         </div>
-        <ContentLanguageSelect resource={manifest} />
       </div>
+      <ContentLanguageSelect resource={manifest} />
 
       {/* tab content */}
       <div className="flex-1 overflow-auto bg-white dark:bg-gray-900">
